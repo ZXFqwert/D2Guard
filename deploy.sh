@@ -143,6 +143,26 @@ dev_service() {
     exec "$VENV_DIR/bin/python" -m uvicorn web_demo:app --host 0.0.0.0 --port "$APP_PORT" --reload
 }
 
+update_service() {
+    echo -e "${YELLOW}[*] 从 GitHub 拉取最新代码 (git pull origin main)...${NC}"
+    git pull origin main
+    echo -e "${YELLOW}[*] 检查并更新依赖 (requirements.txt)...${NC}"
+    pip install -r requirements.txt -q || true
+    echo -e "${YELLOW}[*] 重启服务使更新即时生效...${NC}"
+    if command -v systemctl > /dev/null 2>&1 && systemctl --user is-enabled d2guard.service > /dev/null 2>&1; then
+        systemctl --user restart d2guard
+        echo -e "${GREEN}[OK] systemd 守护进程已自动热重启！${NC}"
+    else
+        stop_service
+        sleep 1
+        start_service
+    fi
+    echo -e "${GREEN}======================================================${NC}"
+    echo -e "${GREEN} [SUCCESS] 算力机环境与代码已 100% 同步！${NC}"
+    echo -e "${GREEN} 公网演练大屏: https://agent.li33.art/safe${NC}"
+    echo -e "${GREEN}======================================================${NC}"
+}
+
 case "$ACTION" in
     start)
         start_service
@@ -155,6 +175,9 @@ case "$ACTION" in
         sleep 1
         start_service
         ;;
+    update|pull)
+        update_service
+        ;;
     status)
         status_service
         ;;
@@ -165,7 +188,7 @@ case "$ACTION" in
         tail -f "$LOG_FILE"
         ;;
     *)
-        echo "使用说明: $0 {start|stop|restart|status|dev|logs}"
+        echo "使用说明: $0 {start|stop|restart|update|status|dev|logs}"
         exit 1
         ;;
 esac

@@ -162,3 +162,38 @@ chmod +x deploy.sh
 ### 3. 公网域名访问配置 (https://agent.li33.art/safe)
 在 VPS（`10.33.0.1`）的 Nginx 中引入 `nginx_safe.conf` 配置，将 `/safe/` 请求反向代理到算力机 `10.33.0.30:8000/safe/`，即可直接通过公网访问。
 
+---
+
+## 六、 团队多端协同开发工作流（反重力 + Codex + 算力机）
+
+为保障团队多人高效开发，且**绝不中断正在对外开放的公网演示大屏**，请遵循以下开发规范：
+
+### 1. 核心协作架构
+* **单一事实来源 (Single Source of Truth)**：`https://github.com/ZXFqwert/D2Guard`
+* **环境完全对称**：
+  * **代码与前端**：本地与算力机完全一致；前端 `web_static/index.html` 内置动态自适应路径，在本地自动请求本地 API，在公网自动走 `/safe/api`，无需任何手工改动。
+  * **LLM API**：本地与算力机 `.env` 配置一致（共享 DeepSeek-v3.2 密钥与服务端点）。
+  * **核心依赖**：统一收敛在 `requirements.txt`。
+
+### 2. 模式 A：日常功能开发（反重力主力 ➔ GitHub ➔ 算力机热更）
+* **适用场景**：新增防御策略 DSL、增强 Hook/网关拦截逻辑、调整 ReAct Agent 业务、优化前端演练大屏。
+* **流程**：
+  1. 在本地让【反重力】改代码，并在本地浏览器（`http://127.0.0.1:8000/safe`）或单元测试中验证；
+  2. 验证无误后，本地 `git commit` 并 `git push origin main`；
+  3. 算力机执行一键更新命令：
+     ```bash
+     ./deploy.sh update
+     ```
+     （该脚本自动 `git pull`、增量安装新依赖，并通知 systemd 守护进程热重启，5 秒内公网生效）。
+
+### 3. 模式 B：GPU 重度任务（算力机 Codex ➔ GitHub ➔ 本地反重力同步）
+* **适用场景**：利用算力机 2×NVIDIA A100 80GB GPU 微调/训练【快镜】Laya 400M 模型、运行百轮全量对抗消融实验。
+* **流程**：
+  1. 通过 VS Code Remote-SSH（端口 6027，`roots@175.6.27.158` 或 Mesh `10.33.0.30`）连入算力机；
+  2. 启动 Codex 编写训练与评测脚本，调用 GPU 运行；
+  3. 算力机上测试通过后，执行：
+     ```bash
+     git add . && git commit -m "feat: 训练并评测新模型权重" && git push origin main
+     ```
+  4. 回到本地反重力会话，执行 `git pull`，本地环境立刻同步。
+
