@@ -1,0 +1,13 @@
+# Local credentials at the contest root and in future code directories.
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Dependency and local runtime output.
+node_modules/
+.venv/
+__pycache__/
+*.pyc
+runs/
+logs/

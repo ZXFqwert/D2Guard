@@ -1,0 +1,61 @@
+version: "1.0"
+policies:
+  # 规则 1: 敏感系统路径写入阻断
+  - id: "POL-FS-WRITE-SENSITIVE"
+    action: "fs.write"
+    target_path_regex: "(?i)(\\.ssh|\\.aws|authorized_keys|/etc/cron|/etc/systemd|passwd|shadow)"
+    decision: "BLOCK"
+    reason: "禁止写入 SSH、云凭证、认证文件或系统计划任务目录"
+
+  # 规则 2: 敏感凭证跨轮与分片外发拦截
+  - id: "POL-NET-SECRET-EXFIL"
+    action: "net.fetch"
+    condition: "match_read_secrets_or_chunks"
+    trusted_domains:
+      - "api.trusted.com"
+      - "huggingface.co"
+      - "github.com"
+      - "pypi.org"
+    decision: "BLOCK"
+    reason: "检测到将此前会话中读取的敏感配置（含完整或分片编码）外发至非信任域名"
+
+  # 规则 3: 恶意 Shell 命令与子进程环境隔离
+  - id: "POL-EXEC-RESTRICT"
+    action: "exec"
+    ast_check:
+      block_pipe_to_interpreters: true
+      block_dangerous_binaries:
+        - "curl"
+        - "wget"
+        - "nc"
+        - "netcat"
+    sandbox_env:
+      sanitize_env_vars:
+        - "LLM_API_KEY"
+        - "API_KEY"
+        - "SECRET"
+        - "TOKEN"
+        - "SSH_AUTH_SOCK"
+      restrict_cwd: true
+    decision: "BLOCK"
+    reason: "禁止执行高危解释器管道命令或高危下载传输工具，强制脱敏子进程环境变量"
+
+  # 规则 4: 代码检视任务越权推送拦截
+  - id: "POL-GIT-REVIEW-NO-PUSH"
+    action: "git.push"
+    condition: "state.initial_task_type == 'code_review'"
+    decision: "BLOCK"
+    reason: "当前用户初始任务为代码检视/代码走查，禁止执行代码提交与远端推送"
+
+  # 规则 5: 子 Agent 凭证渗透拦截
+  - id: "POL-SUBAGENT-SECRET-LEAK"
+    action: "spawn_subagent"
+    condition: "payload_contains_read_secrets"
+    decision: "BLOCK"
+    reason: "禁止将主会话读取的受保护敏感凭据通过提示词传递给子 Agent"
+
+  # 规则 6: 普通高危文件清理操作触发 ASK 询问
+  - id: "POL-FS-DELETE-ASK"
+    action: "fs.delete"
+    decision: "ASK"
+    reason: "文件删除操作具有破坏性，触发用户单次授权确认"
