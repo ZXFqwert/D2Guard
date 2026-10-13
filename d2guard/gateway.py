@@ -30,7 +30,7 @@ class ModelAPIGateway:
     ):
         self.core = core
         self.real_client = real_client or OpenAI(
-            api_key=os.getenv("LLM_API_KEY"),
+            api_key=os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or "mock-key",
             base_url=os.getenv("LLM_BASE_URL", "https://api.huiyan-ai.cn/v1")
         )
 
