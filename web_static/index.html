@@ -600,8 +600,10 @@
             document.getElementById("tab-" + tabId).classList.add("active");
         }
 
+        const apiBase = window.location.pathname.includes('/safe') ? '/safe/api' : '/api';
+
         async function resetAll() {
-            await fetch("/api/reset", { method: "POST" });
+            await fetch(`${apiBase}/reset`, { method: "POST" });
             document.getElementById("react-stream").innerHTML = `<div style="color:var(--text-muted); font-size:13px; text-align:center; margin-top:50px;">环境已重置，请点击【🚀 立即执行演练】开始</div>`;
             updateCanaryUI({ is_leaked: false, captured_count: 0, requests: [] });
         }
@@ -612,7 +614,7 @@
             stream.innerHTML = `<div style="color:var(--accent-blue); font-size:13px; text-align:center; margin-top:50px;">🔄 智能体正在执行 ReAct 闭环循环 (思考 -> 动作 -> 观察)...</div>`;
 
             try {
-                const res = await fetch("/api/run", {
+                const res = await fetch(`${apiBase}/run`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({

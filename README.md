@@ -127,6 +127,38 @@ pip install laya
 │   └── tools/                    # 受控工具集 (fs, net, exec, git, mcp)
 ├── policies/                     # 安全策略配置目录 (YAML)
 │   └── default_policy.yaml
-├── benchmarks/                   # 12 类典型场景与 7 类对抗测试集
-└── run_eval.py                   # 自动化攻防对比与消融评测套件
+├── web_demo.py                   # 智能体攻防演练舱 FastAPI 后端
+├── web_static/                   # 演练舱前端大屏 (ReAct 流 / DAG / 双镜监控)
+│   └── index.html
+├── deploy.sh                     # 算力机与 Linux 服务器一键部署运维脚本
+├── nginx_safe.conf               # VPS (10.33.0.1) 反向代理配置参考
+└── requirements.txt              # 核心依赖清单
 ```
+
+---
+
+## 五、 Web 演练舱启动与部署
+
+系统配备了面向导师与评审汇报的**“智能体攻防对抗实时演练舱”**（支持【未防护裸跑】与【D²Guard 护航】一键同屏对比）：
+
+### 1. 本地快速启动
+```bash
+pip install -r requirements.txt
+python -m uvicorn web_demo:app --host 0.0.0.0 --port 8000
+```
+浏览器访问：`http://127.0.0.1:8000/safe`
+
+### 2. 算力机一键部署 (10.33.0.30)
+```bash
+git clone https://github.com/ZXFqwert/D2Guard.git
+cd D2Guard
+chmod +x deploy.sh
+./deploy.sh start
+```
+* **状态查看**：`./deploy.sh status`
+* **实时日志**：`./deploy.sh logs`
+* **停止服务**：`./deploy.sh stop`
+
+### 3. 公网域名访问配置 (https://agent.li33.art/safe)
+在 VPS（`10.33.0.1`）的 Nginx 中引入 `nginx_safe.conf` 配置，将 `/safe/` 请求反向代理到算力机 `10.33.0.30:8000/safe/`，即可直接通过公网访问。
+

@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 load_dotenv()
 
-from fastapi import FastAPI
+from fastapi import FastAPI, APIRouter
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -30,6 +30,7 @@ from d2guard.hook import ToolHook
 from d2guard.gateway import ModelAPIGateway
 
 app = FastAPI(title="双镜 D²Guard 演练舱")
+router = APIRouter()
 
 app.add_middleware(
     CORSMiddleware,
@@ -50,7 +51,7 @@ class RunRequest(BaseModel):
     task_type: str = "general"
 
 
-@app.get("/api/canary_status")
+@router.get("/api/canary_status")
 def get_canary_status():
     """获取外部数据外泄接收端状态"""
     canary_key = "sk-8f92b7194a0283c8172901a8f93e2b10"
@@ -63,7 +64,7 @@ def get_canary_status():
     }
 
 
-@app.post("/api/reset")
+@router.post("/api/reset")
 def reset_environment():
     """重置测试环境与接收端"""
     global GLOBAL_CORE, GLOBAL_HOOK
@@ -383,7 +384,7 @@ def build_scenario_react_trajectory(scenario_id: str, mode: str, core: Optional[
     return {"rounds": rounds, "final_reply": final_reply}
 
 
-@app.post("/api/run")
+@router.post("/api/run")
 def run_simulation(req: RunRequest):
     """执行攻防演示"""
     global GLOBAL_CORE, GLOBAL_HOOK
@@ -508,7 +509,13 @@ def run_simulation(req: RunRequest):
     }
 
 
+app.include_router(router)
+app.include_router(router, prefix="/safe")
+
+
 @app.get("/", response_class=HTMLResponse)
+@app.get("/safe", response_class=HTMLResponse)
+@app.get("/safe/", response_class=HTMLResponse)
 def index_page():
     """返回一体化交互大屏前端页面"""
     html_path = os.path.join(os.path.dirname(__file__), "web_static", "index.html")
@@ -520,4 +527,4 @@ def index_page():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("web_demo:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("web_demo:app", host="0.0.0.0", port=8000, reload=True)
