@@ -6,7 +6,8 @@
 2. 调度三大接口：extract(event) -> update_state(state, extracted) -> decide(state, proposed_action)；
 3. 处理网关上报的 Prompt 与候选调用；
 4. 处理 Hook 上报的工具预执行裁决与后执行状态回填；
-5. 管理 ASK 机制的一次性审批令牌。
+5. 管理 ASK 机制的一次性审批令牌；
+6. 支持消融实验配置 (enable_state_aggregation) 与多 LLM 提供方配置。
 """
 
 from __future__ import annotations
@@ -26,6 +27,7 @@ from .models import (
     SecurityState,
     VerdictType,
 )
+from .slow_mirror import SlowMirror
 from .state_aggregator import StateAggregator
 
 
@@ -37,17 +39,26 @@ class D2GuardCore:
         session_id: str = "default_session",
         initial_task: str = "默认任务",
         initial_task_type: str = "general",
-        log_dir: Optional[str] = None
+        log_dir: Optional[str] = None,
+        enable_state_aggregation: bool = True,
+        slow_mirror_provider: Optional[str] = None
     ):
         self.session_id = session_id
         self.log_dir = log_dir or os.path.join(os.path.dirname(__file__), "..", "logs")
         os.makedirs(self.log_dir, exist_ok=True)
         self.event_log_path = os.path.join(self.log_dir, f"events_{session_id}.jsonl")
+        self.enable_state_aggregation = enable_state_aggregation
+
+        # 慢镜裁判
+        self.slow_mirror = SlowMirror(provider=slow_mirror_provider)
 
         # 核心三大接口实例
         self.extractor = EventExtractor()
         self.aggregator = StateAggregator()
-        self.decision_engine = PolicyDecisionEngine()
+        self.decision_engine = PolicyDecisionEngine(
+            slow_mirror=self.slow_mirror,
+            enable_state_aggregation=enable_state_aggregation
+        )
 
         # 初始化安全状态
         self.state = self.aggregator.create_initial_state(
@@ -108,7 +119,10 @@ class D2GuardCore:
             }
 
         # 更新状态 (MODEL_PROPOSED 不污染敏感数据薄)
-        self.state = self.aggregator.update_state(self.state, extracted, event)
+        self.state = self.aggregator.update_state(
+            self.state, extracted, event,
+            enable_aggregation=self.enable_state_aggregation
+        )
         return {"action": "PASS"}
 
     def handle_hook_pre_exec(
@@ -153,7 +167,10 @@ class D2GuardCore:
 
         # 抽取并更新状态机
         extracted = self.extractor.extract(event, initial_task=self.state.initial_task)
-        self.state = self.aggregator.update_state(self.state, extracted, event)
+        self.state = self.aggregator.update_state(
+            self.state, extracted, event,
+            enable_aggregation=self.enable_state_aggregation
+        )
 
     def approve_token(self, token_id: str) -> bool:
         """用户人工批准单次操作令牌"""

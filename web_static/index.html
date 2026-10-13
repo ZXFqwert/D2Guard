@@ -411,14 +411,24 @@
             <span class="badge-contest">“华为杯”第五届中国研究生网络安全创新大赛 · 揭榜赛题5</span>
         </div>
 
-        <!-- 模式切换开关 -->
-        <div class="mode-switch">
-            <button id="btn-mode-unprotected" class="mode-btn unprotected" onclick="setMode('unprotected')">
-                🔴 裸智能体 (无防护基线)
-            </button>
-            <button id="btn-mode-protected" class="mode-btn protected active" onclick="setMode('protected')">
-                🟢 双镜 D²Guard (开启防护)
-            </button>
+        <!-- 模型与模式切换开关组 -->
+        <div style="display: flex; align-items: center; gap: 14px;">
+            <div style="display: flex; align-items: center; gap: 6px; background: #090d16; border: 1px solid var(--border-color); border-radius: 20px; padding: 4px 10px;">
+                <span style="font-size: 12px; color: var(--text-muted);">🧠 决策模型:</span>
+                <select id="llm-provider-select" onchange="onLlmProviderChange()" style="background: transparent; color: #38bdf8; border: none; font-size: 12px; font-weight: 600; outline: none; cursor: pointer;">
+                    <option value="deepseek" style="background: #0f172a; color: #fff;">DeepSeek-v3.2 (商用 API)</option>
+                    <option value="gpu1" style="background: #0f172a; color: #fff;">Huihui-Qwen3.8-27B (算力机 GPU1)</option>
+                </select>
+            </div>
+
+            <div class="mode-switch">
+                <button id="btn-mode-unprotected" class="mode-btn unprotected" onclick="setMode('unprotected')">
+                    🔴 裸智能体 (无防护基线)
+                </button>
+                <button id="btn-mode-protected" class="mode-btn protected active" onclick="setMode('protected')">
+                    🟢 双镜 D²Guard (开启防护)
+                </button>
+            </div>
         </div>
     </header>
 
@@ -608,6 +618,12 @@
             updateCanaryUI({ is_leaked: false, captured_count: 0, requests: [] });
         }
 
+        let currentLlmProvider = "deepseek";
+
+        function onLlmProviderChange() {
+            currentLlmProvider = document.getElementById("llm-provider-select").value;
+        }
+
         async function runAttack() {
             const prompt = document.getElementById("prompt-input").value;
             const stream = document.getElementById("react-stream");
@@ -620,7 +636,8 @@
                     body: JSON.stringify({
                         prompt: prompt,
                         mode: currentMode,
-                        scenario_id: currentScenario
+                        scenario_id: currentScenario,
+                        llm_provider: currentLlmProvider
                     })
                 });
                 const data = await res.json();
@@ -741,7 +758,8 @@
 
             const slow = dm.slow_mirror || {};
             const verdictEl = document.getElementById("slow-verdict");
-            verdictEl.innerText = slow.verdict || "NOT_INVOKED";
+            const modelTag = slow.model_used ? ` [${slow.model_used}]` : "";
+            verdictEl.innerText = (slow.verdict || "NOT_INVOKED") + modelTag;
             verdictEl.style.color = slow.verdict === "BLOCK" ? "#ef4444" : "#10b981";
             document.getElementById("slow-reason").innerText = slow.reason || "-";
         }

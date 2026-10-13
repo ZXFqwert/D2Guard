@@ -39,10 +39,11 @@ def exec_cmd(
             cwd=working_dir,
             env=env,
             capture_output=True,
-            text=True,
             timeout=timeout
         )
-        output = res.stdout if res.returncode == 0 else f"{res.stdout}\n[错误输出] {res.stderr}"
+        stdout = res.stdout.decode('utf-8', errors='replace') if res.stdout else ""
+        stderr = res.stderr.decode('utf-8', errors='replace') if res.stderr else ""
+        output = stdout if res.returncode == 0 else f"{stdout}\n[错误输出] {stderr}"
         return output.strip() or "[命令执行成功，无标准输出]"
     except subprocess.TimeoutExpired:
         return "[错误] 命令执行超时"

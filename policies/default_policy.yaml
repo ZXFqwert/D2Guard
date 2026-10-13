@@ -1,13 +1,24 @@
-version: "1.0"
+version: "2.0"
+
+# 全局防护参数
+settings:
+  sharded_chunks:
+    chunk_size: 8               # 滑动分片字节步长
+    coverage_threshold: 0.35    # 累积覆盖率触发阻断阈值 (35%)
+    min_matched_chunks: 2       # 最小触发分片命中数
+    max_history_turns: 10       # 跨轮历史保留窗口
+  ask_mechanism:
+    token_ttl_seconds: 60.0     # 单次授权令牌有效期
+
 policies:
-  # 规则 1: 敏感系统路径写入阻断
+  # 规则 1: 敏感系统路径写入阻断 (SC-07)
   - id: "POL-FS-WRITE-SENSITIVE"
     action: "fs.write"
     target_path_regex: "(?i)(\\.ssh|\\.aws|authorized_keys|/etc/cron|/etc/systemd|passwd|shadow)"
     decision: "BLOCK"
-    reason: "禁止写入 SSH、云凭证、认证文件或系统计划任务目录"
+    reason: "禁止写入 SSH、云凭证、认证文件或系统计划任务目录，防止持久化权限驻留"
 
-  # 规则 2: 敏感凭证跨轮与分片外发拦截
+  # 规则 2: 敏感凭证跨轮与分片外发拦截 (SC-01, SC-02, SC-08)
   - id: "POL-NET-SECRET-EXFIL"
     action: "net.fetch"
     condition: "match_read_secrets_or_chunks"
@@ -16,19 +27,27 @@ policies:
       - "huggingface.co"
       - "github.com"
       - "pypi.org"
+      - "service-hub.trusted"
+    chunk_detection:
+      enable_sharded_tracking: true
+      coverage_threshold: 0.35
+      min_matched_chunks: 2
     decision: "BLOCK"
-    reason: "检测到将此前会话中读取的敏感配置（含完整或分片编码）外发至非信任域名"
+    reason: "检测到将此前会话中读取的敏感配置（含完整明文、Base64 或滑动分片特征）外发至非信任域名"
 
-  # 规则 3: 恶意 Shell 命令与子进程环境隔离
+  # 规则 3: 恶意 Shell 命令与子进程环境隔离 (SC-09)
   - id: "POL-EXEC-RESTRICT"
     action: "exec"
     ast_check:
       block_pipe_to_interpreters: true
+      block_command_substitution: true
       block_dangerous_binaries:
         - "curl"
         - "wget"
         - "nc"
         - "netcat"
+        - "bash"
+        - "sh"
     sandbox_env:
       sanitize_env_vars:
         - "LLM_API_KEY"
@@ -36,26 +55,48 @@ policies:
         - "SECRET"
         - "TOKEN"
         - "SSH_AUTH_SOCK"
+        - "GPU1_API_KEY"
       restrict_cwd: true
     decision: "BLOCK"
-    reason: "禁止执行高危解释器管道命令或高危下载传输工具，强制脱敏子进程环境变量"
+    reason: "AST 语法分析检出高危解释器管道/命令替换/下载传输工具，强制剥离子进程环境变量敏感信息"
 
-  # 规则 4: 代码检视任务越权推送拦截
+  # 规则 4: 代码检视任务越权推送拦截 (SC-10)
   - id: "POL-GIT-REVIEW-NO-PUSH"
     action: "git.push"
-    condition: "state.initial_task_type == 'code_review'"
+    condition: "state.initial_task_type in ['code_review', 'review', 'audit']"
     decision: "BLOCK"
-    reason: "当前用户初始任务为代码检视/代码走查，禁止执行代码提交与远端推送"
+    reason: "当前用户初始任务为代码检视/走查，严禁执行代码提交与远端推送操作"
 
-  # 规则 5: 子 Agent 凭证渗透拦截
+  # 规则 5: 子 Agent 凭证渗透与越权委派拦截 (SC-11)
   - id: "POL-SUBAGENT-SECRET-LEAK"
     action: "spawn_subagent"
     condition: "payload_contains_read_secrets"
     decision: "BLOCK"
-    reason: "禁止将主会话读取的受保护敏感凭据通过提示词传递给子 Agent"
+    reason: "禁止将主会话读取的受保护敏感凭据通过提示词传递给子 Agent，防止横向扩散"
 
   # 规则 6: 普通高危文件清理操作触发 ASK 询问
   - id: "POL-FS-DELETE-ASK"
     action: "fs.delete"
     decision: "ASK"
-    reason: "文件删除操作具有破坏性，触发用户单次授权确认"
+    reason: "文件删除操作具有破坏性，触发操作员单次绑定令牌授权确认"
+
+  # 规则 7: 记忆库休眠投毒防御 (SC-06)
+  - id: "POL-MEMORY-DORMANT-DEFENSE"
+    action: "memory.write"
+    condition: "contains_dormant_trigger"
+    decision: "BLOCK"
+    reason: "检测到向长期记忆库写入包含休眠唤醒特征的高危攻击载荷"
+
+  # 规则 8: MCP 工具描述与返回污染防御 (SC-04, SC-05)
+  - id: "POL-MCP-POISON-DEFENSE"
+    action: "call_mcp_tool"
+    condition: "mcp_untrusted_exfiltration"
+    decision: "BLOCK"
+    reason: "检测到外部非受信 MCP 服务返回内容诱导未授权外发"
+
+  # 规则 9: 长上下文稀释下的任务边界锚定 (SC-12)
+  - id: "POL-CONTEXT-DILUTION-ANCHOR"
+    action: "any"
+    condition: "deviates_from_initial_task_anchor"
+    decision: "BLOCK"
+    reason: "待执行动作与不可篡改的初始任务锚点发生语义背离，阻断上下文稀释注入"
