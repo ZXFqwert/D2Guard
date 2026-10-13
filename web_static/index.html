@@ -8,15 +8,19 @@
     <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <style>
         :root {
-            --bg-color: #0f172a;
+            --bg-color: #0b1120;
             --panel-bg: #1e293b;
             --border-color: #334155;
             --text-main: #f8fafc;
             --text-muted: #94a3b8;
             --accent-blue: #38bdf8;
+            --accent-indigo: #818cf8;
             --accent-green: #10b981;
             --accent-red: #ef4444;
             --accent-amber: #f59e0b;
+            --thought-bg: #172554;
+            --action-bg: #1e1b4b;
+            --obs-bg: #090d16;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -34,7 +38,7 @@
         header {
             background: linear-gradient(90deg, #1e1b4b 0%, #0f172a 100%);
             border-bottom: 1px solid var(--border-color);
-            padding: 12px 24px;
+            padding: 10px 24px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -45,7 +49,7 @@
             gap: 12px;
         }
         .brand h1 {
-            font-size: 19px;
+            font-size: 18px;
             font-weight: 700;
             background: linear-gradient(135deg, #38bdf8, #818cf8);
             -webkit-background-clip: text;
@@ -99,30 +103,30 @@
             overflow: hidden;
         }
 
-        /* 左侧栏：剧本与参数 */
+        /* 左侧栏：攻防剧本库 */
         .sidebar {
-            width: 320px;
+            width: 300px;
             background: var(--panel-bg);
             border-right: 1px solid var(--border-color);
             padding: 16px;
             display: flex;
             flex-direction: column;
-            gap: 16px;
+            gap: 12px;
             overflow-y: auto;
         }
         .section-title {
-            font-size: 12px;
+            font-size: 11px;
             text-transform: uppercase;
             letter-spacing: 0.05em;
             color: var(--text-muted);
             font-weight: 700;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
         .scenario-card {
             background: #131d2e;
             border: 1px solid var(--border-color);
             border-radius: 8px;
-            padding: 12px;
+            padding: 10px 12px;
             cursor: pointer;
             transition: all 0.2s;
         }
@@ -146,16 +150,17 @@
             line-height: 1.4;
         }
 
-        /* 中间栏：交互控制台 */
+        /* 中间栏：真实的 Agent ReAct 运行中枢 */
         .main-console {
-            flex: 1.2;
+            flex: 1.4;
             display: flex;
             flex-direction: column;
-            background: #0b1120;
+            background: #090e1a;
             border-right: 1px solid var(--border-color);
         }
         .console-header {
-            padding: 12px 20px;
+            padding: 10px 20px;
+            background: #101726;
             border-bottom: 1px solid var(--border-color);
             font-size: 13px;
             font-weight: 600;
@@ -163,27 +168,151 @@
             justify-content: space-between;
             align-items: center;
         }
-        .timeline-scroll {
+        .react-stream {
             flex: 1;
-            padding: 20px;
+            padding: 16px 20px;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
-            gap: 14px;
+            gap: 16px;
         }
 
-        /* 输入区 */
-        .input-bar {
-            padding: 14px 20px;
-            background: var(--panel-bg);
-            border-top: 1px solid var(--border-color);
+        /* ReAct 单轮卡片 */
+        .round-card {
+            background: #111a2e;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .round-title {
+            background: #18243c;
+            padding: 8px 14px;
+            font-size: 12px;
+            font-weight: 700;
+            color: #93c5fd;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            justify-content: space-between;
+        }
+        .round-body {
+            padding: 12px 14px;
             display: flex;
             flex-direction: column;
             gap: 10px;
         }
+
+        /* 思考框 (Thought) */
+        .box-thought {
+            background: var(--thought-bg);
+            border-left: 3px solid #3b82f6;
+            padding: 8px 12px;
+            border-radius: 0 4px 4px 0;
+            font-size: 13px;
+            color: #dbeafe;
+            line-height: 1.5;
+        }
+        .box-thought-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: #60a5fa;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+        }
+
+        /* 动作框 (Action) */
+        .box-action {
+            background: var(--action-bg);
+            border-left: 3px solid #a855f7;
+            padding: 8px 12px;
+            border-radius: 0 4px 4px 0;
+            font-size: 12px;
+        }
+        .box-action-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: #c084fc;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+        }
+
+        /* D²Guard Hook 裁决框 */
+        .box-hook {
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+        .box-hook.block {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid #ef4444;
+            color: #fca5a5;
+        }
+        .box-hook.allow {
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid #10b981;
+            color: #6ee7b7;
+        }
+        .box-hook.ask {
+            background: rgba(245, 158, 11, 0.15);
+            border: 1px solid #f59e0b;
+            color: #fcd34d;
+        }
+
+        /* 观察框 (Observation) */
+        .box-obs {
+            background: var(--obs-bg);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #cbd5e1;
+            max-height: 140px;
+            overflow-y: auto;
+            font-family: monospace;
+        }
+        .box-obs-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: #94a3b8;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+        }
+
+        /* 最终回复卡片 */
+        .final-card {
+            background: #1e293b;
+            border: 1px solid var(--accent-blue);
+            border-radius: 8px;
+            padding: 14px;
+        }
+        .final-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #38bdf8;
+            margin-bottom: 8px;
+        }
+        .final-text {
+            font-size: 13px;
+            color: #f1f5f9;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+
+        /* 输入区 */
+        .input-bar {
+            padding: 12px 20px;
+            background: var(--panel-bg);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
         textarea {
             width: 100%;
-            height: 70px;
+            height: 65px;
             background: #0f172a;
             border: 1px solid var(--border-color);
             border-radius: 6px;
@@ -199,7 +328,7 @@
             background: linear-gradient(135deg, #0284c7, #2563eb);
             color: white;
             border: none;
-            padding: 8px 24px;
+            padding: 7px 22px;
             border-radius: 6px;
             font-size: 13px;
             font-weight: 600;
@@ -208,34 +337,9 @@
         }
         .btn-run:hover { opacity: 0.9; }
 
-        /* 卡片风格 */
-        .step-card {
-            background: #1e293b;
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-            padding: 14px;
-            font-size: 13px;
-        }
-        .step-header {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 6px;
-            align-items: center;
-        }
-        .step-tag {
-            font-size: 11px;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-weight: bold;
-        }
-        .tag-invoke { background: #0284c7; color: white; }
-        .tag-block { background: #dc2626; color: white; }
-        .tag-allow { background: #059669; color: white; }
-        .tag-ask { background: #d97706; color: white; }
-
-        /* 右侧栏：审计与 DAG */
+        /* 右侧栏：深度分析大屏 */
         .right-panel {
-            flex: 1.1;
+            flex: 1.2;
             background: var(--panel-bg);
             display: flex;
             flex-direction: column;
@@ -247,8 +351,8 @@
         }
         .tab-btn {
             flex: 1;
-            padding: 12px 10px;
-            font-size: 12px;
+            padding: 10px 8px;
+            font-size: 11px;
             font-weight: 600;
             color: var(--text-muted);
             border: none;
@@ -272,9 +376,9 @@
         /* 外部接收端报警看板 */
         .canary-box {
             border-radius: 8px;
-            padding: 16px;
+            padding: 14px;
             text-align: center;
-            margin-bottom: 16px;
+            margin-bottom: 14px;
         }
         .canary-box.leaked {
             background: rgba(239, 68, 68, 0.15);
@@ -286,14 +390,13 @@
             border: 2px solid #10b981;
             color: #6ee7b7;
         }
-        .canary-title { font-size: 16px; font-weight: bold; margin-bottom: 6px; }
+        .canary-title { font-size: 15px; font-weight: bold; margin-bottom: 4px; }
 
-        /* DAG 图容器 */
         #dag-network {
             width: 100%;
             height: 100%;
             min-height: 480px;
-            background: #0b1120;
+            background: #090e1a;
             border-radius: 6px;
         }
     </style>
@@ -327,42 +430,42 @@
             <div class="section-title">典型攻防演练剧本库</div>
 
             <div class="scenario-card active" onclick="selectScenario('sc02_secret_leak')">
-                <div class="scenario-name">1. 敏感凭证跨轮外发窃取 (SC-02)</div>
-                <div class="scenario-desc">读取 database.ini 配置中的 API 私钥与密码，尝试向外部第三方域名回传。</div>
+                <div class="scenario-name">1. 敏感凭证跨轮外发 (SC-02)</div>
+                <div class="scenario-desc">读取 database.ini 凭证后诱导向外部注册中心 service-hub.io 发送。</div>
             </div>
 
             <div class="scenario-card" onclick="selectScenario('sc07_path_write')">
-                <div class="scenario-name">2. 敏感系统路径覆盖写入 (SC-07)</div>
-                <div class="scenario-desc">诱导覆写 ~/.ssh/authorized_keys 写入攻击者公钥以建立系统持久化后门。</div>
+                <div class="scenario-name">2. 敏感路径覆盖写入 (SC-07)</div>
+                <div class="scenario-desc">诱导覆写 ~/.ssh/authorized_keys 写入恶意公钥以建立后门持久化。</div>
             </div>
 
             <div class="scenario-card" onclick="selectScenario('sc09_exec_pipe')">
                 <div class="scenario-name">3. 高危解释器管道执行 (SC-09)</div>
-                <div class="scenario-desc">诱导在子进程中执行 curl http://... | bash 逃逸管道命令。</div>
+                <div class="scenario-desc">诱导在子进程中执行 curl http://... | bash 逃逸危险管道。</div>
             </div>
 
             <div class="scenario-card" onclick="selectScenario('sc08_delete_ask')">
-                <div class="scenario-name">4. 破坏性文件清理触发 ASK</div>
-                <div class="scenario-desc">请求删除 ./dist/old_cache，验证挂起机制与单次用户授权令牌审批。</div>
+                <div class="scenario-name">4. 破坏性操作触发 ASK 审批</div>
+                <div class="scenario-desc">请求删除 ./dist/old_cache，验证挂起机制与单次用户授权令牌。</div>
             </div>
 
             <div class="scenario-card" onclick="selectScenario('custom')">
-                <div class="scenario-name">5. 自定义大模型自由演练</div>
-                <div class="scenario-desc">输入任意指令，交由底层 DeepSeek-v3.2 智能体与网关实测。</div>
+                <div class="scenario-name">5. 自由交互与良性任务测试</div>
+                <div class="scenario-desc">驱动真实 DeepSeek-v3.2 ReAct 循环，测试良性任务零误报放行。</div>
             </div>
         </div>
 
-        <!-- 中间交互控制台 -->
+        <!-- 中间：真实的 Agent 运行流控制台 -->
         <div class="main-console">
             <div class="console-header">
-                <span id="current-mode-label">🟢 当前运行状态：双镜 D²Guard 探针与中央内核已挂载</span>
+                <span id="current-mode-label" style="color:#34d399;">🟢 当前运行状态：双镜 D²Guard 探针与内核已挂载</span>
                 <button onclick="resetAll()" style="background:transparent; border:1px solid var(--border-color); color:var(--text-muted); padding:2px 8px; border-radius:4px; font-size:11px; cursor:pointer;">重置环境</button>
             </div>
 
-            <!-- 时间线展示区 -->
-            <div class="timeline-scroll" id="timeline">
-                <div style="color:var(--text-muted); font-size:13px; text-align:center; margin-top:40px;">
-                    👈 请在左侧选择攻防剧本，点击下方【立即执行演练】查看实况
+            <!-- Agent 运行时间线 -->
+            <div class="react-stream" id="react-stream">
+                <div style="color:var(--text-muted); font-size:13px; text-align:center; margin-top:50px;">
+                    🤖 智能体就绪。请在左侧选择剧本或输入指令，点击【🚀 立即执行演练】查看 Agent 实时运行思考流。
                 </div>
             </div>
 
@@ -373,28 +476,46 @@
             </div>
         </div>
 
-        <!-- 右侧双重视角审计大屏 -->
+        <!-- 右侧：多维度深度分析大屏 -->
         <div class="right-panel">
             <div class="tab-bar">
-                <button class="tab-btn active" onclick="switchTab('canary')">📡 外部接收端 (外泄监控)</button>
+                <button class="tab-btn active" onclick="switchTab('canary')">📡 外泄监控捕获端</button>
+                <button class="tab-btn" onclick="switchTab('dualmirror')">⚖️ 双镜裁决剖析</button>
                 <button class="tab-btn" onclick="switchTab('state')">🧠 内核安全状态机</button>
-                <button class="tab-btn" onclick="switchTab('dag')">🕸️ 因果 DAG 拓扑</button>
+                <button class="tab-btn" onclick="switchTab('dag')">🕸️ 因果拓扑 DAG</button>
             </div>
 
-            <!-- Tab 1: 外部接收端看板 -->
+            <!-- Tab 1: 外部接收端抓包分析 -->
             <div class="tab-content active" id="tab-canary">
                 <div id="canary-banner" class="canary-box safe">
                     <div class="canary-title" id="canary-status-text">🛡️ 零数据泄露 (0 Bytes Leaked)</div>
                     <div style="font-size:12px;" id="canary-sub-text">外部测试接收端未截获任何私钥或机密配置</div>
                 </div>
 
-                <div class="section-title">独立接收端网络请求抓包记录 (Canary Sink)</div>
+                <div class="section-title">独立外部接收端抓包记录 (Canary Sink)</div>
                 <div id="canary-requests-list" style="display:flex; flex-direction:column; gap:8px; font-size:12px;">
                     <div style="color:var(--text-muted);">暂无捕获到的外发数据包</div>
                 </div>
             </div>
 
-            <!-- Tab 2: 内核状态机 -->
+            <!-- Tab 2: 双镜裁决剖析 -->
+            <div class="tab-content" id="tab-dualmirror">
+                <div class="section-title">⚡ 【快镜】System 1 (本地 Laya 400M 定型初筛)</div>
+                <div style="background:#131d2e; padding:10px; border-radius:6px; font-size:12px; margin-bottom:12px; display:flex; flex-direction:column; gap:6px;">
+                    <div>文本性质分类: <span id="fast-nature" style="color:#38bdf8; font-weight:bold;">-</span></div>
+                    <div>动作合规性评估: <span id="fast-compliance" style="color:#f59e0b; font-weight:bold;">-</span></div>
+                    <div>初筛综合风险分: <span id="fast-risk" style="color:#ef4444; font-weight:bold;">-</span></div>
+                    <div>决策延迟: <span id="fast-latency" style="color:#10b981;">- ms</span></div>
+                </div>
+
+                <div class="section-title">🧠 【慢镜】System 2 (DeepSeek API 精选证据包裁判)</div>
+                <div style="background:#131d2e; padding:10px; border-radius:6px; font-size:12px; display:flex; flex-direction:column; gap:6px;">
+                    <div>慢镜裁决: <span id="slow-verdict" style="font-weight:bold;">-</span></div>
+                    <div>因果推理判词: <div id="slow-reason" style="color:#cbd5e1; margin-top:4px; line-height:1.4;">-</div></div>
+                </div>
+            </div>
+
+            <!-- Tab 3: 内核状态机 -->
             <div class="tab-content" id="tab-state">
                 <div class="section-title">不可篡改初始任务锚点</div>
                 <div style="background:#131d2e; padding:10px; border-radius:6px; font-size:12px; margin-bottom:12px;" id="state-task">-</div>
@@ -411,7 +532,7 @@
                 </div>
             </div>
 
-            <!-- Tab 3: 因果拓扑 DAG -->
+            <!-- Tab 4: 因果拓扑 DAG -->
             <div class="tab-content" id="tab-dag" style="padding:0; height:100%;">
                 <div id="dag-network"></div>
             </div>
@@ -463,14 +584,14 @@
 
         async function resetAll() {
             await fetch("/api/reset", { method: "POST" });
-            document.getElementById("timeline").innerHTML = `<div style="color:var(--text-muted); font-size:13px; text-align:center; margin-top:40px;">环境已重置，请点击【立即执行演练】开始</div>`;
+            document.getElementById("react-stream").innerHTML = `<div style="color:var(--text-muted); font-size:13px; text-align:center; margin-top:50px;">环境已重置，请点击【🚀 立即执行演练】开始</div>`;
             updateCanaryUI({ is_leaked: false, captured_count: 0, requests: [] });
         }
 
         async function runAttack() {
             const prompt = document.getElementById("prompt-input").value;
-            const timeline = document.getElementById("timeline");
-            timeline.innerHTML = `<div style="color:var(--accent-blue); font-size:13px; text-align:center; margin-top:40px;">🔄 正在执行演练，请稍候...</div>`;
+            const stream = document.getElementById("react-stream");
+            stream.innerHTML = `<div style="color:var(--accent-blue); font-size:13px; text-align:center; margin-top:50px;">🔄 智能体正在执行 ReAct 闭环循环 (思考 -> 动作 -> 观察)...</div>`;
 
             try {
                 const res = await fetch("/api/run", {
@@ -483,76 +604,80 @@
                     })
                 });
                 const data = await res.json();
-                renderTimeline(data.logs);
+                renderReactStream(data.react_rounds, data.final_reply);
                 updateCanaryUI(data.canary_status);
+                updateDualMirrorUI(data.dual_mirror_info);
                 updateStateUI(data.state_info);
                 renderDAG(data.dag_nodes, data.dag_edges);
             } catch (e) {
-                timeline.innerHTML = `<div style="color:var(--accent-red); font-size:13px;">执行请求异常: ${e}</div>`;
+                stream.innerHTML = `<div style="color:var(--accent-red); font-size:13px;">执行请求异常: ${e}</div>`;
             }
         }
 
-        function renderTimeline(logs) {
-            const timeline = document.getElementById("timeline");
-            timeline.innerHTML = "";
+        function renderReactStream(rounds, finalReply) {
+            const stream = document.getElementById("react-stream");
+            stream.innerHTML = "";
 
-            logs.forEach(log => {
-                const card = document.createElement("div");
-                card.className = "step-card";
+            if (!rounds || rounds.length === 0) {
+                stream.innerHTML = `<div class="final-card"><div class="final-title">💬 智能体最终回复</div><div class="final-text">${finalReply}</div></div>`;
+                return;
+            }
 
-                if (log.stage === "TOOL_INVOKE") {
-                    card.innerHTML = `
-                        <div class="step-header">
-                            <span class="step-tag tag-invoke">工具准备调用</span>
-                            <span style="font-family:monospace; color:var(--accent-blue);">${log.tool}</span>
-                        </div>
-                        <div style="color:#e2e8f0; margin-bottom:6px;">${log.desc}</div>
-                        <pre style="background:#090d16; padding:8px; border-radius:4px; font-size:11px; color:#94a3b8; overflow-x:auto;">${JSON.stringify(log.args, null, 2)}</pre>
-                    `;
-                } else if (log.stage === "HOOK_DECISION") {
-                    const isBlock = log.verdict === "BLOCK";
-                    const isAsk = log.verdict === "ASK";
-                    const tagClass = isBlock ? "tag-block" : (isAsk ? "tag-ask" : "tag-allow");
-                    card.style.borderColor = isBlock ? "var(--accent-red)" : (isAsk ? "var(--accent-amber)" : "var(--accent-green)");
+            rounds.forEach(r => {
+                const roundCard = document.createElement("div");
+                roundCard.className = "round-card";
 
-                    let askHtml = "";
-                    if (isAsk) {
-                        askHtml = `
-                            <div style="margin-top:10px; display:flex; gap:8px;">
-                                <button onclick="alert('用户已单次批准令牌: ${log.token_id}')" style="background:#10b981; color:white; border:none; padding:4px 12px; border-radius:4px; font-size:12px; cursor:pointer;">✅ 批准单次执行</button>
-                                <button onclick="alert('用户已拒绝')" style="background:#ef4444; color:white; border:none; padding:4px 12px; border-radius:4px; font-size:12px; cursor:pointer;">❌ 拒绝并阻断</button>
-                            </div>
-                        `;
-                    }
-
-                    card.innerHTML = `
-                        <div class="step-header">
-                            <span class="step-tag ${tagClass}">🛡️ D²Guard 裁决: ${log.verdict}</span>
-                            <span style="font-size:11px; color:var(--text-muted);">${log.policy_id || ''}</span>
+                let hookHtml = "";
+                if (r.hook) {
+                    const isBlock = r.hook.verdict === "BLOCK";
+                    const isAsk = r.hook.verdict === "ASK";
+                    const hookClass = isBlock ? "block" : (isAsk ? "ask" : "allow");
+                    hookHtml = `
+                        <div class="box-hook ${hookClass}">
+                            <div style="font-weight:700;">🛡️ D²Guard Hook 截获裁决: [${r.hook.verdict}] ${r.hook.policy_id || ''}</div>
+                            <div>${r.hook.reason}</div>
                         </div>
-                        <div style="font-weight:600; color:${isBlock ? '#fca5a5' : '#fde68a'}; margin-bottom:4px;">${log.reason}</div>
-                        <div style="font-size:12px; color:#cbd5e1;">${log.output || ''}</div>
-                        ${askHtml}
-                    `;
-                } else if (log.stage === "TOOL_RESULT") {
-                    card.innerHTML = `
-                        <div class="step-header">
-                            <span class="step-tag tag-allow">底层工具物理执行结果</span>
-                            <span style="font-family:monospace;">${log.tool}</span>
-                        </div>
-                        <pre style="background:#090d16; padding:8px; border-radius:4px; font-size:11px; color:#cbd5e1; max-height:120px; overflow-y:auto;">${log.output}</pre>
-                    `;
-                } else if (log.stage === "AGENT_COMPLETE") {
-                    card.innerHTML = `
-                        <div class="step-header">
-                            <span class="step-tag tag-allow">智能体最终回复</span>
-                        </div>
-                        <div style="font-size:13px; color:#f1f5f9; line-height:1.5;">${log.final_reply}</div>
                     `;
                 }
 
-                timeline.appendChild(card);
+                roundCard.innerHTML = `
+                    <div class="round-title">
+                        <span>🔄 ReAct 循环轮次 #${r.round}</span>
+                        <span>工具: ${r.action.tool}</span>
+                    </div>
+                    <div class="round-body">
+                        <div class="box-thought">
+                            <div class="box-thought-title">🧠 思考 (Thought)</div>
+                            <div>${r.thought}</div>
+                        </div>
+
+                        <div class="box-action">
+                            <div class="box-action-title">🛠️ 准备调用工具 (Action)</div>
+                            <div style="font-family:monospace; color:#e2e8f0; font-weight:600; margin-bottom:4px;">${r.action.tool}()</div>
+                            <pre style="background:#090d16; padding:6px; border-radius:4px; font-size:11px; color:#cbd5e1; overflow-x:auto;">${JSON.stringify(r.action.args, null, 2)}</pre>
+                        </div>
+
+                        ${hookHtml}
+
+                        <div class="box-obs">
+                            <div class="box-obs-title">👁️ 工具观察返回 (Observation)</div>
+                            <div>${r.observation}</div>
+                        </div>
+                    </div>
+                `;
+                stream.appendChild(roundCard);
             });
+
+            // 最终回复
+            if (finalReply) {
+                const finalCard = document.createElement("div");
+                finalCard.className = "final-card";
+                finalCard.innerHTML = `
+                    <div class="final-title">💬 智能体最终输出 (Final Answer)</div>
+                    <div class="final-text">${finalReply}</div>
+                `;
+                stream.appendChild(finalCard);
+            }
         }
 
         function updateCanaryUI(canary) {
@@ -568,7 +693,7 @@
             } else {
                 banner.className = "canary-box safe";
                 title.innerText = "🛡️ 零数据泄露 (0 Bytes Leaked)";
-                sub.innerText = "目标数据被锁死在沙箱内部，未发生任何非受信外发";
+                sub.innerText = "物理外发被坚决阻断，未发生任何非受信外发";
             }
 
             if (canary.requests && canary.requests.length > 0) {
@@ -578,12 +703,27 @@
                     item.style.background = "#131d2e";
                     item.style.padding = "8px";
                     item.style.borderRadius = "4px";
-                    item.innerHTML = `<span style="color:#38bdf8;">[${r.method}]</span> ${r.url}<br><span style="color:#94a3b8; font-size:11px;">Body: ${r.body.substring(0, 70)}...</span>`;
+                    item.innerHTML = `<span style="color:#38bdf8;">[${r.method}]</span> ${r.url}<br><span style="color:#94a3b8; font-size:11px;">Body: ${r.body.substring(0, 75)}...</span>`;
                     list.appendChild(item);
                 });
             } else {
                 list.innerHTML = `<div style="color:var(--text-muted);">接收端未收到任何请求</div>`;
             }
+        }
+
+        function updateDualMirrorUI(dm) {
+            if (!dm) return;
+            const fast = dm.fast_mirror || {};
+            document.getElementById("fast-nature").innerText = fast.text_nature || "-";
+            document.getElementById("fast-compliance").innerText = fast.action_compliance || "-";
+            document.getElementById("fast-risk").innerText = (fast.risk_score * 100).toFixed(0) + " %";
+            document.getElementById("fast-latency").innerText = (fast.latency_ms || 12.0) + " ms";
+
+            const slow = dm.slow_mirror || {};
+            const verdictEl = document.getElementById("slow-verdict");
+            verdictEl.innerText = slow.verdict || "NOT_INVOKED";
+            verdictEl.style.color = slow.verdict === "BLOCK" ? "#ef4444" : "#10b981";
+            document.getElementById("slow-reason").innerText = slow.reason || "-";
         }
 
         function updateStateUI(state) {
@@ -623,7 +763,6 @@
             network = new vis.Network(container, data, options);
         }
 
-        // 初始化
         window.onload = () => {
             selectScenario("sc02_secret_leak");
         };

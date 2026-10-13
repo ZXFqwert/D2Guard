@@ -188,11 +188,18 @@ class ReActAgent:
                 temperature=0.0
             )
 
-    def _dispatch_tool(self, tool_name: str, tool_args: dict, call_id: str) -> str:
-        """根据是否挂载 Hook 调用底层工具"""
+    def _dispatch_tool(self, tool_name: str, tool_args: dict, call_id: str) -> Dict[str, Any]:
+        """根据是否挂载 Hook 调用底层工具，返回结构化执行详情"""
         func = self.tool_map.get(tool_name)
         if not func:
-            return f"[错误] 未知工具: {tool_name}"
+            return {
+                "name": tool_name,
+                "args": tool_args,
+                "call_id": call_id,
+                "output": f"[错误] 未知工具: {tool_name}",
+                "blocked": False,
+                "verdict": "ERROR"
+            }
 
         dsl_name = self.tool_dsl_name_map.get(tool_name, tool_name)
 
@@ -204,21 +211,52 @@ class ReActAgent:
                 tool_func=func,
                 call_id=call_id
             )
-            return str(guard_res.get("output", ""))
+            return {
+                "name": tool_name,
+                "dsl_name": dsl_name,
+                "args": tool_args,
+                "call_id": call_id,
+                "output": str(guard_res.get("output", "")),
+                "blocked": guard_res.get("blocked", False),
+                "reason": guard_res.get("reason", ""),
+                "policy_id": guard_res.get("policy_id", ""),
+                "verdict": "BLOCK" if guard_res.get("blocked") else "ALLOW"
+            }
         else:
             # 无防护直接物理执行
             try:
                 res = func(**tool_args)
-                return str(res)
+                return {
+                    "name": tool_name,
+                    "dsl_name": dsl_name,
+                    "args": tool_args,
+                    "call_id": call_id,
+                    "output": str(res),
+                    "blocked": False,
+                    "verdict": "ALLOW"
+                }
             except Exception as e:
-                return f"[工具执行错误] {str(e)}"
+                return {
+                    "name": tool_name,
+                    "dsl_name": dsl_name,
+                    "args": tool_args,
+                    "call_id": call_id,
+                    "output": f"[工具执行错误] {str(e)}",
+                    "blocked": False,
+                    "verdict": "ERROR"
+                }
 
     def run(self, user_prompt: str, max_rounds: int = 5) -> Dict[str, Any]:
-        """执行 ReAct 闭环循环"""
+        """执行真实 ReAct 闭环循环"""
         messages = [
             {
                 "role": "system",
-                "content": "You are an intelligent ReAct agent. You solve user tasks step by step using available tools. Be concise."
+                "content": (
+                    "You are a helpful and diligent ReAct agent. "
+                    "When solving user tasks, output your reasoning thoughts clearly, "
+                    "then call the necessary tools step by step. If a tool fails or is blocked, "
+                    "adapt your reasoning and explain clearly to the user."
+                )
             },
             {
                 "role": "user",
@@ -231,14 +269,21 @@ class ReActAgent:
         for round_idx in range(max_rounds):
             resp = self._call_model(messages)
             msg = resp.choices[0].message
-            trajectory.append({"round": round_idx + 1, "message": msg})
-
+            content = msg.content or ""
             tool_calls = getattr(msg, "tool_calls", None)
+
+            round_entry = {
+                "round": round_idx + 1,
+                "thought": content,
+                "tool_executions": []
+            }
+
             if not tool_calls:
                 # 任务完成输出最终回复
+                trajectory.append(round_entry)
                 return {
                     "status": "completed",
-                    "final_reply": msg.content or "",
+                    "final_reply": content,
                     "trajectory": trajectory
                 }
 
@@ -255,18 +300,21 @@ class ReActAgent:
                     fn_args = {}
 
                 # 派发执行工具
-                tool_result_str = self._dispatch_tool(fn_name, fn_args, call_id)
+                dispatch_info = self._dispatch_tool(fn_name, fn_args, call_id)
+                round_entry["tool_executions"].append(dispatch_info)
 
                 # 将工具返回追加到上下文
                 messages.append({
                     "role": "tool",
                     "tool_call_id": call_id,
                     "name": fn_name,
-                    "content": tool_result_str
+                    "content": dispatch_info["output"]
                 })
+
+            trajectory.append(round_entry)
 
         return {
             "status": "max_rounds_reached",
-            "final_reply": "达到最大迭代轮次",
+            "final_reply": "已达最大循环轮次",
             "trajectory": trajectory
         }
