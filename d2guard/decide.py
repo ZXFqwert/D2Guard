@@ -27,8 +27,10 @@ from .models import (
     SecurityState,
     VerdictType,
 )
+from .contract import ContractCompiler, InvariantVerifier
 from .normalizer import AdversarialNormalizer
 from .slow_mirror import EvidencePack, SlowMirror
+from .taint_engine import DynamicTaintEngine
 
 
 class PolicyDecisionEngine:
@@ -128,6 +130,13 @@ class PolicyDecisionEngine:
                     if len(matched_list) >= min_chunks:
                         return True, True, f"命中已读敏感凭证多重特征分片 [{sec_id}]"
 
+        # 4. 动态变异污点 (Hex/URL/反转) 与香农熵异常检测
+        is_tainted, taint_reason, _ = DynamicTaintEngine.scan_for_tainted_flow(
+            payload_str, state.read_secrets
+        )
+        if is_tainted:
+            return True, False, taint_reason
+
         return False, False, ""
 
     def decide(
@@ -150,17 +159,35 @@ class PolicyDecisionEngine:
                 reason="用户已单次手动批准此特定操作令牌"
             )
 
-        # 1. 规则 1: 敏感系统路径写入阻断 (fs.write)
+        # 0.5 语义不变量断言契约验证 (Semantic Invariant Contract)
+        contract = getattr(state, "invariant_contract", None)
+        if not contract and state.initial_task:
+            contract = ContractCompiler.compile_intent(state.initial_task)
+            state.invariant_contract = contract
+
+        if contract:
+            is_valid, violation_id, violation_reason = InvariantVerifier.verify(
+                contract, tool_name, tool_args, state
+            )
+            if not is_valid:
+                return ActionVerdict(
+                    verdict=VerdictType.BLOCK,
+                    policy_id=violation_id or "CONTRACT-VIOLATION",
+                    reason=violation_reason or "违背会话语义安全不变量契约"
+                )
+
+        # 1. 规则 1: 敏感系统路径写入阻断 (fs.write) 与工作区关键配置不可篡改 (CVE-2025-53773)
         if tool_name in ["fs.write", "fs_write"]:
             target_path = str(tool_args.get("path", "") or tool_args.get("file", ""))
             for p in self.policies:
-                if p.get("id") == "POL-FS-WRITE-SENSITIVE":
+                pid = p.get("id")
+                if pid in ["POL-FS-WRITE-SENSITIVE", "POL-FS-CONFIG-IMMUTABLE"]:
                     pattern = p.get("target_path_regex", "")
                     if pattern and re.search(pattern, target_path, re.IGNORECASE):
                         return ActionVerdict(
                             verdict=VerdictType.BLOCK,
-                            policy_id="POL-FS-WRITE-SENSITIVE",
-                            reason=f"阻断写入敏感系统路径: {target_path}"
+                            policy_id=pid,
+                            reason=f"阻断写入关键受限路径: {target_path} ({p.get('reason', '')})"
                         )
 
         # 2. 规则 2: 敏感凭证跨轮与分片外发拦截 (net.fetch)

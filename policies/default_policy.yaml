@@ -18,6 +18,13 @@ policies:
     decision: "BLOCK"
     reason: "禁止写入 SSH、云凭证、认证文件或系统计划任务目录，防止持久化权限驻留"
 
+  # 规则 1.1: 工作区关键配置防篡改 (CVE-2025-53773)
+  - id: "POL-FS-CONFIG-IMMUTABLE"
+    action: "fs.write"
+    target_path_regex: "(?i)(\\.vscode/settings\\.json|\\.vscode/tasks\\.json|\\.git/config|\\.bashrc|\\.zshrc)"
+    decision: "BLOCK"
+    reason: "严禁修改工作区元配置或安全审查开关文件，防御 CVE-2025-53773 间接注入篡改配置提权"
+
   # 规则 2: 敏感凭证跨轮与分片外发拦截 (SC-01, SC-02, SC-08)
   - id: "POL-NET-SECRET-EXFIL"
     action: "net.fetch"
