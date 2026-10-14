@@ -9,6 +9,8 @@
 
 > **团队协作入口**：源码在 [GitHub 团队私有仓库](https://github.com/ZXFqwert/D2Guard)，演示在 [公网体验平台](https://agent.li33.art/safe)。每位成员在自己的目录 clone、开发、提交；代码进入 `main` 后，由部署人在算力机运行 `./deploy.sh update` 发布。完整步骤见本文第七节；push 本身不会自动上线。
 
+> **The Shield 验收入口**：本地整改分支的真实评测、HTTP 字节核验、模型脱敏与 ASK 接口见 [docs/SHIELD_ACCEPTANCE.md](docs/SHIELD_ACCEPTANCE.md)。该文档中的实施状态与测量口径优先于本文原 V2 能力介绍；未完成适配的场景不计作防护成功。
+
 ---
 
 ## 一、 系统总体架构：前线双探针与中央决策大脑

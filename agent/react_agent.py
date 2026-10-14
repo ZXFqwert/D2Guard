@@ -123,206 +123,152 @@ AGENT_TOOL_DEFINITIONS = [
 ]
 
 
-def git_push_dummy(remote: str = "origin", branch: str = "main") -> str:
-    """模拟 git.push 执行"""
-    return f"[模拟 Git Push] 已成功推送分支 {branch} 到 {remote}"
-
-
 from d2guard.llm_config import create_llm_client
-
+import copy
+import time
 
 class ReActAgent:
-    """通用 ReAct 智能体"""
+    """A real model/tool loop, with resumable batched tool calls and observable events."""
+    def __init__(self, name="ReActAgent-01", model=None, hook=None, gateway=None,
+                 api_key=None, base_url=None, client=None, tool_map=None,
+                 tool_definitions=None, event_callback=None, provider=None, max_tool_calls=16, max_wall_seconds=150):
+        self.name, self.hook, self.gateway = name, hook, gateway
+        configured, configured_model = create_llm_client(provider=provider, api_key=api_key,
+                                                        base_url=base_url, model=model)
+        self.raw_client, self.model = client or configured, model or configured_model
+        # Non-fixture tools must be explicitly installed by an embedding application.
+        self.tool_map = tool_map or {"fs_read": fs_read, "fs_write": fs_write,
+            "fs_delete": fs_delete, "net_fetch": net_fetch, "exec_cmd": exec_cmd}
+        self.tool_definitions = copy.deepcopy(tool_definitions or
+            [d for d in AGENT_TOOL_DEFINITIONS if d["function"]["name"] in self.tool_map])
+        self.tool_dsl_name_map = {"fs_read":"fs.read", "fs_write":"fs.write",
+            "fs_delete":"fs.delete", "net_fetch":"net.fetch", "exec_cmd":"exec",
+            "git_push":"git.push", "memory_write":"memory.write", "memory_read":"memory.read"}
+        self.event_callback = event_callback
+        self.messages, self.trajectory, self._remaining_calls = [], [], []
+        self._pending = None
+        self.status, self.max_rounds, self.final_reply = "idle", 0, ""
+        self.max_tool_calls, self.max_wall_seconds = max_tool_calls, max_wall_seconds
+        self._tool_count, self._started = 0, None
 
-    def __init__(
-        self,
-        name: str = "ReActAgent-01",
-        model: str = "deepseek-v3.2",
-        hook=None,       # d2guard.hook.ToolHook 实例 (若为 None 则为无防护裸奔)
-        gateway=None,    # d2guard.gateway.ModelAPIGateway 实例
-        api_key: Optional[str] = None,
-        base_url: Optional[str] = None
-    ):
-        self.name = name
-        self.model = model
-        self.hook = hook
-        self.gateway = gateway
-        cached_client, _ = create_llm_client(
-            api_key=api_key or os.getenv("LLM_API_KEY"),
-            base_url=base_url or os.getenv("LLM_BASE_URL", "https://api.huiyan-ai.cn/v1"),
-            model=model
-        )
-        self.raw_client = cached_client or OpenAI(
-            api_key=api_key or "mock-key",
-            base_url=base_url or "https://api.huiyan-ai.cn/v1"
-        )
+    def _emit(self, kind, data):
+        if self.event_callback:
+            self.event_callback(kind, data)
 
-        # 本地工具映射
-        self.tool_map = {
-            "fs_read": fs_read,
-            "fs_write": fs_write,
-            "fs_delete": fs_delete,
-            "net_fetch": net_fetch,
-            "exec_cmd": exec_cmd,
-            "git_push": git_push_dummy,
-            "spawn_subagent": spawn_subagent
-        }
-
-        # 工具标准化名称映射到系统 DSL
-        self.tool_dsl_name_map = {
-            "fs_read": "fs.read",
-            "fs_write": "fs.write",
-            "fs_delete": "fs.delete",
-            "net_fetch": "net.fetch",
-            "exec_cmd": "exec",
-            "git_push": "git.push",
-            "spawn_subagent": "spawn_subagent"
-        }
-
-    def _call_model(self, messages: List[Dict[str, str]]) -> Any:
-        """根据是否挂载网关调用大模型"""
+    def _call_model(self, messages):
         if self.gateway:
-            return self.gateway.chat_completion(
-                model=self.model,
-                messages=messages,
-                tools=AGENT_TOOL_DEFINITIONS,
-                temperature=0.0
-            )
-        else:
-            return self.raw_client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                tools=AGENT_TOOL_DEFINITIONS,
-                temperature=0.0
-            )
+            return self.gateway.chat_completion(model=self.model, messages=messages,
+                tools=self.tool_definitions, temperature=0.0, max_tokens=1000)
+        if self.raw_client is None:
+            raise RuntimeError("No model credentials configured; live inference unavailable")
+        # Baseline disables defense decisions, never protection of deployment credentials.
+        from d2guard.redaction import OutboundRedactor
+        safe=OutboundRedactor([getattr(self.raw_client,"api_key","")], detect_credentials=False).sanitize(dict(
+            model=self.model,messages=messages,tools=self.tool_definitions,temperature=0.0,max_tokens=1000))
+        return self.raw_client.chat.completions.create(**safe)
 
-    def _dispatch_tool(self, tool_name: str, tool_args: dict, call_id: str) -> Dict[str, Any]:
-        """根据是否挂载 Hook 调用底层工具，返回结构化执行详情"""
+    def _dispatch_tool(self, tool_name, tool_args, call_id):
+        start = time.perf_counter()
+        details = dict(name=tool_name, dsl_name=self.tool_dsl_name_map.get(tool_name, tool_name),
+                       args=copy.deepcopy(tool_args), call_id=call_id)
         func = self.tool_map.get(tool_name)
         if not func:
-            return {
-                "name": tool_name,
-                "args": tool_args,
-                "call_id": call_id,
-                "output": f"[错误] 未知工具: {tool_name}",
-                "blocked": False,
-                "verdict": "ERROR"
-            }
-
-        dsl_name = self.tool_dsl_name_map.get(tool_name, tool_name)
-
-        if self.hook:
-            # 经过 D²Guard 工具侧 Hook 保护
-            guard_res = self.hook.execute_with_guard(
-                tool_name=dsl_name,
-                tool_args=tool_args,
-                tool_func=func,
-                call_id=call_id
-            )
-            return {
-                "name": tool_name,
-                "dsl_name": dsl_name,
-                "args": tool_args,
-                "call_id": call_id,
-                "output": str(guard_res.get("output", "")),
-                "blocked": guard_res.get("blocked", False),
-                "reason": guard_res.get("reason", ""),
-                "policy_id": guard_res.get("policy_id", ""),
-                "verdict": "BLOCK" if guard_res.get("blocked") else "ALLOW"
-            }
+            details.update(success=False, blocked=False, verdict="ERROR", output="Unknown tool")
+        elif self.hook:
+            details.update(self.hook.execute_with_guard(details['dsl_name'], tool_args, func, call_id,
+                source_type='WEB' if tool_name=='net_fetch' else 'LOCAL_FILE'))
         else:
-            # 无防护直接物理执行
             try:
-                res = func(**tool_args)
-                return {
-                    "name": tool_name,
-                    "dsl_name": dsl_name,
-                    "args": tool_args,
-                    "call_id": call_id,
-                    "output": str(res),
-                    "blocked": False,
-                    "verdict": "ALLOW"
-                }
-            except Exception as e:
-                return {
-                    "name": tool_name,
-                    "dsl_name": dsl_name,
-                    "args": tool_args,
-                    "call_id": call_id,
-                    "output": f"[工具执行错误] {str(e)}",
-                    "blocked": False,
-                    "verdict": "ERROR"
-                }
+                details.update(output=func(**tool_args), success=True, blocked=False, verdict="ALLOW")
+            except Exception as exc:
+                details.update(output=f"Tool failed: {type(exc).__name__}: {exc}",
+                               success=False, blocked=False, verdict="ERROR")
+        details['output'] = str(details['output'])
+        details['elapsed_ms'] = (time.perf_counter()-start)*1000
+        self._emit('tool_result', details)
+        return details
 
-    def run(self, user_prompt: str, max_rounds: int = 5) -> Dict[str, Any]:
-        """执行真实 ReAct 闭环循环"""
-        messages = [
-            {
-                "role": "system",
-                "content": (
-                    "You are a helpful and diligent ReAct agent. "
-                    "When solving user tasks, output your reasoning thoughts clearly, "
-                    "then call the necessary tools step by step. If a tool fails or is blocked, "
-                    "adapt your reasoning and explain clearly to the user."
-                )
-            },
-            {
-                "role": "user",
-                "content": user_prompt
-            }
-        ]
+    def _append_tool_result(self, details):
+        self.messages.append(dict(role='tool', tool_call_id=details['call_id'],
+                                  name=details['name'], content=details['output']))
 
-        trajectory = []
+    def _process_calls(self):
+        while self._remaining_calls:
+            if self._tool_count>=self.max_tool_calls or time.perf_counter()-self._started>=self.max_wall_seconds:
+                self.status, self.final_reply='budget_exhausted','实际执行预算耗尽，保留已发生的工具和接收端证据'
+                return False
+            self._tool_count+=1
+            call = self._remaining_calls.pop(0)
+            try:
+                args = json.loads(call.function.arguments)
+                if not isinstance(args, dict):
+                    raise ValueError('Arguments must be an object')
+                details = self._dispatch_tool(call.function.name, args, call.id)
+            except (ValueError, TypeError) as exc:
+                details = dict(name=call.function.name, call_id=call.id, args={}, output='Invalid arguments',
+                               verdict='ERROR', success=False, blocked=False, elapsed_ms=0)
+            self.trajectory[-1]['tool_executions'].append(details)
+            if details.get('pending'):
+                self._pending = details
+                self.status = 'pending_approval'
+                return False
+            self._append_tool_result(details)
+        return True
 
-        for round_idx in range(max_rounds):
-            resp = self._call_model(messages)
-            msg = resp.choices[0].message
-            content = msg.content or ""
-            tool_calls = getattr(msg, "tool_calls", None)
+    def _continue(self):
+        while len(self.trajectory) < self.max_rounds:
+            if time.perf_counter()-self._started>=self.max_wall_seconds:
+                self.status, self.final_reply='budget_exhausted','实际执行预算耗尽'
+                return self.result()
+            self._emit('model_started', {'round': len(self.trajectory)+1})
+            start = time.perf_counter()
+            response = self._call_model(self.messages)
+            msg = response.choices[0].message
+            content = msg.content or ''
+            calls = getattr(msg, 'tool_calls', None) or []
+            entry = dict(round=len(self.trajectory)+1, thought=content,
+                         model_latency_ms=(time.perf_counter()-start)*1000, tool_executions=[])
+            self.trajectory.append(entry)
+            # Serialize SDK messages, preserving tool-call arguments and IDs.
+            if hasattr(msg, 'model_dump'):
+                self.messages.append(msg.model_dump(exclude_none=True))
+            else:
+                self.messages.append(dict(role='assistant', content=content,
+                    tool_calls=[dict(id=c.id, type='function', function=dict(name=c.function.name,
+                                arguments=c.function.arguments)) for c in calls]))
+            self._emit('model_completed', entry)
+            if not calls:
+                self.status, self.final_reply = 'completed', content
+                return self.result()
+            self._remaining_calls = list(calls)
+            if not self._process_calls():
+                return self.result()
+        self.status, self.final_reply = 'max_rounds_reached', '已达最大循环轮次，任务完成情况需核验'
+        return self.result()
 
-            round_entry = {
-                "round": round_idx + 1,
-                "thought": content,
-                "tool_executions": []
-            }
+    def run(self, user_prompt, max_rounds=6):
+        self.messages = [dict(role='system', content='You are a helpful agent. Use tools to complete the user task. '
+            'Provide concise action summaries; do not reveal private reasoning.'),
+            dict(role='user', content=user_prompt)]
+        self.trajectory, self._remaining_calls, self._pending = [], [], None
+        self.max_rounds, self.status = max_rounds, 'running'
+        self._tool_count, self._started = 0, time.perf_counter()
+        return self._continue()
 
-            if not tool_calls:
-                # 任务完成输出最终回复
-                trajectory.append(round_entry)
-                return {
-                    "status": "completed",
-                    "final_reply": content,
-                    "trajectory": trajectory
-                }
+    def resume(self, token_id, principal_id):
+        if not self.hook or not self._pending or self._pending['approval_token']['token_id'] != token_id:
+            raise ValueError('No matching suspended call')
+        result = self.hook.resume(token_id, principal_id)
+        details = {**self._pending, **result}
+        self.trajectory[-1]['tool_executions'][-1] = details
+        self._pending = None
+        self._started=time.perf_counter()  # Approval waiting time is not model execution time.
+        self._append_tool_result(details)
+        self._emit('tool_resumed', details)
+        if not self._process_calls():
+            return self.result()
+        return self._continue()
 
-            # 追加 assistant 消息
-            messages.append(msg)
-
-            # 遍历执行每个工具调用
-            for tc in tool_calls:
-                fn_name = tc.function.name
-                call_id = tc.id
-                try:
-                    fn_args = json.loads(tc.function.arguments)
-                except Exception:
-                    fn_args = {}
-
-                # 派发执行工具
-                dispatch_info = self._dispatch_tool(fn_name, fn_args, call_id)
-                round_entry["tool_executions"].append(dispatch_info)
-
-                # 将工具返回追加到上下文
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": call_id,
-                    "name": fn_name,
-                    "content": dispatch_info["output"]
-                })
-
-            trajectory.append(round_entry)
-
-        return {
-            "status": "max_rounds_reached",
-            "final_reply": "已达最大循环轮次",
-            "trajectory": trajectory
-        }
+    def result(self):
+        return dict(status=self.status, final_reply=self.final_reply,
+                    trajectory=copy.deepcopy(self.trajectory), pending=copy.deepcopy(self._pending))

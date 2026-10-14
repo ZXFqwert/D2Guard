@@ -13,3 +13,6 @@ runs/
 logs/
 dist/
 ~
+
+# Browser verification traces contain temporary session capabilities.
+.playwright-cli/

@@ -18,7 +18,7 @@ def get_llm_config(provider: Optional[str] = None) -> Dict[str, str]:
 
     if selected in ["gpu1", "server", "vllm", "local_gpu"]:
         base_url = os.getenv("GPU1_BASE_URL", "https://api.li33.art/gpu1/v1")
-        api_key = os.getenv("GPU1_API_KEY", "15581643721")
+        api_key = os.getenv("GPU1_API_KEY", "")
         model = os.getenv("GPU1_MODEL", "huihui-qwen3.8-27b")
         return {
             "provider": "gpu1",
@@ -54,7 +54,7 @@ def create_llm_client(
     使用单例缓存池，消除 Windows 下每次新建 httpx 客户端长达 2.2 秒的初始化延迟
     """
     cfg = get_llm_config(provider)
-    final_key = api_key or cfg["api_key"]
+    final_key = cfg["api_key"] if api_key is None else api_key
     final_url = base_url or cfg["base_url"]
     final_model = model or cfg["model"]
 
@@ -63,6 +63,6 @@ def create_llm_client(
 
     cache_key = (final_key, final_url)
     if cache_key not in _CLIENT_CACHE:
-        _CLIENT_CACHE[cache_key] = OpenAI(api_key=final_key, base_url=final_url)
+        _CLIENT_CACHE[cache_key] = OpenAI(api_key=final_key, base_url=final_url, timeout=float(os.getenv("LLM_TIMEOUT_SECONDS", "60")), max_retries=0)
 
     return _CLIENT_CACHE[cache_key], final_model

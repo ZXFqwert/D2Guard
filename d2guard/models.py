@@ -5,6 +5,7 @@ D²Guard 核心数据结构模型规范
 
 from __future__ import annotations
 import hashlib
+import json
 import time
 from dataclasses import dataclass, field
 from enum import Enum
@@ -16,6 +17,13 @@ class CallLifecycleStage(str, Enum):
     MODEL_PROPOSED = "MODEL_PROPOSED"  # 网关记录: 模型提出的候选意图，尚未执行
     TOOL_PRE_EXEC = "TOOL_PRE_EXEC"    # Hook 记录: 实际准备执行，申请内核决策
     TOOL_POST_EXEC = "TOOL_POST_EXEC"  # Hook 记录: 工具真实执行结束返回数据
+    DECISION = "DECISION"
+    APPROVAL = "APPROVAL"
+
+
+def canonical_args_hash(tool_args: dict) -> str:
+    return hashlib.sha256(json.dumps(tool_args, sort_keys=True, ensure_ascii=False,
+                                    separators=(",", ":"), allow_nan=False).encode("utf-8")).hexdigest()
 
 
 class VerdictType(str, Enum):
@@ -34,15 +42,24 @@ class ApprovalToken:
     created_at: float = field(default_factory=time.time)
     ttl_seconds: float = 60.0
     status: str = "PENDING"  # PENDING, APPROVED, REJECTED, EXPIRED
+    session_id: str = ""
+    agent_id: str = ""
+    principal_id: str = ""
+    tool_name: str = ""
+    signature: str = ""
+    consumed_at: Optional[float] = None
 
-    def is_valid_for(self, call_id: str, tool_args: dict) -> bool:
+    def is_valid_for(self, call_id: str, tool_args: dict, *, session_id: str = "",
+                     agent_id: str = "", principal_id: str = "", tool_name: str = "") -> bool:
         if self.status != "APPROVED":
             return False
         if time.time() - self.created_at > self.ttl_seconds:
             self.status = "EXPIRED"
             return False
-        curr_hash = hashlib.sha256(str(sorted(tool_args.items())).encode()).hexdigest()
-        return self.call_id == call_id and self.args_hash == curr_hash
+        return (self.consumed_at is None and self.call_id == call_id
+                and self.args_hash == canonical_args_hash(tool_args)
+                and self.session_id == session_id and self.agent_id == agent_id
+                and self.principal_id == principal_id and self.tool_name == tool_name)
 
 
 @dataclass
@@ -63,6 +80,10 @@ class D2Event:
     char_span: Tuple[int, int] = (0, 0)    # 原始字符区间 (start, end)
     token_span: Tuple[int, int] = (0, 0)   # 分词器 Token 序号区间 (token_start, token_end)
     parent_event_id: Optional[str] = None  # 上游因果父事件 ID
+    verdict: Optional[str] = None
+    policy_id: Optional[str] = None
+    reason: str = ""
+    success: Optional[bool] = None
 
 
 @dataclass
@@ -144,3 +165,5 @@ class ActionVerdict:
     evidence_summary: Optional[Dict[str, Any]] = None
     is_chunked_leak: bool = False
     is_partial_leak: bool = False
+    fast_mirror_signals: Dict[str, Any] = field(default_factory=dict)
+    guard_latency_ms: float = 0.0
