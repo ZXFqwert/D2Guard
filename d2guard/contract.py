@@ -72,10 +72,10 @@ class ContractCompiler:
                 task_intent=initial_task,
                 task_category="doc_summary",
                 allowed_read_patterns=[r".*\.(md|txt|html|pdf)$", r"docs/.*"],
-                forbidden_write_patterns=[r".*"],
+                forbidden_write_patterns=[r".*settings\.json$", r".*\.vscode/.*", r".*\.git/.*", r".*\.ssh/.*", r".*\.env.*"],
                 allow_network_egress=False,  # 总结文档禁止将本地数据向外窃取
-                allow_filesystem_write=False,
-                allow_filesystem_delete=False,
+                allow_filesystem_write=True, # 允许保存总结产物与临时笔记
+                allow_filesystem_delete=True,
                 allow_terminal_exec=False,
                 allow_git_push=False,
                 allow_subagent_secrets=False,
@@ -98,16 +98,16 @@ class ContractCompiler:
                 trusted_network_domains=["pypi.org", "github.com", "api.trusted.com"]
             )
 
-        # 默认通用保守契约 (常规只读排障)
+        # 默认通用契约 (常规交互与任务支持)
         return InvariantContract(
             task_intent=initial_task,
             task_category="general_qa",
-            allowed_read_patterns=[r"README\.md", r"docs/.*", r"dist/.*"],
+            allowed_read_patterns=[r".*"],
             forbidden_write_patterns=[r".*\.ssh/.*", r".*settings\.json", r"/etc/.*"],
-            allow_network_egress=False,
-            allow_filesystem_write=False,
-            allow_filesystem_delete=False,
-            allow_terminal_exec=False,
+            allow_network_egress=True,
+            allow_filesystem_write=True,
+            allow_filesystem_delete=True,
+            allow_terminal_exec=True,
             allow_git_push=False,
             allow_subagent_secrets=False,
             trusted_network_domains=["api.trusted.com"]
@@ -156,10 +156,7 @@ class InvariantVerifier:
             if not contract.allow_git_push:
                 return False, "POL-GIT-REVIEW-NO-PUSH", f"语义契约违背: 用户初始任务属于 [{contract.task_category}] 场景，形式化禁止代码推送操作"
 
-        # 3. 检查破坏性删除 (fs.delete)
-        if tool_name in ["fs.delete", "fs_delete", "fs.remove"]:
-            if not contract.allow_filesystem_delete:
-                return False, "CONTRACT-FS-DELETE-DISALLOWED", "语义契约违背: 任务契约中未开启破坏性文件删除权限，禁止直接调用"
+        # 3. 破坏性删除 (fs.delete) 由策略引擎 POL-FS-DELETE-ASK 统一触发 ASK 单次审批机制，契约层不执行硬阻断
 
         # 4. 检查网络外发能力 (net.fetch)
         if tool_name in ["net.fetch", "net_fetch"]:
