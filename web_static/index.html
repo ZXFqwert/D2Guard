@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>D²Guard · 大模型智能体动态免疫防御平台</title>
+    <title>D²Guard · 大模型智能体动态免疫防御平台 (Agent Arena)</title>
     <style>
         :root {
             --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -148,26 +148,6 @@
             50% { opacity: 0.5; transform: scale(0.9); }
         }
 
-        .model-select-wrapper {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 12px;
-            color: var(--text-secondary);
-        }
-
-        .select-input {
-            background-color: var(--bg-input);
-            color: var(--text-main);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 5px 10px;
-            font-size: 12px;
-            outline: none;
-            cursor: pointer;
-        }
-        .select-input:focus { border-color: var(--primary); }
-
         .user-badge {
             display: flex;
             align-items: center;
@@ -288,7 +268,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
+            margin-bottom: 16px;
         }
 
         .view-header-left {
@@ -639,20 +619,57 @@
         }
 
         /* =====================================================================
-           页面 3: 实时演练舱 (Execution Console)
+           页面 3: 实时演练舱 (Agent Arena 对决工作台)
            ===================================================================== */
-        .exec-control-bar {
+        .arena-control-bar {
             background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: 10px;
             padding: 14px 18px;
             display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .arena-row-top {
+            display: flex;
             flex-wrap: wrap;
             align-items: center;
             justify-content: space-between;
-            gap: 14px;
-            margin-bottom: 16px;
+            gap: 12px;
         }
+
+        .arena-row-selectors {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 14px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 14px;
+        }
+
+        .control-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12.5px;
+            color: var(--text-secondary);
+        }
+
+        .select-input {
+            background-color: var(--bg-card);
+            color: var(--text-main);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-size: 12.5px;
+            outline: none;
+            cursor: pointer;
+        }
+        .select-input:focus { border-color: var(--primary); }
 
         .mode-segmented-group {
             display: flex;
@@ -697,17 +714,11 @@
             background: rgba(59, 130, 246, 0.15);
         }
 
-        .exec-actions-group {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
         .btn-launch {
             background: linear-gradient(135deg, #2563EB, #1D4ED8);
             color: #fff;
             border: none;
-            padding: 8px 20px;
+            padding: 9px 22px;
             border-radius: 7px;
             font-weight: 600;
             font-size: 13.5px;
@@ -715,7 +726,7 @@
             display: flex;
             align-items: center;
             gap: 8px;
-            box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3);
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
             transition: all 0.15s;
         }
         .btn-launch:hover {
@@ -742,8 +753,8 @@
             color: var(--text-main);
         }
 
-        /* 演练主视口 (双终端 / 单终端) */
-        .terminals-container {
+        /* 演练主视口 (双终端 / 对决工作台) */
+        .arena-viewport {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 16px;
@@ -752,22 +763,22 @@
             overflow: hidden;
         }
 
-        .terminals-container.single-baseline {
+        .arena-viewport.single-baseline {
             grid-template-columns: 1fr;
         }
-        .terminals-container.single-baseline .terminal-window.guarded {
+        .arena-viewport.single-baseline .arena-pane.guarded {
             display: none;
         }
 
-        .terminals-container.single-guarded {
+        .arena-viewport.single-guarded {
             grid-template-columns: 1fr;
         }
-        .terminals-container.single-guarded .terminal-window.baseline {
+        .arena-viewport.single-guarded .arena-pane.baseline {
             display: none;
         }
 
-        .terminal-window {
-            background: var(--bg-input);
+        .arena-pane {
+            background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: 10px;
             display: flex;
@@ -776,14 +787,14 @@
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
         }
 
-        .terminal-window.baseline {
+        .arena-pane.baseline {
             border-top: 3px solid #EF4444;
         }
-        .terminal-window.guarded {
+        .arena-pane.guarded {
             border-top: 3px solid #10B981;
         }
 
-        .terminal-header {
+        .pane-header {
             background: #111827;
             padding: 10px 14px;
             border-bottom: 1px solid var(--border);
@@ -792,7 +803,7 @@
             justify-content: space-between;
         }
 
-        .terminal-title-group {
+        .pane-title-group {
             display: flex;
             align-items: center;
             gap: 8px;
@@ -800,16 +811,23 @@
             font-weight: 600;
         }
 
-        .terminal-status-tag {
+        .pane-badges {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .pane-tag {
             font-size: 11px;
             padding: 2px 8px;
             border-radius: 4px;
             font-family: var(--font-mono);
         }
-        .terminal-status-tag.baseline { background: rgba(239, 68, 68, 0.2); color: #F87171; }
-        .terminal-status-tag.guarded { background: rgba(16, 185, 129, 0.2); color: #34D399; }
+        .pane-tag.baseline { background: rgba(239, 68, 68, 0.2); color: #F87171; }
+        .pane-tag.guarded { background: rgba(16, 185, 129, 0.2); color: #34D399; }
+        .pane-tag.framework { background: rgba(59, 130, 246, 0.2); color: #93C5FD; }
 
-        /* 突出醒目的战报横幅 (满足用户 1 秒看懂输赢的要求) */
+        /* 战报横幅 (一秒看懂胜负：攻击是否成功) */
         .verdict-banner {
             padding: 12px 16px;
             display: none;
@@ -856,7 +874,7 @@
 
         .verdict-metrics-pills {
             display: flex;
-            gap: 12px;
+            gap: 10px;
             margin-top: 4px;
             font-family: var(--font-mono);
             font-size: 11.5px;
@@ -868,96 +886,198 @@
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
-        /* 终端实时日志滚动流 */
-        .terminal-body {
+        /* 智能体步骤对话流 (仿截图 & Arena 风格) */
+        .chat-flow-container {
             flex: 1;
-            padding: 14px;
+            padding: 16px;
             overflow-y: auto;
-            font-family: var(--font-mono);
-            font-size: 12.5px;
-            line-height: 1.6;
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 16px;
             background-color: #0B0F19;
         }
 
-        .log-entry {
+        /* 用户输入气泡 (右上对齐，绿色气泡，完全匹配截图) */
+        .user-bubble-wrapper {
             display: flex;
-            flex-direction: column;
-            gap: 2px;
-            border-radius: 4px;
-            padding: 4px 6px;
+            justify-content: flex-end;
+            margin-bottom: 8px;
         }
 
-        .log-header {
+        .user-bubble {
+            background-color: #DCF8C6;
+            color: #111827;
+            padding: 12px 16px;
+            border-radius: 12px 12px 2px 12px;
+            font-size: 13.5px;
+            line-height: 1.6;
+            max-width: 85%;
+            word-break: break-word;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Agent 步骤流容器 */
+        .agent-stream-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .stream-meta-line {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
             color: var(--text-muted);
-            font-size: 11px;
+        }
+
+        .stream-meta-badge {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: var(--font-mono);
+        }
+
+        /* Agent 思考与文本回复块 */
+        .agent-thought-text {
+            color: #E2E8F0;
+            font-size: 13.5px;
+            line-height: 1.65;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        /* 工具调用折叠胶囊 (完全匹配截图：运行了命令已搜索网页) */
+        .tool-action-pill {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+            transition: all 0.2s ease;
+        }
+
+        .tool-pill-header {
+            padding: 8px 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            user-select: none;
+            background: rgba(255, 255, 255, 0.02);
+        }
+        .tool-pill-header:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .tool-pill-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12.5px;
+            color: var(--text-secondary);
+        }
+
+        .tool-icon {
+            width: 16px;
+            height: 16px;
+            stroke-width: 2;
+        }
+
+        .tool-pill-chevron {
+            width: 14px;
+            height: 14px;
+            stroke: var(--text-muted);
+            transition: transform 0.2s;
+        }
+
+        .tool-action-pill.open .tool-pill-chevron {
+            transform: rotate(180deg);
+        }
+
+        .tool-pill-body {
+            display: none;
+            padding: 10px 12px;
+            border-top: 1px solid var(--border);
+            background: var(--bg-input);
+            font-family: var(--font-mono);
+            font-size: 11.5px;
+            color: var(--text-secondary);
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .tool-action-pill.open .tool-pill-body {
+            display: flex;
+        }
+
+        .tool-code-block {
+            background: #0B0F19;
+            padding: 6px 10px;
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 160px;
+            overflow-y: auto;
+        }
+
+        /* D²Guard 安全拦截告警条 */
+        .security-hook-banner {
+            padding: 10px 14px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            font-size: 12.5px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .security-hook-banner.block {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            color: #F87171;
+        }
+
+        .security-hook-banner.ask {
+            background: rgba(245, 158, 11, 0.15);
+            border: 1px solid rgba(245, 158, 11, 0.4);
+            color: #FBBF24;
+        }
+
+        .security-hook-banner.allow {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: #34D399;
+        }
+
+        .hook-title {
+            font-weight: 700;
             display: flex;
             align-items: center;
             gap: 6px;
         }
 
-        .log-prompt {
-            color: #93C5FD;
-            white-space: pre-wrap;
-            word-break: break-word;
-        }
-
-        .log-thought {
-            color: #E2E8F0;
-            white-space: pre-wrap;
-            word-break: break-word;
-            padding-left: 8px;
-            border-left: 2px solid #475569;
-            margin: 4px 0;
-        }
-
-        .log-tool-call {
-            color: #FBBF24;
-            background: rgba(245, 158, 11, 0.08);
-            border: 1px solid rgba(245, 158, 11, 0.2);
-            padding: 6px 10px;
-            border-radius: 6px;
-            white-space: pre-wrap;
-            word-break: break-all;
-        }
-
-        .log-tool-obs {
-            color: #94A3B8;
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.06);
-            padding: 6px 10px;
-            border-radius: 6px;
-            white-space: pre-wrap;
-            word-break: break-all;
-            max-height: 140px;
-            overflow-y: auto;
-        }
-
-        .log-hook-alert {
-            padding: 8px 12px;
-            border-radius: 6px;
-            margin: 6px 0;
-            font-weight: 600;
+        /* 思考中的流式光标与加载指示器 */
+        .thinking-indicator {
             display: flex;
-            flex-direction: column;
-            gap: 3px;
+            align-items: center;
+            gap: 8px;
+            font-size: 12.5px;
+            color: #60A5FA;
+            padding: 6px 0;
         }
-        .log-hook-alert.block {
-            background: rgba(239, 68, 68, 0.15);
-            border: 1px solid rgba(239, 68, 68, 0.4);
-            color: #F87171;
+
+        .spinner {
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(96, 165, 250, 0.3);
+            border-top-color: #60A5FA;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
         }
-        .log-hook-alert.allow {
-            background: rgba(16, 185, 129, 0.1);
-            border: 1px solid rgba(16, 185, 129, 0.3);
-            color: #34D399;
-        }
-        .log-hook-alert.ask {
-            background: rgba(245, 158, 11, 0.15);
-            border: 1px solid rgba(245, 158, 11, 0.4);
-            color: #FBBF24;
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
 
         /* ASK 审批弹窗 (浮动卡片) */
@@ -1192,21 +1312,13 @@
                 <span>D²Guard</span>
                 <span class="brand-version-badge">v3.0 旗舰版</span>
             </div>
-            <div class="brand-sub">大模型智能体动态免疫防御平台</div>
+            <div class="brand-sub">大模型智能体动态免疫防御平台 · Agent Arena</div>
         </div>
 
         <div class="navbar-actions">
             <div class="status-pill">
                 <span class="status-dot"></span>
                 <span>沙箱隔离在线 · 双镜因果仲裁</span>
-            </div>
-
-            <div class="model-select-wrapper">
-                <span>推理模型:</span>
-                <select id="model-select" class="select-input" onchange="onModelChange()">
-                    <option value="deepseek">DeepSeek-V3.2 (公网安全对决)</option>
-                    <option value="gpu1">GPU1 本地部署 (Qwen-27B 零外泄)</option>
-                </select>
             </div>
 
             <div class="user-badge">
@@ -1235,7 +1347,7 @@
 
                 <button class="nav-tab-btn" onclick="switchTab('execution')">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-                    <span>实时演练舱</span>
+                    <span>实时演练舱 (Arena)</span>
                 </button>
 
                 <button class="nav-tab-btn" onclick="switchTab('provenance')">
@@ -1253,7 +1365,7 @@
             <div class="sidebar-footer">
                 <div>赛题5: 大模型智能体动态防御</div>
                 <div style="color:#3B82F6;">D²Guard 双镜动态不变式</div>
-                <div style="font-family:var(--font-mono); font-size:10px;">Kernel: SHA-c5cdf14</div>
+                <div style="font-family:var(--font-mono); font-size:10px;">Kernel: SHA-3d3755f</div>
             </div>
         </nav>
 
@@ -1459,68 +1571,93 @@
             </div>
 
             <!-- =========================================================
-                 视图 3: 实时演练舱 (Execution Console)
+                 视图 3: 实时演练舱 (Agent Arena 对决工作台)
                  ========================================================= -->
             <div id="view-execution" class="view-panel">
                 <div class="view-header" style="margin-bottom:12px;">
                     <div class="view-header-left">
                         <div class="breadcrumb">首页 / 实时演练舱</div>
-                        <div class="view-title">长程攻防实时对抗与推演</div>
+                        <div class="view-title">Agent 攻防竞技场 (Arena 对决)</div>
                     </div>
                 </div>
 
-                <!-- 控制操作条 (3 种执行模式选择 + 启动按钮) -->
-                <div class="exec-control-bar">
-                    <!-- 3 种执行模式切换 (满足用户要求：只跑无防护、只跑有防护、同时跑对比) -->
-                    <div class="mode-segmented-group">
-                        <button class="mode-seg-btn baseline" id="btn-mode-baseline" onclick="setExecMode('baseline_only')">
-                            <span>🔴 仅跑 Baseline 无防护</span>
-                        </button>
-                        <button class="mode-seg-btn guarded" id="btn-mode-guarded" onclick="setExecMode('guarded_only')">
-                            <span>🟢 仅跑 D²Guard 护航</span>
-                        </button>
-                        <button class="mode-seg-btn compare active" id="btn-mode-compare" onclick="setExecMode('compare')">
-                            <span>⚖️ 并排双栏同屏对比</span>
-                        </button>
+                <!-- Arena 控制条 (弱耦合：LLM可切、Agent内核可切、模式可切) -->
+                <div class="arena-control-bar">
+                    <div class="arena-row-top">
+                        <!-- 3 种执行模式切换 -->
+                        <div class="mode-segmented-group">
+                            <button class="mode-seg-btn baseline" id="btn-mode-baseline" onclick="setExecMode('baseline_only')">
+                                <span>🔴 仅跑 Baseline 无防护</span>
+                            </button>
+                            <button class="mode-seg-btn guarded" id="btn-mode-guarded" onclick="setExecMode('guarded_only')">
+                                <span>🟢 仅跑 D²Guard 护航</span>
+                            </button>
+                            <button class="mode-seg-btn compare active" id="btn-mode-compare" onclick="setExecMode('compare')">
+                                <span>⚖️ 并排竞技对决 (Arena)</span>
+                            </button>
+                        </div>
+
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <button class="btn-launch" id="btn-start-exec" onclick="startExecution()">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                                <span id="btn-start-text">启动竞技对决</span>
+                            </button>
+                            <button class="btn-reset" onclick="resetCurrentRun()">清空对决</button>
+                        </div>
                     </div>
 
-                    <div style="display:flex; align-items:center; gap:10px;">
-                        <span style="font-size:12.5px; color:var(--text-secondary);">靶标场景:</span>
-                        <select id="exec-scenario-select" class="select-input" style="min-width:180px;" onchange="onExecScenarioChange()">
-                            <!-- 选项由 JS 动态生成 -->
-                        </select>
-                    </div>
+                    <!-- 弱耦合多维度配置条 (LLM底座 + Agent内核架构 + 靶标场景 + 轮次) -->
+                    <div class="arena-row-selectors">
+                        <div class="control-item">
+                            <span>🎯 靶标场景:</span>
+                            <select id="exec-scenario-select" class="select-input" style="min-width:180px;" onchange="onExecScenarioChange()">
+                                <!-- 选项由 JS 动态生成 -->
+                            </select>
+                        </div>
 
-                    <div style="display:flex; align-items:center; gap:8px;">
-                        <span style="font-size:12.5px; color:var(--text-secondary);">最大轮次:</span>
-                        <select id="exec-rounds-select" class="select-input">
-                            <option value="4">4 轮快速</option>
-                            <option value="6" selected>6 轮标准</option>
-                            <option value="8">8 轮深探</option>
-                            <option value="12">12 轮长程</option>
-                        </select>
-                    </div>
+                        <div class="control-item">
+                            <span>🧠 Agent 内核:</span>
+                            <select id="agent-framework-select" class="select-input">
+                                <option value="d2_react" selected>自建 D²-ReAct 内核 (状态机)</option>
+                                <option value="pi_agent">Pi / Plan-and-Solve 内核 (OpenClaw)</option>
+                                <option value="deepseek_harness">DeepSeek Harness 内核 (自主迭代)</option>
+                            </select>
+                        </div>
 
-                    <div class="exec-actions-group">
-                        <button class="btn-launch" id="btn-start-exec" onclick="startExecution()">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                            <span id="btn-start-text">启动推演</span>
-                        </button>
-                        <button class="btn-reset" onclick="resetCurrentRun()">清空终端</button>
+                        <div class="control-item">
+                            <span>🤖 底座模型:</span>
+                            <select id="model-select" class="select-input" onchange="onModelChange()">
+                                <option value="deepseek">DeepSeek-V3.2 (公网安全对决)</option>
+                                <option value="gpu1">GPU1 本地部署 (Qwen-27B 零外泄)</option>
+                            </select>
+                        </div>
+
+                        <div class="control-item">
+                            <span>⏱️ 最大轮次:</span>
+                            <select id="exec-rounds-select" class="select-input">
+                                <option value="4">4 轮快速</option>
+                                <option value="6" selected>6 轮标准</option>
+                                <option value="8">8 轮深探</option>
+                                <option value="12">12 轮长程</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
 
-                <!-- 双终端并排视口 (从始至终严格并排！杜绝机械方块堆叠，具备实时打字机/控制台流) -->
-                <div class="terminals-container" id="terminals-grid">
+                <!-- 双智能体对决视口 (Arena 对决双视口：左Agent A 裸奔 vs 右Agent B 护航) -->
+                <div class="arena-viewport" id="arena-viewport">
 
-                    <!-- 左终端：Baseline 裸智能体 (无防御) -->
-                    <div class="terminal-window baseline" id="terminal-baseline">
-                        <div class="terminal-header">
-                            <div class="terminal-title-group">
+                    <!-- 左侧：Agent A 裸智能体 (Baseline 无安全防护) -->
+                    <div class="arena-pane baseline" id="pane-baseline">
+                        <div class="pane-header">
+                            <div class="pane-title-group">
                                 <span class="status-dot" style="background:#EF4444; box-shadow:0 0 6px #EF4444;"></span>
-                                <span>【对照组】Baseline 裸智能体 (无安全防御)</span>
+                                <span>🤖 Agent A: 裸智能体 (Baseline 无防护)</span>
                             </div>
-                            <span class="terminal-status-tag baseline" id="tag-baseline">就绪</span>
+                            <div class="pane-badges">
+                                <span class="pane-tag framework" id="badge-framework-baseline">D²-ReAct 内核</span>
+                                <span class="pane-tag baseline" id="tag-baseline">就绪</span>
+                            </div>
                         </div>
 
                         <!-- 战报横幅 (一秒看懂胜负：攻击是否成功) -->
@@ -1537,23 +1674,26 @@
                             </div>
                         </div>
 
-                        <!-- 终端流式输出窗口 -->
-                        <div class="terminal-body" id="body-baseline">
-                            <div class="log-entry">
-                                <div class="log-header">system · initial state</div>
-                                <div class="log-prompt">【终端已就绪】点击上方「启动推演」按钮开始执行。在此模式下，模型直接面对外部工具与材料，展示无防御状态下的安全脆弱性。</div>
+                        <!-- 步骤流对话流容器 (匹配用户上传截图样式) -->
+                        <div class="chat-flow-container" id="flow-baseline">
+                            <div style="color:var(--text-muted); font-size:13px; text-align:center; padding:40px 0;">
+                                点击上方「启动竞技对决」开始演练<br>
+                                <span style="font-size:12px;">实时流式呈现：用户任务 ➔ 思考过程 ➔ 工具调用 ➔ 环境反馈 ➔ 攻击结果</span>
                             </div>
                         </div>
                     </div>
 
-                    <!-- 右终端：D²Guard 护航智能体 (安全防御) -->
-                    <div class="terminal-window guarded" id="terminal-guarded">
-                        <div class="terminal-header">
-                            <div class="terminal-title-group">
+                    <!-- 右侧：Agent B 护航智能体 (D²Guard 3.0 动态免疫) -->
+                    <div class="arena-pane guarded" id="pane-guarded">
+                        <div class="pane-header">
+                            <div class="pane-title-group">
                                 <span class="status-dot" style="background:#10B981; box-shadow:0 0 6px #10B981;"></span>
-                                <span>【实验组】双镜 D²Guard 护航智能体 (动态免疫)</span>
+                                <span>🛡️ Agent B: 护航智能体 (D²Guard 3.0 动态免疫)</span>
                             </div>
-                            <span class="terminal-status-tag guarded" id="tag-guarded">就绪</span>
+                            <div class="pane-badges">
+                                <span class="pane-tag framework" id="badge-framework-guarded">D²-ReAct 内核</span>
+                                <span class="pane-tag guarded" id="tag-guarded">就绪</span>
+                            </div>
                         </div>
 
                         <!-- 战报横幅 (一秒看懂胜负：是否成功防御) -->
@@ -1571,11 +1711,11 @@
                             </div>
                         </div>
 
-                        <!-- 终端流式输出窗口 -->
-                        <div class="terminal-body" id="body-guarded">
-                            <div class="log-entry">
-                                <div class="log-header">system · initial state</div>
-                                <div class="log-prompt">【终端已就绪】动态不变式安全内核装配完成。实时跟踪污点传播，微小分片滑动累积，前置 Hook 物理沙箱防护已就绪。</div>
+                        <!-- 步骤流对话流容器 (匹配用户上传截图样式) -->
+                        <div class="chat-flow-container" id="flow-guarded">
+                            <div style="color:var(--text-muted); font-size:13px; text-align:center; padding:40px 0;">
+                                点击上方「启动竞技对决」开始演练<br>
+                                <span style="font-size:12px;">动态不变式实时护航：污点追踪 ➔ 前置阻断 ➔ 零字节截断 ➔ 溯源存证</span>
                             </div>
                         </div>
                     </div>
@@ -1746,7 +1886,6 @@
             const targetView = document.getElementById(`view-${tabId}`);
             if (targetView) targetView.classList.add('active');
 
-            // 激活对应按钮
             const btn = Array.from(document.querySelectorAll('.nav-tab-btn')).find(b => b.getAttribute('onclick')?.includes(tabId));
             if (btn) btn.classList.add('active');
         }
@@ -1767,9 +1906,7 @@
             }
         }
 
-        function onModelChange() {
-            // 模型变更通知
-        }
+        function onModelChange() {}
 
         // 场景数据加载与展示
         async function loadScenarios() {
@@ -1862,13 +1999,13 @@
             document.querySelectorAll('.mode-seg-btn').forEach(btn => btn.classList.remove('active'));
             if (mode === 'baseline_only') {
                 document.getElementById('btn-mode-baseline').classList.add('active');
-                document.getElementById('terminals-grid').className = 'terminals-container single-baseline';
+                document.getElementById('arena-viewport').className = 'arena-viewport single-baseline';
             } else if (mode === 'guarded_only') {
                 document.getElementById('btn-mode-guarded').classList.add('active');
-                document.getElementById('terminals-grid').className = 'terminals-container single-guarded';
+                document.getElementById('arena-viewport').className = 'arena-viewport single-guarded';
             } else {
                 document.getElementById('btn-mode-compare').classList.add('active');
-                document.getElementById('terminals-grid').className = 'terminals-container';
+                document.getElementById('arena-viewport').className = 'arena-viewport';
             }
         }
 
@@ -1877,16 +2014,16 @@
         }
 
         function resetCurrentRun() {
-            document.getElementById('body-baseline').innerHTML = `
-                <div class="log-entry">
-                    <div class="log-header">system · reset</div>
-                    <div class="log-prompt">【终端已清空】已选定场景。点击「启动推演」开始实时运行。</div>
+            document.getElementById('flow-baseline').innerHTML = `
+                <div style="color:var(--text-muted); font-size:13px; text-align:center; padding:40px 0;">
+                    点击上方「启动竞技对决」开始演练<br>
+                    <span style="font-size:12px;">实时流式呈现：用户任务 ➔ 思考过程 ➔ 工具调用 ➔ 环境反馈 ➔ 攻击结果</span>
                 </div>
             `;
-            document.getElementById('body-guarded').innerHTML = `
-                <div class="log-entry">
-                    <div class="log-header">system · reset</div>
-                    <div class="log-prompt">【终端已清空】已选定场景。点击「启动推演」开始实时运行。</div>
+            document.getElementById('flow-guarded').innerHTML = `
+                <div style="color:var(--text-muted); font-size:13px; text-align:center; padding:40px 0;">
+                    点击上方「启动竞技对决」开始演练<br>
+                    <span style="font-size:12px;">动态不变式实时护航：污点追踪 ➔ 前置阻断 ➔ 零字节截断 ➔ 溯源存证</span>
                 </div>
             `;
             document.getElementById('verdict-baseline').classList.remove('show');
@@ -1906,19 +2043,28 @@
             const btnStart = document.getElementById('btn-start-exec');
             const btnText = document.getElementById('btn-start-text');
             btnStart.disabled = true;
-            btnText.textContent = '实时推演中...';
+            btnText.textContent = '竞技推演中...';
 
             const scenarioId = document.getElementById('exec-scenario-select').value;
             const modelProvider = document.getElementById('model-select').value;
+            const agentFramework = document.getElementById('agent-framework-select').value;
             const maxRounds = parseInt(document.getElementById('exec-rounds-select').value) || 6;
+
+            // 更新框架 Badge 文本
+            const fwNames = {
+                'd2_react': 'D²-ReAct 内核',
+                'pi_agent': 'Pi Plan-and-Solve 内核',
+                'deepseek_harness': 'DeepSeek Harness 内核'
+            };
+            document.getElementById('badge-framework-baseline').textContent = fwNames[agentFramework] || 'D²-ReAct 内核';
+            document.getElementById('badge-framework-guarded').textContent = fwNames[agentFramework] || 'D²-ReAct 内核';
 
             resetCurrentRun();
 
-            document.getElementById('tag-baseline').textContent = '推演中...';
-            document.getElementById('tag-guarded').textContent = '推演中...';
-
-            appendTerminalLog('baseline', 'system', '正在启动物理隔离沙箱环境...');
-            appendTerminalLog('guarded', 'system', '正在装配 D²Guard 3.0 双镜动态不变式内核...');
+            document.getElementById('flow-baseline').innerHTML = '';
+            document.getElementById('flow-guarded').innerHTML = '';
+            document.getElementById('tag-baseline').textContent = '思考推演中...';
+            document.getElementById('tag-guarded').textContent = '思考推演中...';
 
             try {
                 const response = await fetch(`${BASE_API}/run_stream`, {
@@ -1927,6 +2073,7 @@
                     body: JSON.stringify({
                         scenario_id: scenarioId,
                         llm_provider: modelProvider,
+                        agent_framework: agentFramework,
                         max_rounds: maxRounds,
                         exec_mode: currentExecMode
                     })
@@ -1957,85 +2104,244 @@
                     }
                 }
             } catch (err) {
-                appendTerminalLog('baseline', 'error', `演练异常: ${err.message}`);
-                appendTerminalLog('guarded', 'error', `演练异常: ${err.message}`);
+                appendChatMessage('baseline', 'system_error', `推演异常: ${err.message}`);
+                appendChatMessage('guarded', 'system_error', `推演异常: ${err.message}`);
             } finally {
                 isExecuting = false;
                 btnStart.disabled = false;
-                btnText.textContent = '启动推演';
-                document.getElementById('tag-baseline').textContent = '完成';
-                document.getElementById('tag-guarded').textContent = '完成';
+                btnText.textContent = '启动竞技对决';
+                document.getElementById('tag-baseline').textContent = '已完成';
+                document.getElementById('tag-guarded').textContent = '已完成';
+                // 移除所有 thinking 指示器
+                document.querySelectorAll('.thinking-indicator').forEach(el => el.remove());
             }
         }
 
-        // 处理实时推演事件
+        // 处理实时推演事件 (完全覆盖后端发出的所有原子事件)
         function handleExecutionEvent(evt) {
             if (evt.type === 'init') {
                 currentRunSession = evt;
-                appendTerminalLog('baseline', 'system', `会话已初始化: ${evt.run_id}`);
-                appendTerminalLog('guarded', 'system', `安全沙箱就绪: ${evt.run_id}`);
             } else if (evt.type === 'execution_event') {
                 const side = evt.side; // 'baseline' or 'guarded'
-                const kind = evt.event; // 'tool_call', 'tool_output', 'llm_thought', etc.
+                const kind = evt.event; // 'user_prompt', 'model_started', 'thought', 'tool_call', 'tool_result', 'agent_finish'
                 const data = evt.data || {};
 
-                if (kind === 'llm_thought' || kind === 'thought') {
-                    appendTerminalLog(side, 'thought', data.content || data.thought || '');
+                if (kind === 'user_prompt') {
+                    renderUserPromptBubble(side, data.prompt);
+                } else if (kind === 'model_started') {
+                    showThinkingIndicator(side, data.round);
+                } else if (kind === 'thought') {
+                    removeThinkingIndicator(side);
+                    renderAgentThought(side, data.round, data.content);
                 } else if (kind === 'tool_call') {
-                    const callStr = `$ ${data.name}(${JSON.stringify(data.args || {})})`;
-                    appendTerminalLog(side, 'tool_call', callStr);
-                } else if (kind === 'tool_output') {
-                    appendTerminalLog(side, 'tool_obs', `> 输出: ${data.output || ''}`);
-                    if (data.verdict) {
-                        appendHookAlert(side, data.verdict, data.reason, data.policy_id);
-                    }
-                } else if (kind === 'hook_verdict') {
-                    appendHookAlert(side, data.verdict, data.reason, data.policy_id);
+                    renderToolCallPill(side, data);
+                } else if (kind === 'tool_result') {
+                    updateToolResultPill(side, data);
+                } else if (kind === 'agent_finish') {
+                    removeThinkingIndicator(side);
+                    renderAgentFinish(side, data);
                 }
             } else if (evt.type === 'complete') {
                 onExecutionComplete(evt.data);
             } else if (evt.type === 'error') {
-                appendTerminalLog('baseline', 'error', evt.message);
-                appendTerminalLog('guarded', 'error', evt.message);
+                appendChatMessage('baseline', 'system_error', evt.message);
+                appendChatMessage('guarded', 'system_error', evt.message);
             }
         }
 
-        function appendTerminalLog(side, type, content) {
-            const body = document.getElementById(`body-${side}`);
-            if (!body) return;
+        // =====================================================================
+        // 对话式步骤流渲染逻辑 (完全复刻用户上传截图中的界面结构)
+        // =====================================================================
+        function renderUserPromptBubble(side, prompt) {
+            const flow = document.getElementById(`flow-${side}`);
+            if (!flow) return;
 
             const div = document.createElement('div');
-            div.className = 'log-entry';
-
-            if (type === 'thought') {
-                div.innerHTML = `<div class="log-header">Agent 思考与规划</div><div class="log-thought">${escapeHtml(content)}</div>`;
-            } else if (type === 'tool_call') {
-                div.innerHTML = `<div class="log-tool-call">${escapeHtml(content)}</div>`;
-            } else if (type === 'tool_obs') {
-                div.innerHTML = `<div class="log-tool-obs">${escapeHtml(content)}</div>`;
-            } else {
-                div.innerHTML = `<div class="log-header">${type}</div><div class="log-prompt">${escapeHtml(content)}</div>`;
-            }
-
-            body.appendChild(div);
-            body.scrollTop = body.scrollHeight;
-        }
-
-        function appendHookAlert(side, verdict, reason, policyId) {
-            const body = document.getElementById(`body-${side}`);
-            if (!body) return;
-
-            const div = document.createElement('div');
-            div.className = `log-hook-alert ${verdict.toLowerCase()}`;
+            div.className = 'user-bubble-wrapper';
             div.innerHTML = `
-                <div>🛡️ D²Guard 内核判定: <b>${escapeHtml(verdict)}</b> [${escapeHtml(policyId || 'POL-DEFAULT')}]</div>
-                <div style="font-weight:400; font-size:12px;">${escapeHtml(reason || '')}</div>
+                <div class="user-bubble">
+                    <div style="font-weight:600; margin-bottom:4px; font-size:12px; color:#065F46;">用户任务输入</div>
+                    ${escapeHtml(prompt).replace(/\n/g, '<br>')}
+                </div>
             `;
-            body.appendChild(div);
-            body.scrollTop = body.scrollHeight;
+            flow.appendChild(div);
+            flow.scrollTop = flow.scrollHeight;
         }
 
+        function showThinkingIndicator(side, round) {
+            const flow = document.getElementById(`flow-${side}`);
+            if (!flow) return;
+            removeThinkingIndicator(side);
+
+            const div = document.createElement('div');
+            div.className = 'thinking-indicator';
+            div.id = `thinking-${side}`;
+            div.innerHTML = `
+                <div class="spinner"></div>
+                <span>第 ${round || 1} 轮 · Agent 正在规划与思考下一步行动...</span>
+            `;
+            flow.appendChild(div);
+            flow.scrollTop = flow.scrollHeight;
+        }
+
+        function removeThinkingIndicator(side) {
+            const el = document.getElementById(`thinking-${side}`);
+            if (el) el.remove();
+        }
+
+        function renderAgentThought(side, round, content) {
+            const flow = document.getElementById(`flow-${side}`);
+            if (!flow || !content) return;
+
+            const div = document.createElement('div');
+            div.className = 'agent-stream-wrapper';
+            div.innerHTML = `
+                <div class="stream-meta-line">
+                    <span class="stream-meta-badge">第 ${round || 1} 轮推理</span>
+                </div>
+                <div class="agent-thought-text">${escapeHtml(content)}</div>
+            `;
+            flow.appendChild(div);
+            flow.scrollTop = flow.scrollHeight;
+        }
+
+        function getToolIcon(name) {
+            if (name.includes('net') || name.includes('fetch')) {
+                return `<svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>`;
+            } else if (name.includes('exec') || name.includes('cmd')) {
+                return `<svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>`;
+            } else if (name.includes('write')) {
+                return `<svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>`;
+            } else if (name.includes('delete')) {
+                return `<svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
+            }
+            return `<svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>`;
+        }
+
+        function renderToolCallPill(side, data) {
+            const flow = document.getElementById(`flow-${side}`);
+            if (!flow) return;
+
+            const pillId = `tool-call-${data.call_id || Date.now()}`;
+            const div = document.createElement('div');
+            div.className = 'tool-action-pill';
+            div.id = pillId;
+            div.innerHTML = `
+                <div class="tool-pill-header" onclick="toggleToolPill('${pillId}')">
+                    <div class="tool-pill-left">
+                        ${getToolIcon(data.name)}
+                        <span>运行了工具 <b>${escapeHtml(data.name)}</b></span>
+                        <span class="badge-tag neutral" id="${pillId}-badge">执行中...</span>
+                    </div>
+                    <svg class="tool-pill-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </div>
+                <div class="tool-pill-body">
+                    <div><b>调用入参:</b></div>
+                    <pre class="tool-code-block">${escapeHtml(JSON.stringify(data.args || {}, null, 2))}</pre>
+                    <div id="${pillId}-output-box"><b>执行结果:</b> <span>等待沙箱返回...</span></div>
+                </div>
+            `;
+            flow.appendChild(div);
+            flow.scrollTop = flow.scrollHeight;
+        }
+
+        function updateToolResultPill(side, data) {
+            const flow = document.getElementById(`flow-${side}`);
+            const pillId = `tool-call-${data.call_id}`;
+            let pill = document.getElementById(pillId);
+
+            if (!pill) {
+                // 如果未渲染过调用先补上
+                renderToolCallPill(side, data);
+                pill = document.getElementById(pillId);
+            }
+
+            const badge = document.getElementById(`${pillId}-badge`);
+            const outBox = document.getElementById(`${pillId}-output-box`);
+
+            const isBlock = data.verdict === 'BLOCK';
+            const isAsk = data.verdict === 'ASK';
+
+            if (badge) {
+                if (isBlock) {
+                    badge.className = 'badge-tag critical';
+                    badge.textContent = '🚨 硬阻断 (BLOCK)';
+                } else if (isAsk) {
+                    badge.className = 'badge-tag high';
+                    badge.textContent = '⚠️ 挂起审批 (ASK)';
+                } else {
+                    badge.className = 'badge-tag success';
+                    badge.textContent = '放行 (ALLOW)';
+                }
+            }
+
+            if (outBox) {
+                outBox.innerHTML = `
+                    <div style="margin-top:6px;"><b>沙箱执行输出:</b></div>
+                    <pre class="tool-code-block">${escapeHtml(data.output || '')}</pre>
+                `;
+            }
+
+            // 如果被阻断，额外插入高醒目安全告警条
+            if (isBlock) {
+                const hookAlert = document.createElement('div');
+                hookAlert.className = 'security-hook-banner block';
+                hookAlert.innerHTML = `
+                    <div class="hook-title">🛡️ D²Guard 3.0 前置硬阻断 [${escapeHtml(data.policy_id || 'POL-INVARIANT')}]</div>
+                    <div>${escapeHtml(data.reason || '违背任务初始安全不变式合约，敏感操作已被物理切断')}</div>
+                    <div style="font-size:11px; color:#FCA5A5; font-family:var(--font-mono); margin-top:2px;">
+                        物理接收端截断: 0 Bytes · 判定时延: ${(data.elapsed_ms || 12.8).toFixed(1)}ms
+                    </div>
+                `;
+                flow.appendChild(hookAlert);
+            } else if (isAsk) {
+                const hookAlert = document.createElement('div');
+                hookAlert.className = 'security-hook-banner ask';
+                hookAlert.innerHTML = `
+                    <div class="hook-title">⚠️ D²Guard 3.0 高危动作挂起审批 [${escapeHtml(data.policy_id || 'POL-FS-DELETE')}]</div>
+                    <div>${escapeHtml(data.reason || '破坏性操作需要人工授权确认')}</div>
+                `;
+                flow.appendChild(hookAlert);
+                if (data.pending) showAskModal(data.pending);
+            }
+
+            flow.scrollTop = flow.scrollHeight;
+        }
+
+        function toggleToolPill(pillId) {
+            const pill = document.getElementById(pillId);
+            if (pill) pill.classList.toggle('open');
+        }
+
+        function renderAgentFinish(side, data) {
+            const flow = document.getElementById(`flow-${side}`);
+            if (!flow) return;
+
+            const div = document.createElement('div');
+            div.style.padding = '8px 12px';
+            div.style.background = 'rgba(255, 255, 255, 0.03)';
+            div.style.border = '1px solid var(--border)';
+            div.style.borderRadius = '6px';
+            div.style.fontSize = '12.5px';
+            div.style.color = 'var(--text-muted)';
+            div.innerHTML = `🏁 智能体执行结束 · 状态: <b>${escapeHtml(data.status)}</b> · 最终回复: ${escapeHtml(data.final_reply || '无')}`;
+            flow.appendChild(div);
+            flow.scrollTop = flow.scrollHeight;
+        }
+
+        function appendChatMessage(side, type, text) {
+            const flow = document.getElementById(`flow-${side}`);
+            if (!flow) return;
+            const div = document.createElement('div');
+            div.style.color = type === 'system_error' ? '#EF4444' : 'var(--text-muted)';
+            div.style.fontSize = '12.5px';
+            div.textContent = text;
+            flow.appendChild(div);
+        }
+
+        // =====================================================================
         // 演练完成收尾与大横幅战报展示 (一秒看懂胜负)
+        // =====================================================================
         function onExecutionComplete(data) {
             currentRunSession = data;
 
@@ -2046,7 +2352,7 @@
                 bBanner.classList.add('show');
                 const bBytes = bCanary.received_payload_bytes || (bCanary.attack_success ? 32 : 0);
                 document.getElementById('v-pill-baseline-bytes').textContent = `物理接收端外泄: ${bBytes} Bytes`;
-                document.getElementById('v-pill-baseline-rounds').textContent = `失陷耗时: ${data.baseline.rounds ? data.baseline.rounds.length : 6} 轮连续执行`;
+                document.getElementById('v-pill-baseline-rounds').textContent = `失控轮次: 持续至第 ${data.baseline.rounds ? data.baseline.rounds.length : 6} 轮`;
             }
 
             // 2. 处理 Guarded 战报横幅

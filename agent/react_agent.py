@@ -131,8 +131,10 @@ class ReActAgent:
     """A real model/tool loop, with resumable batched tool calls and observable events."""
     def __init__(self, name="ReActAgent-01", model=None, hook=None, gateway=None,
                  api_key=None, base_url=None, client=None, tool_map=None,
-                 tool_definitions=None, event_callback=None, provider=None, max_tool_calls=16, max_wall_seconds=150):
+                 tool_definitions=None, event_callback=None, provider=None, max_tool_calls=16, max_wall_seconds=150,
+                 agent_framework="d2_react"):
         self.name, self.hook, self.gateway = name, hook, gateway
+        self.agent_framework = agent_framework
         configured, configured_model = create_llm_client(provider=provider, api_key=api_key,
                                                         base_url=base_url, model=model)
         self.raw_client, self.model = client or configured, model or configured_model
@@ -168,6 +170,7 @@ class ReActAgent:
         return self.raw_client.chat.completions.create(**safe)
 
     def _dispatch_tool(self, tool_name, tool_args, call_id):
+        self._emit('tool_call', dict(name=tool_name, args=copy.deepcopy(tool_args), call_id=call_id))
         start = time.perf_counter()
         details = dict(name=tool_name, dsl_name=self.tool_dsl_name_map.get(tool_name, tool_name),
                        args=copy.deepcopy(tool_args), call_id=call_id)
@@ -220,13 +223,14 @@ class ReActAgent:
             if time.perf_counter()-self._started>=self.max_wall_seconds:
                 self.status, self.final_reply='budget_exhausted','实际执行预算耗尽'
                 return self.result()
-            self._emit('model_started', {'round': len(self.trajectory)+1})
+            round_num = len(self.trajectory) + 1
+            self._emit('model_started', {'round': round_num})
             start = time.perf_counter()
             response = self._call_model(self.messages)
             msg = response.choices[0].message
             content = msg.content or ''
             calls = getattr(msg, 'tool_calls', None) or []
-            entry = dict(round=len(self.trajectory)+1, thought=content,
+            entry = dict(round=round_num, thought=content,
                          model_latency_ms=(time.perf_counter()-start)*1000, tool_executions=[])
             self.trajectory.append(entry)
             # Serialize SDK messages, preserving tool-call arguments and IDs.
@@ -237,22 +241,36 @@ class ReActAgent:
                     tool_calls=[dict(id=c.id, type='function', function=dict(name=c.function.name,
                                 arguments=c.function.arguments)) for c in calls]))
             self._emit('model_completed', entry)
+            self._emit('thought', dict(round=round_num, content=content))
             if not calls:
                 self.status, self.final_reply = 'completed', content
+                self._emit('agent_finish', dict(final_reply=content, status=self.status, round=round_num))
                 return self.result()
             self._remaining_calls = list(calls)
             if not self._process_calls():
                 return self.result()
         self.status, self.final_reply = 'max_rounds_reached', '已达最大循环轮次，任务完成情况需核验'
+        self._emit('agent_finish', dict(final_reply=self.final_reply, status=self.status, round=len(self.trajectory)))
         return self.result()
 
     def run(self, user_prompt, max_rounds=6):
-        self.messages = [dict(role='system', content='You are a helpful agent. Use tools to complete the user task. '
-            'Provide concise action summaries; do not reveal private reasoning.'),
-            dict(role='user', content=user_prompt)]
+        system_prompts = {
+            'd2_react': 'You are a helpful ReAct Agent. Use tools to complete the user task step by step. '
+                        'Provide concise action summaries and thoughts; do not reveal private reasoning.',
+            'pi_agent': 'You are an autonomous Pi Plan-and-Solve Agent. For each user task, formulate structured plan stages, '
+                        'execute tools systematically to accomplish each stage, and verify outcomes.',
+            'deepseek_harness': 'You are an engineering Agent operating within DeepSeek Harness. You strictly follow '
+                                'an iterative observe-hypothesize-act-verify cycle and output concise Thoughts.'
+        }
+        sys_prompt = system_prompts.get(self.agent_framework, system_prompts['d2_react'])
+        self.messages = [
+            dict(role='system', content=sys_prompt),
+            dict(role='user', content=user_prompt)
+        ]
         self.trajectory, self._remaining_calls, self._pending = [], [], None
         self.max_rounds, self.status = max_rounds, 'running'
         self._tool_count, self._started = 0, time.perf_counter()
+        self._emit('user_prompt', {'prompt': user_prompt, 'agent_framework': self.agent_framework, 'model': self.model})
         return self._continue()
 
     def resume(self, token_id, principal_id):

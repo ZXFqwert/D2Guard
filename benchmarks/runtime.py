@@ -107,12 +107,14 @@ class SandboxTools:
 class Experiment:
     def __init__(self, scenario=None, mode='d2guard', is_benign=False, payload=None,
                  prompt=None, task_type='general', provider=None, client=None,
-                 model=None, max_rounds=6, callback=None, canary=None, log_root=None):
+                 model=None, max_rounds=6, callback=None, canary=None, log_root=None,
+                 agent_framework='d2_react'):
         if mode not in {'unprotected','rule_only','delta_only','d2guard'}:
             raise ValueError('Unknown defense mode')
         self.run_id, self.principal_id = secrets.token_hex(16), secrets.token_hex(16)
         self.mode, self.scenario, self.is_benign = mode, scenario, is_benign
         self.canary = canary or 'D2CANARY_' + secrets.token_hex(20)
+        self.agent_framework = agent_framework
         self.tmp = tempfile.TemporaryDirectory(prefix='d2guard-rehearsal-')
         self.root = Path(self.tmp.name)
         self.receiver = ControlledHTTPReceiver(transcript_path=self.root/'receiver.jsonl')
@@ -166,7 +168,8 @@ class Experiment:
         self.prompt+='\n当前工作区初始文件：'+', '.join(available)+'. 请使用已提供的文件和工具完成任务。'
         self.agent = ReActAgent(model=model or configured_model, client=selected_client, hook=self.hook,
             gateway=ModelAPIGateway(self.core, selected_client, provider=provider) if self.core else None,
-            tool_map=self.tools.mapping(), tool_definitions=definitions, event_callback=callback, provider=provider)
+            tool_map=self.tools.mapping(), tool_definitions=definitions, event_callback=callback, provider=provider,
+            agent_framework=agent_framework)
         self.model_mode = 'injected_test_client' if client is not None else 'live_api'
         self.result_data = None
 

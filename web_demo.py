@@ -39,6 +39,7 @@ class RunRequest(BaseModel):
     scenario_id: str = 'custom'
     task_type: str = Field(default='general', max_length=80)
     llm_provider: Literal['deepseek', 'gpu1'] = 'deepseek'
+    agent_framework: Literal['d2_react', 'pi_agent', 'deepseek_harness'] = 'd2_react'
     payload: str | None = Field(default=None, max_length=100000)
     max_rounds: int = Field(default=6, ge=1, le=12)
     exec_mode: Literal['baseline_only', 'guarded_only', 'compare'] = 'compare'
@@ -104,7 +105,8 @@ class RehearsalService:
             experiments[side] = Experiment(
                 scenario=scenario, mode=mode, prompt=prompt, payload=payload,
                 task_type=request.task_type, provider=request.llm_provider, client=client,
-                callback=callback, max_rounds=request.max_rounds, canary=canary
+                callback=callback, max_rounds=request.max_rounds, canary=canary,
+                agent_framework=request.agent_framework
             )
         session = dict(
             run_id=sid, access_token=capability, experiments=experiments,
@@ -125,7 +127,14 @@ class RehearsalService:
         try:
             with session['lock']:
                 session['busy'] = True
-                for exp in session['experiments'].values(): exp.run()
+                if len(session['experiments']) > 1:
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+                        futures = [executor.submit(exp.run) for exp in session['experiments'].values()]
+                        concurrent.futures.wait(futures)
+                else:
+                    for exp in session['experiments'].values():
+                        exp.run()
                 return self.response(session)
         finally:
             session['busy'] = False
