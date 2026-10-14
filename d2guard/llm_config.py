@@ -40,6 +40,9 @@ def get_llm_config(provider: Optional[str] = None) -> Dict[str, str]:
         }
 
 
+_CLIENT_CACHE: Dict[Tuple[str, str], OpenAI] = {}
+
+
 def create_llm_client(
     provider: Optional[str] = None,
     api_key: Optional[str] = None,
@@ -48,6 +51,7 @@ def create_llm_client(
 ) -> Tuple[Optional[OpenAI], str]:
     """
     创建并返回 (OpenAI_client, model_name)
+    使用单例缓存池，消除 Windows 下每次新建 httpx 客户端长达 2.2 秒的初始化延迟
     """
     cfg = get_llm_config(provider)
     final_key = api_key or cfg["api_key"]
@@ -57,5 +61,8 @@ def create_llm_client(
     if not final_key:
         return None, final_model
 
-    client = OpenAI(api_key=final_key, base_url=final_url)
-    return client, final_model
+    cache_key = (final_key, final_url)
+    if cache_key not in _CLIENT_CACHE:
+        _CLIENT_CACHE[cache_key] = OpenAI(api_key=final_key, base_url=final_url)
+
+    return _CLIENT_CACHE[cache_key], final_model

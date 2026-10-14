@@ -18,6 +18,7 @@ from openai import OpenAI
 
 from .core import D2GuardCore
 from .models import CallLifecycleStage, D2Event
+from .llm_config import create_llm_client
 
 
 class ModelAPIGateway:
@@ -29,10 +30,17 @@ class ModelAPIGateway:
         real_client: Optional[OpenAI] = None
     ):
         self.core = core
-        self.real_client = real_client or OpenAI(
-            api_key=os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or "mock-key",
-            base_url=os.getenv("LLM_BASE_URL", "https://api.huiyan-ai.cn/v1")
-        )
+        if real_client:
+            self.real_client = real_client
+        else:
+            cached_client, _ = create_llm_client(
+                api_key=os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or "mock-key",
+                base_url=os.getenv("LLM_BASE_URL", "https://api.huiyan-ai.cn/v1")
+            )
+            self.real_client = cached_client or OpenAI(
+                api_key=os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or "mock-key",
+                base_url=os.getenv("LLM_BASE_URL", "https://api.huiyan-ai.cn/v1")
+            )
 
     def chat_completion(
         self,

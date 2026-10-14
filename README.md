@@ -7,6 +7,8 @@
 > **核心机制**：**$D^1$（Dual-System 快慢双系统） + $D^2$（Delta-JSON 增量状态流与安全状态聚合）**  
 > **三大接口**：`extract(event)` $\to$ `update_state(state, extracted)` $\to$ `decide(state, proposed_action)`
 
+> **团队协作入口**：源码在 [GitHub 团队私有仓库](https://github.com/ZXFqwert/D2Guard)，演示在 [公网体验平台](https://agent.li33.art/safe)。每位成员在自己的目录 clone、开发、提交；代码进入 `main` 后，由部署人在算力机运行 `./deploy.sh update` 发布。完整步骤见本文第七节；push 本身不会自动上线。
+
 ---
 
 ## 一、 系统总体架构：前线双探针与中央决策大脑
@@ -96,9 +98,8 @@ flowchart TD
 conda create -n d2guard python=3.10 -y
 conda activate d2guard
 
-pip install openai pydantic jinja2 python-dotenv bashlex pyyaml
-# 本地决策小模型 (支持 CPU / 普通 GPU，显存 < 1GB)
-pip install laya
+python -m pip install -r requirements.txt
+# 如需启用 Laya 模型，再按模型环境要求安装相应依赖。
 ```
 
 ### 2. 项目目录结构
@@ -191,34 +192,96 @@ chmod +x deploy.sh
 
 ## 七、 团队多端协同开发工作流（反重力 + Codex + 算力机）
 
-为保障团队多人高效开发，且**绝不中断正在对外开放的公网演示大屏**，请遵循以下开发规范：
+### 1. 当前发布链路与职责
 
-### 1. 核心协作架构
-* **单一事实来源 (Single Source of Truth)**：`https://github.com/ZXFqwert/D2Guard`
-* **环境完全对称**：
-  * **代码与前端**：本地与算力机完全一致；前端 `web_static/index.html` 内置动态自适应路径，在本地自动请求本地 API，在公网自动走 `/safe/api`，无需任何手工改动。
-  * **LLM API**：本地与算力机 `.env` 配置一致（共享 DeepSeek-v3.2 密钥与服务端点）。
-  * **核心依赖**：统一收敛在 `requirements.txt`。
+```text
+各成员独立 clone → 本地开发与验证 → commit / push → 合并到 GitHub main
+                                                        ↓
+                          部署人登录算力机，执行 ./deploy.sh update
+                                                        ↓
+                               拉取代码、安装依赖、重启 Web 服务
+                                                        ↓
+                             VPS 反向代理 → 公网 /safe 体验平台
+```
 
-### 2. 模式 A：日常功能开发（反重力主力 ➔ GitHub ➔ 算力机热更）
-* **适用场景**：新增防御策略 DSL、增强 Hook/网关拦截逻辑、调整 ReAct Agent 业务、优化前端演练大屏。
-* **流程**：
-  1. 在本地让【反重力】改代码，并在本地浏览器（`http://127.0.0.1:8000/safe`）或单元测试中验证；
-  2. 验证无误后，本地 `git commit` 并 `git push origin main`；
-  3. 算力机执行一键更新命令：
-     ```bash
-     ./deploy.sh update
-     ```
-     （该脚本自动 `git pull`、增量安装新依赖，并通知 systemd 守护进程热重启，5 秒内公网生效）。
+| 位置 | 用途 | 操作约定 |
+| :--- | :--- | :--- |
+| 各成员电脑 / 独立开发目录 | 反重力、Codex 或手工开发与验证 | 各自 clone，不操作他人正在开发的工作目录 |
+| [GitHub 团队仓库](https://github.com/ZXFqwert/D2Guard) | 共享源码与文档，私有仓库 | 成员需有仓库访问权限；当前发布来源为 `main` |
+| 算力机部署目录 | 运行对外 Web 服务 | 由当次指定的部署人统一拉取、更新；不在此目录并行开发 |
+| [公网体验平台](https://agent.li33.art/safe) | 团队与外部访客查看已发布效果 | 本次检查无需 GitHub 登录即可访问；展示已发布代码，本机未提交改动不会自动同步 |
 
-### 3. 模式 B：GPU 重度任务（算力机 Codex ➔ GitHub ➔ 本地反重力同步）
-* **适用场景**：利用算力机 2×NVIDIA A100 80GB GPU 微调/训练【快镜】Laya 400M 模型、运行百轮全量对抗消融实验。
-* **流程**：
-  1. 通过 VS Code Remote-SSH（端口 6027，`roots@175.6.27.158` 或 Mesh `10.33.0.30`）连入算力机；
-  2. 启动 Codex 编写训练与评测脚本，调用 GPU 运行；
-  3. 算力机上测试通过后，执行：
-     ```bash
-     git add . && git commit -m "feat: 训练并评测新模型权重" && git push origin main
-     ```
-  4. 回到本地反重力会话，执行 `git pull`，本地环境立刻同步。
+**“一键更新”指在算力机执行更新命令后，脚本自动拉取并重启。当前仓库的 GitHub Actions 工作流和 Webhook 数量均为 0，未核实有外部自动部署入口；不能把 push 当作已经上线。** 执行更新的人需要算力机登录和部署目录权限，不是所有仓库成员都默认有发布权限。
+
+### 2. 新成员各自 clone 与启动（Windows PowerShell）
+
+在自己的工作目录执行以下示例，不要复用其他成员正在开发的目录。私有仓库需要先用自己的 GitHub 账户获得访问权限并完成 Git 认证；远程地址使用普通 HTTPS URL，凭据交给凭据管理器，不把令牌写进 URL。
+
+```powershell
+git clone https://github.com/ZXFqwert/D2Guard.git
+Set-Location -LiteralPath 'D2Guard'
+git switch -c feat/your-task
+python -m venv .venv
+& .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+Copy-Item -LiteralPath '.env.example' -Destination '.env'
+```
+
+`feat/your-task` 是示例分支名，换成自己的任务名；Codex 创建分支时默认使用 `codex/` 前缀。如果已有独立 clone 或 Python 环境，复用自己的环境；已有 `.env` 不覆盖。按 `.env.example` 在各自环境配置经授权的模型端点、模型名与密钥，然后启动本地 Web：
+
+```powershell
+& .\.venv\Scripts\python.exe -m uvicorn web_demo:app --host 127.0.0.1 --port 8000
+```
+
+本地访问 `http://127.0.0.1:8000/safe`。若端口已被自己的其他服务占用，改用空闲端口，不停止他人服务。前端会按访问路径选择 `/safe/api` 或 `/api`，通常无需为本地和公网分别改源码。
+
+### 3. 提交、同步与多人协作
+
+1. 在自己的开发分支修改并完成与本次改动相应的本地验证；用 `git status --short` 和 `git diff` 确认提交范围。
+2. 只 `git add` 本次确认的文件，再 `git commit`、`git push -u origin <自己的分支>`；推荐通过 PR 合并到 `main`。个人分支上的代码尚未进入发布来源。
+3. 如果团队继续直接提交 `main`，提交前先同步最新 `main`，解决并验证冲突后再正常 push；push 被拒绝时先同步，禁止 force push 覆盖他人提交。
+4. 新任务开始前，在自己的干净工作区执行 `git fetch origin`，切到 `main`，再执行 `git pull --ff-only origin main`，然后新建任务分支。已有未完成工作先自行提交或妥善保存；不要在反重力正在开发的共享目录切分支、pull、reset、clean 或覆盖文件。
+
+代码、依赖清单、策略和必要文档通过 Git 同步；`.env`、`.venv`、日志与 `runs/` 已在 `.gitignore` 中排除，分别留在各自环境。`requirements.txt` 当前使用版本下限，不是锁定文件，因此不承诺各环境依赖和凭证完全一致。模型权重和大体积实验产物另行约定交付方式，不用 `git add .` 混入源码提交。
+
+### 4. 算力机一键发布（Linux Bash）
+
+由团队指定当次部署人，确认待发布改动已进入 GitHub `main`。旧交接信息给出的连接入口是 `roots@175.6.27.158`、SSH 端口 `6027`，Mesh 地址为 `10.33.0.30`；本次未成功建立 SSH 会话，入口、部署目录绝对路径和实际服务管理方式需要由部署人核实后使用，不能按本地 Windows 路径推断。
+
+登录后进入**既有部署目录**，先检查：
+
+```bash
+git branch --show-current
+git status --short
+git log -1 --oneline
+```
+
+当前分支应为 `main`，工作区应无待处理改动；另在本机私下确认 `origin` 指向团队仓库，分享信息时不输出可能含凭据的 remote URL。若发现开发中的改动或分支不对，先协调处理，不用 reset/clean 强行覆盖。确认发布条件后，在该部署目录执行：
+
+```bash
+./deploy.sh update
+```
+
+脚本在自身所在目录执行 `git pull origin main`，不会自动切到 `main`，也不会拉取个人开发分支。随后安装 `requirements.txt`，若用户级 `d2guard.service` 已启用，则调用 `systemctl --user restart d2guard`；否则停止旧进程，再用 `nohup` 启动 Uvicorn，监听 `8000` 端口。
+
+这是**服务重启**，可能短暂中断演示或正在进行的请求；更新时间受网络、依赖安装和启动影响，不承诺 5 秒生效。脚本不会创建 systemd 单元；`nginx_safe.conf` 是 VPS 将 `/safe/` 转发到 `10.33.0.30:8000/safe/` 的参考配置，首次部署时还需由部署人完成环境、模型配置与反代设置。
+
+### 5. 发布后验收与失败处理
+
+1. 记录部署目录的 `git log -1 --oneline`，确认它对应本次计划发布的 GitHub 提交。
+2. 查看实际运行方式对应的状态和日志。使用用户级 systemd 时可读 `systemctl --user status d2guard --no-pager`；使用脚本后台进程时检查 `web_demo.pid` 对应的进程与 `logs/web_demo.log`。不要只凭脚本的成功提示判断上线成功。
+3. 打开 [公网平台](https://agent.li33.art/safe)，确认页面包含本次预期的改动；可先用只读 GET 检查 `/safe/api/models`。需要完整功能验收时，由部署人安排演示请求，避免影响正在进行的展示。
+4. 拉取冲突、安装异常、进程未启动、页面/API 异常时，保留错误信息并先排查；不强推、不清理他人的工作，也不在未核验时宣布更新成功。
+
+**脚本当前限制**：`update` 的一次依赖安装失败可被 `|| true` 忽略，启动检查只验证进程存在，不验证 HTTP 健康；`status`、`logs` 等动作也会先执行环境初始化、安装依赖，缺失时还可能创建 `.env`。因此它们不是纯只读诊断命令，审计或其他人开发期间不要随手运行。
+
+### 6. GPU 开发与生产目录分开
+
+GPU 训练、评测或算力机上的 Codex 开发应使用独立 clone（或另行约定的 worktree）、独立虚拟环境及不冲突的调试端口；按同一分支提交流程把源码合并回 `main`，再由部署目录更新。不要在运行公网服务的目录改前端、切分支、安装开发依赖或训练；前端文件在请求时读取，共用目录可能让开发改动直接影响公网。
+
+### 7. 2026-10-14 只读核查记录
+
+- GitHub 团队仓库为私有仓库，默认分支 `main`；核查时最新提交为 `cc3341590748f7a93292b5a3fc16e5550897c4d5`，GitHub Actions 工作流和仓库 Webhook 数量均为 0。
+- 公网 `/safe` 与 `/safe/api/models` 均返回 HTTP 200；公网前端响应与 GitHub `main` 的 `web_static/index.html` 内容一致。本机前后端有未提交改动，当前工作中的页面与公网不同，符合“开发后提交，再发布”的流程。
+- 未成功登录算力机，未核实其部署目录、运行进程的代码版本及实际 systemd/Nginx 配置；前端一致不能证明整个后端部署与 `main` 完全一致，也未执行更新来验证发布链路。
+- 本次只核查并修订文档，没有执行 Git 同步或提交、部署脚本、服务重启、在线演练或重置。以上是核查时的状态，不是持续可用性保证。
 

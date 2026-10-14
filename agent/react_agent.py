@@ -128,6 +128,9 @@ def git_push_dummy(remote: str = "origin", branch: str = "main") -> str:
     return f"[模拟 Git Push] 已成功推送分支 {branch} 到 {remote}"
 
 
+from d2guard.llm_config import create_llm_client
+
+
 class ReActAgent:
     """通用 ReAct 智能体"""
 
@@ -144,9 +147,14 @@ class ReActAgent:
         self.model = model
         self.hook = hook
         self.gateway = gateway
-        self.raw_client = OpenAI(
+        cached_client, _ = create_llm_client(
             api_key=api_key or os.getenv("LLM_API_KEY"),
-            base_url=base_url or os.getenv("LLM_BASE_URL", "https://api.huiyan-ai.cn/v1")
+            base_url=base_url or os.getenv("LLM_BASE_URL", "https://api.huiyan-ai.cn/v1"),
+            model=model
+        )
+        self.raw_client = cached_client or OpenAI(
+            api_key=api_key or "mock-key",
+            base_url=base_url or "https://api.huiyan-ai.cn/v1"
         )
 
         # 本地工具映射
