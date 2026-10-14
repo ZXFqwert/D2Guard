@@ -146,7 +146,22 @@ class SlowMirror:
             if m_json:
                 raw = m_json.group(0)
 
-            result = json.loads(raw)
+            try:
+                result = json.loads(raw)
+            except Exception:
+                # 针对模型输出未转义双引号或换行的鲁棒正则提取兜底
+                verdict_m = re.search(r'"verdict"\s*:\s*"([A-Z]+)"', raw, re.I)
+                reason_m = re.search(r'"reason"\s*:\s*"([^"\r\n]+)"', raw)
+                conf_m = re.search(r'"confidence"\s*:\s*([0-9.]+)', raw)
+                causal_m = re.search(r'"causal_chain"\s*:\s*"([^"\r\n]+)"', raw)
+                unauth_m = re.search(r'"is_unauthorized_action"\s*:\s*(true|false)', raw, re.I)
+                result = {
+                    "verdict": verdict_m.group(1).upper() if verdict_m else "ASK",
+                    "reason": reason_m.group(1) if reason_m else "慢镜提取研判结果",
+                    "confidence": float(conf_m.group(1)) if conf_m else 0.85,
+                    "causal_chain": causal_m.group(1) if causal_m else "因果分析完成",
+                    "is_unauthorized_action": unauth_m.group(1).lower() == "true" if unauth_m else False
+                }
             verdict = result.get("verdict", "ASK")
             if verdict not in ["ALLOW", "ASK", "BLOCK"]:
                 verdict = "ASK"

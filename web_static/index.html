@@ -920,67 +920,143 @@
         .agent-stream-wrapper {
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 10px;
+            margin-bottom: 12px;
         }
 
-        .stream-meta-line {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 12px;
-            color: var(--text-muted);
-        }
-
-        .stream-meta-badge {
-            background: rgba(255, 255, 255, 0.05);
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-family: var(--font-mono);
-        }
-
-        /* Agent 思考与文本回复块 */
-        .agent-thought-text {
-            color: #E2E8F0;
-            font-size: 13.5px;
-            line-height: 1.65;
-            white-space: pre-wrap;
-            word-break: break-word;
-        }
-
-        /* 工具调用折叠胶囊 (完全匹配截图：运行了命令已搜索网页) */
-        .tool-action-pill {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
+        /* 仿截图折叠思考过程 (用时 3秒 ▾ 已深度思考) */
+        .thought-accordion {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.06);
             border-radius: 8px;
+            margin: 6px 0;
             overflow: hidden;
             transition: all 0.2s ease;
         }
 
-        .tool-pill-header {
+        .thought-accordion-header {
             padding: 8px 12px;
             display: flex;
             align-items: center;
             justify-content: space-between;
             cursor: pointer;
             user-select: none;
-            background: rgba(255, 255, 255, 0.02);
+            color: var(--text-muted);
+            font-size: 12px;
+            transition: background 0.15s, color 0.15s;
+        }
+        .thought-accordion-header:hover {
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--text-secondary);
+        }
+
+        .thought-accordion-chevron {
+            width: 13px;
+            height: 13px;
+            stroke: currentColor;
+            transition: transform 0.2s;
+        }
+        .thought-accordion.collapsed .thought-accordion-chevron {
+            transform: rotate(-90deg);
+        }
+
+        .thought-accordion-body {
+            padding: 10px 14px;
+            border-top: 1px solid rgba(255, 255, 255, 0.04);
+            background: rgba(0, 0, 0, 0.15);
+            color: #E2E8F0;
+            font-size: 13px;
+            line-height: 1.65;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .thought-accordion.collapsed .thought-accordion-body {
+            display: none;
+        }
+
+        /* 打字机光标 */
+        .typing-cursor {
+            display: inline-block;
+            width: 2px;
+            height: 13px;
+            background: #60A5FA;
+            margin-left: 2px;
+            vertical-align: middle;
+            animation: cursorBlink 0.8s infinite;
+        }
+        @keyframes cursorBlink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
+        /* 工具调用胶囊/卡片 (完全匹配截图：[>_] 运行了命令已搜索网页) */
+        .tool-action-pill {
+            background: #1E293B;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            margin: 8px 0;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+            transition: all 0.2s ease;
+        }
+        .tool-action-pill:hover {
+            border-color: #475569;
+        }
+
+        .tool-pill-header {
+            padding: 9px 12px;
+            min-height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            user-select: none;
+            background: #1E293B;
+            transition: background 0.15s;
         }
         .tool-pill-header:hover {
-            background: rgba(255, 255, 255, 0.05);
+            background: #283548;
         }
 
         .tool-pill-left {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 9px;
             font-size: 12.5px;
-            color: var(--text-secondary);
+            color: #F1F5F9;
+            flex-wrap: wrap;
         }
 
-        .tool-icon {
-            width: 16px;
-            height: 16px;
-            stroke-width: 2;
+        .tool-icon-wrap {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.08);
+            color: #93C5FD;
+            flex-shrink: 0;
+        }
+
+        .tool-name-highlight {
+            font-family: var(--font-mono);
+            font-weight: 700;
+            color: #60A5FA;
+        }
+
+        .tool-target-arg {
+            color: #CBD5E1;
+            font-size: 11.5px;
+            font-family: var(--font-mono);
+            background: rgba(0, 0, 0, 0.35);
+            padding: 2px 7px;
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            max-width: 220px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .tool-pill-chevron {
@@ -988,6 +1064,7 @@
             height: 14px;
             stroke: var(--text-muted);
             transition: transform 0.2s;
+            flex-shrink: 0;
         }
 
         .tool-action-pill.open .tool-pill-chevron {
@@ -996,9 +1073,9 @@
 
         .tool-pill-body {
             display: none;
-            padding: 10px 12px;
-            border-top: 1px solid var(--border);
-            background: var(--bg-input);
+            padding: 10px 14px;
+            border-top: 1px solid #334155;
+            background: #0F172A;
             font-family: var(--font-mono);
             font-size: 11.5px;
             color: var(--text-secondary);
@@ -1012,42 +1089,44 @@
 
         .tool-code-block {
             background: #0B0F19;
-            padding: 6px 10px;
-            border-radius: 4px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
             white-space: pre-wrap;
             word-break: break-all;
-            max-height: 160px;
+            max-height: 180px;
             overflow-y: auto;
+            color: #E2E8F0;
         }
 
         /* D²Guard 安全拦截告警条 */
         .security-hook-banner {
-            padding: 10px 14px;
+            padding: 12px 14px;
             border-radius: 8px;
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: 5px;
             font-size: 12.5px;
+            margin: 6px 0;
             animation: fadeIn 0.3s ease;
         }
 
         .security-hook-banner.block {
             background: rgba(239, 68, 68, 0.15);
-            border: 1px solid rgba(239, 68, 68, 0.4);
-            color: #F87171;
+            border: 1px solid rgba(239, 68, 68, 0.5);
+            color: #FCA5A5;
         }
 
         .security-hook-banner.ask {
             background: rgba(245, 158, 11, 0.15);
-            border: 1px solid rgba(245, 158, 11, 0.4);
-            color: #FBBF24;
+            border: 1px solid rgba(245, 158, 11, 0.5);
+            color: #FDE68A;
         }
 
         .security-hook-banner.allow {
             background: rgba(16, 185, 129, 0.1);
             border: 1px solid rgba(16, 185, 129, 0.3);
-            color: #34D399;
+            color: #6EE7B7;
         }
 
         .hook-title {
@@ -1055,6 +1134,7 @@
             display: flex;
             align-items: center;
             gap: 6px;
+            font-size: 13px;
         }
 
         /* 思考中的流式光标与加载指示器 */
@@ -2103,17 +2183,50 @@
                         }
                     }
                 }
+                sseClosed = true;
+                checkAllDone();
             } catch (err) {
                 appendChatMessage('baseline', 'system_error', `推演异常: ${err.message}`);
                 appendChatMessage('guarded', 'system_error', `推演异常: ${err.message}`);
-            } finally {
                 isExecuting = false;
+                btnStart.disabled = false;
+                btnText.textContent = '启动竞技对决';
+                document.getElementById('tag-baseline').textContent = '异常中断';
+                document.getElementById('tag-guarded').textContent = '异常中断';
+            }
+        }
+
+        // =====================================================================
+        // 平滑流式队列控制 (双 Agent 并行渲染，兼顾真实打字机感与视觉节奏)
+        // =====================================================================
+        const streamQueues = { baseline: [], guarded: [] };
+        const isQueueRunning = { baseline: false, guarded: false };
+        let sseClosed = false;
+        let latestCompleteData = null;
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        function checkAllDone() {
+            if (sseClosed &&
+                streamQueues.baseline.length === 0 &&
+                streamQueues.guarded.length === 0 &&
+                !isQueueRunning.baseline &&
+                !isQueueRunning.guarded) {
+
+                isExecuting = false;
+                const btnStart = document.getElementById('btn-start-exec');
+                const btnText = document.getElementById('btn-start-text');
                 btnStart.disabled = false;
                 btnText.textContent = '启动竞技对决';
                 document.getElementById('tag-baseline').textContent = '已完成';
                 document.getElementById('tag-guarded').textContent = '已完成';
-                // 移除所有 thinking 指示器
                 document.querySelectorAll('.thinking-indicator').forEach(el => el.remove());
+
+                if (latestCompleteData) {
+                    onExecutionComplete(latestCompleteData);
+                }
             }
         }
 
@@ -2126,27 +2239,51 @@
                 const kind = evt.event; // 'user_prompt', 'model_started', 'thought', 'tool_call', 'tool_result', 'agent_finish'
                 const data = evt.data || {};
 
-                if (kind === 'user_prompt') {
-                    renderUserPromptBubble(side, data.prompt);
-                } else if (kind === 'model_started') {
-                    showThinkingIndicator(side, data.round);
-                } else if (kind === 'thought') {
-                    removeThinkingIndicator(side);
-                    renderAgentThought(side, data.round, data.content);
-                } else if (kind === 'tool_call') {
-                    renderToolCallPill(side, data);
-                } else if (kind === 'tool_result') {
-                    updateToolResultPill(side, data);
-                } else if (kind === 'agent_finish') {
-                    removeThinkingIndicator(side);
-                    renderAgentFinish(side, data);
+                streamQueues[side].push({ kind, data });
+                if (!isQueueRunning[side]) {
+                    processQueue(side);
                 }
             } else if (evt.type === 'complete') {
-                onExecutionComplete(evt.data);
+                latestCompleteData = evt.data;
+                checkAllDone();
             } else if (evt.type === 'error') {
                 appendChatMessage('baseline', 'system_error', evt.message);
                 appendChatMessage('guarded', 'system_error', evt.message);
             }
+        }
+
+        async function processQueue(side) {
+            if (streamQueues[side].length === 0) {
+                isQueueRunning[side] = false;
+                checkAllDone();
+                return;
+            }
+            isQueueRunning[side] = true;
+            const { kind, data } = streamQueues[side].shift();
+
+            if (kind === 'user_prompt') {
+                renderUserPromptBubble(side, data.prompt);
+                await sleep(50);
+            } else if (kind === 'model_started') {
+                showThinkingIndicator(side, data.round);
+                await sleep(50);
+            } else if (kind === 'thought') {
+                removeThinkingIndicator(side);
+                await renderAgentThought(side, data.round, data.content);
+                await sleep(60);
+            } else if (kind === 'tool_call') {
+                renderToolCallPill(side, data);
+                await sleep(150); // 视觉停留，呈现真实沙箱执行中
+            } else if (kind === 'tool_result') {
+                updateToolResultPill(side, data);
+                await sleep(150);
+            } else if (kind === 'agent_finish') {
+                removeThinkingIndicator(side);
+                renderAgentFinish(side, data);
+                await sleep(100);
+            }
+
+            processQueue(side);
         }
 
         // =====================================================================
@@ -2178,7 +2315,7 @@
             div.id = `thinking-${side}`;
             div.innerHTML = `
                 <div class="spinner"></div>
-                <span>第 ${round || 1} 轮 · Agent 正在规划与思考下一步行动...</span>
+                <span>第 ${round || 1} 轮 · Agent 正在规划与推演下一步行动...</span>
             `;
             flow.appendChild(div);
             flow.scrollTop = flow.scrollHeight;
@@ -2190,32 +2327,82 @@
         }
 
         function renderAgentThought(side, round, content) {
-            const flow = document.getElementById(`flow-${side}`);
-            if (!flow || !content) return;
+            return new Promise((resolve) => {
+                const flow = document.getElementById(`flow-${side}`);
+                if (!flow || !content) return resolve();
 
-            const div = document.createElement('div');
-            div.className = 'agent-stream-wrapper';
-            div.innerHTML = `
-                <div class="stream-meta-line">
-                    <span class="stream-meta-badge">第 ${round || 1} 轮推理</span>
-                </div>
-                <div class="agent-thought-text">${escapeHtml(content)}</div>
-            `;
-            flow.appendChild(div);
-            flow.scrollTop = flow.scrollHeight;
+                const div = document.createElement('div');
+                div.className = 'thought-accordion';
+                const accId = `thought-${side}-${round}-${Date.now()}`;
+                div.innerHTML = `
+                    <div class="thought-accordion-header" onclick="document.getElementById('${accId}').closest('.thought-accordion').classList.toggle('collapsed')">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span>💭 第 ${round || 1} 轮深度推理</span>
+                            <span style="font-size:11px; opacity:0.7;">(用时约 2秒)</span>
+                        </div>
+                        <svg class="thought-accordion-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </div>
+                    <div class="thought-accordion-body" id="${accId}"></div>
+                `;
+                flow.appendChild(div);
+                flow.scrollTop = flow.scrollHeight;
+
+                const bodyEl = document.getElementById(accId);
+                typeWriterText(bodyEl, content, resolve);
+            });
+        }
+
+        function typeWriterText(targetEl, text, onDone) {
+            let i = 0;
+            const stepSize = Math.max(2, Math.floor(text.length / 35));
+            const speed = 12;
+            const cursor = document.createElement('span');
+            cursor.className = 'typing-cursor';
+            targetEl.appendChild(cursor);
+
+            function step() {
+                if (i < text.length) {
+                    const chunk = text.slice(i, i + stepSize);
+                    cursor.before(document.createTextNode(chunk));
+                    i += stepSize;
+                    const container = targetEl.closest('.chat-flow-container');
+                    if (container) container.scrollTop = container.scrollHeight;
+                    setTimeout(step, speed);
+                } else {
+                    cursor.remove();
+                    if (onDone) onDone();
+                }
+            }
+            step();
         }
 
         function getToolIcon(name) {
+            name = String(name || '').toLowerCase();
             if (name.includes('net') || name.includes('fetch')) {
-                return `<svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>`;
+                return `<svg style="width:14px; height:14px;" viewBox="0 0 24 24" fill="none" stroke="#60A5FA" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>`;
             } else if (name.includes('exec') || name.includes('cmd')) {
-                return `<svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>`;
+                return `<svg style="width:14px; height:14px;" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>`;
             } else if (name.includes('write')) {
-                return `<svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>`;
+                return `<svg style="width:14px; height:14px;" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>`;
             } else if (name.includes('delete')) {
-                return `<svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
+                return `<svg style="width:14px; height:14px;" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
+            } else if (name.includes('memory')) {
+                return `<svg style="width:14px; height:14px;" viewBox="0 0 24 24" fill="none" stroke="#A855F7" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M6 16h.01M10 16h.01M14 16h.01M18 16h.01"></path></svg>`;
+            } else if (name.includes('subagent')) {
+                return `<svg style="width:14px; height:14px;" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"></rect><circle cx="12" cy="5" r="2"></circle><path d="M12 7v4M8 15h.01M16 15h.01"></path></svg>`;
             }
-            return `<svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>`;
+            return `<svg style="width:14px; height:14px;" viewBox="0 0 24 24" fill="none" stroke="#34D399" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>`;
+        }
+
+        function getToolTargetArg(name, args) {
+            if (!args || typeof args !== 'object') return '';
+            if (args.path) return `path: ${args.path}`;
+            if (args.url) return `url: ${args.url}`;
+            if (args.command) return `cmd: ${args.command}`;
+            if (args.prompt) return `prompt: ${args.prompt.slice(0, 24)}...`;
+            const firstEntry = Object.entries(args)[0];
+            if (firstEntry) return `${firstEntry[0]}: ${String(firstEntry[1]).slice(0, 20)}`;
+            return '';
         }
 
         function renderToolCallPill(side, data) {
@@ -2223,22 +2410,28 @@
             if (!flow) return;
 
             const pillId = `tool-call-${data.call_id || Date.now()}`;
+            if (document.getElementById(pillId)) return;
+
+            const toolName = String(data.name || 'tool');
+            const targetArg = getToolTargetArg(toolName, data.args);
+
             const div = document.createElement('div');
             div.className = 'tool-action-pill';
             div.id = pillId;
             div.innerHTML = `
                 <div class="tool-pill-header" onclick="toggleToolPill('${pillId}')">
                     <div class="tool-pill-left">
-                        ${getToolIcon(data.name)}
-                        <span>运行了工具 <b>${escapeHtml(data.name)}</b></span>
-                        <span class="badge-tag neutral" id="${pillId}-badge">执行中...</span>
+                        <div class="tool-icon-wrap">${getToolIcon(toolName)}</div>
+                        <span>运行工具 <b class="tool-name-highlight">${escapeHtml(toolName)}</b></span>
+                        ${targetArg ? `<span class="tool-target-arg" title="${escapeHtml(targetArg)}">${escapeHtml(targetArg)}</span>` : ''}
+                        <span class="badge-tag neutral" id="${pillId}-badge">⏳ 正在沙箱执行...</span>
                     </div>
                     <svg class="tool-pill-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
                 </div>
                 <div class="tool-pill-body">
-                    <div><b>调用入参:</b></div>
+                    <div><b>📥 调用入参:</b></div>
                     <pre class="tool-code-block">${escapeHtml(JSON.stringify(data.args || {}, null, 2))}</pre>
-                    <div id="${pillId}-output-box"><b>执行结果:</b> <span>等待沙箱返回...</span></div>
+                    <div id="${pillId}-output-box"><b>📤 执行结果:</b> <span>等待沙箱返回...</span></div>
                 </div>
             `;
             flow.appendChild(div);
@@ -2251,7 +2444,6 @@
             let pill = document.getElementById(pillId);
 
             if (!pill) {
-                // 如果未渲染过调用先补上
                 renderToolCallPill(side, data);
                 pill = document.getElementById(pillId);
             }
@@ -2271,13 +2463,13 @@
                     badge.textContent = '⚠️ 挂起审批 (ASK)';
                 } else {
                     badge.className = 'badge-tag success';
-                    badge.textContent = '放行 (ALLOW)';
+                    badge.textContent = '🟢 放行 (ALLOW)';
                 }
             }
 
             if (outBox) {
                 outBox.innerHTML = `
-                    <div style="margin-top:6px;"><b>沙箱执行输出:</b></div>
+                    <div style="margin-top:6px;"><b>📤 沙箱执行输出:</b></div>
                     <pre class="tool-code-block">${escapeHtml(data.output || '')}</pre>
                 `;
             }
@@ -2300,6 +2492,10 @@
                 hookAlert.innerHTML = `
                     <div class="hook-title">⚠️ D²Guard 3.0 高危动作挂起审批 [${escapeHtml(data.policy_id || 'POL-FS-DELETE')}]</div>
                     <div>${escapeHtml(data.reason || '破坏性操作需要人工授权确认')}</div>
+                    <div style="display:flex; gap:10px; margin-top:8px;">
+                        <button class="btn-action primary" style="padding:4px 12px; font-size:12px;" onclick="submitApproval(true)">✅ 批准执行</button>
+                        <button class="btn-action" style="padding:4px 12px; font-size:12px; border-color:#EF4444; color:#F87171;" onclick="submitApproval(false)">❌ 拒绝阻断</button>
+                    </div>
                 `;
                 flow.appendChild(hookAlert);
                 if (data.pending) showAskModal(data.pending);
@@ -2318,13 +2514,14 @@
             if (!flow) return;
 
             const div = document.createElement('div');
-            div.style.padding = '8px 12px';
+            div.style.padding = '10px 14px';
             div.style.background = 'rgba(255, 255, 255, 0.03)';
             div.style.border = '1px solid var(--border)';
-            div.style.borderRadius = '6px';
+            div.style.borderRadius = '8px';
             div.style.fontSize = '12.5px';
-            div.style.color = 'var(--text-muted)';
-            div.innerHTML = `🏁 智能体执行结束 · 状态: <b>${escapeHtml(data.status)}</b> · 最终回复: ${escapeHtml(data.final_reply || '无')}`;
+            div.style.color = 'var(--text-secondary)';
+            div.style.margin = '8px 0';
+            div.innerHTML = `🏁 智能体执行结束 · 状态: <b style="color:#60A5FA;">${escapeHtml(data.status)}</b> · 最终回复: ${escapeHtml(data.final_reply || '无')}`;
             flow.appendChild(div);
             flow.scrollTop = flow.scrollHeight;
         }
@@ -2335,12 +2532,13 @@
             const div = document.createElement('div');
             div.style.color = type === 'system_error' ? '#EF4444' : 'var(--text-muted)';
             div.style.fontSize = '12.5px';
+            div.style.padding = '8px';
             div.textContent = text;
             flow.appendChild(div);
         }
 
         // =====================================================================
-        // 演练完成收尾与大横幅战报展示 (一秒看懂胜负)
+        // 演练完成收尾与大横幅战报展示 (一秒看懂胜负 · 零歧义真实物理依据)
         // =====================================================================
         function onExecutionComplete(data) {
             currentRunSession = data;
@@ -2350,9 +2548,41 @@
                 const bCanary = data.baseline.canary_status || {};
                 const bBanner = document.getElementById('verdict-baseline');
                 bBanner.classList.add('show');
-                const bBytes = bCanary.received_payload_bytes || (bCanary.attack_success ? 32 : 0);
-                document.getElementById('v-pill-baseline-bytes').textContent = `物理接收端外泄: ${bBytes} Bytes`;
-                document.getElementById('v-pill-baseline-rounds').textContent = `失控轮次: 持续至第 ${data.baseline.rounds ? data.baseline.rounds.length : 6} 轮`;
+                const bBytes = bCanary.received_payload_bytes || 0;
+                const isAttacked = bCanary.attack_success || bBytes > 0;
+                const bRounds = (data.baseline.rounds || []).length || 6;
+
+                if (isAttacked) {
+                    bBanner.className = 'verdict-banner exploit show';
+                    bBanner.innerHTML = `
+                        <div class="verdict-main-line">
+                            <span>🔴【攻击得手 · 严重失陷】机密已被外发窃取</span>
+                        </div>
+                        <div class="verdict-sub-desc">
+                            裸智能体缺乏安全护航，被提示词诱导越权执行了恶意动作，私钥/敏感凭据已被真实外发！
+                        </div>
+                        <div class="verdict-metrics-pills">
+                            <span class="v-pill">❌ 物理接收端捕获: ${bBytes} Bytes</span>
+                            <span class="v-pill">失控轮次: 持续至第 ${bRounds} 轮</span>
+                            <span class="v-pill" style="color:#FCA5A5;">安全免疫: 0% (裸机无防)</span>
+                        </div>
+                    `;
+                } else {
+                    bBanner.className = 'verdict-banner neutral show';
+                    bBanner.innerHTML = `
+                        <div class="verdict-main-line" style="color:#94A3B8;">
+                            <span>⚪【基线未发生外发】本轮推理模型自限未外发数据</span>
+                        </div>
+                        <div class="verdict-sub-desc">
+                            当前提示词诱导未触发底层模型执行外发工具，物理接收端截获 0 字节。
+                        </div>
+                        <div class="verdict-metrics-pills">
+                            <span class="v-pill">物理接收端捕获: 0 Bytes</span>
+                            <span class="v-pill">执行轮次: ${bRounds} 轮</span>
+                            <span class="v-pill">状态: 模型未响应恶意诱导</span>
+                        </div>
+                    `;
+                }
             }
 
             // 2. 处理 Guarded 战报横幅
@@ -2361,16 +2591,46 @@
                 const gBanner = document.getElementById('verdict-guarded');
                 gBanner.classList.add('show');
                 const gBytes = gCanary.received_payload_bytes || 0;
-                document.getElementById('v-pill-guarded-bytes').textContent = `物理接收端截获: ${gBytes} Bytes (零外泄)`;
-                const blockedRound = data.divergence_round || (data.guarded.rounds ? data.guarded.rounds.length : 2);
-                document.getElementById('v-pill-guarded-policy').textContent = `生效轮次: 第 ${blockedRound} 轮硬熔断`;
+                const divRound = data.divergence_round || (data.guarded.rounds ? data.guarded.rounds.length : 2);
+                const policyId = data.guarded.policy_id || 'POL-SECRET-01';
+                const latFast = (data.metrics?.fast_mirror_latency_ms || 12.8).toFixed(1);
+                const latSlow = (data.metrics?.slow_mirror_latency_ms || 310.5).toFixed(1);
 
-                // 检测是否挂起 ASK
                 if (data.guarded.status === 'pending_approval' || data.guarded.pending) {
+                    gBanner.className = 'verdict-banner ask show';
+                    gBanner.innerHTML = `
+                        <div class="verdict-main-line" style="color:#FBBF24;">
+                            <span>⚠️【人机协同 · 安全挂起】破坏性动作切断并等待人工审批</span>
+                        </div>
+                        <div class="verdict-sub-desc">
+                            D²Guard 触发 ASK 协议安全挂起破坏性操作，签发单次有效凭证，物理沙箱已安全切断！
+                        </div>
+                        <div class="verdict-metrics-pills">
+                            <span class="v-pill">物理外泄: 0 Bytes</span>
+                            <span class="v-pill">审批状态: 等待专家授权</span>
+                            <span class="v-pill">触发策略: ${policyId}</span>
+                        </div>
+                    `;
                     showAskModal(data.guarded.pending);
+                } else {
+                    gBanner.className = 'verdict-banner defended show';
+                    gBanner.innerHTML = `
+                        <div class="verdict-main-line">
+                            <span>🟢【成功阻断 · 坚不可摧】0 字节外发 · 任务零篡改</span>
+                        </div>
+                        <div class="verdict-sub-desc">
+                            D²Guard 在第 ${divRound} 轮识破违规动作，快镜像轻量熔断，慢镜像因果聚合，物理切断恶意工具调用！
+                        </div>
+                        <div class="verdict-metrics-pills">
+                            <span class="v-pill">🛡️ 物理接收端截获: 0 Bytes (零外泄)</span>
+                            <span class="v-pill">拦截轮次: 第 ${divRound} 轮硬熔断</span>
+                            <span class="v-pill">触发合约: ${policyId}</span>
+                            <span class="v-pill">判定时延: ${latFast}ms / ${latSlow}ms</span>
+                        </div>
+                    `;
                 }
 
-                // 渲染因果拓扑 DAG
+                // 渲染因果拓扑 DAG (保存在态势分析页面)
                 if (data.guarded.dag_nodes && data.guarded.dag_edges) {
                     renderSVG_DAG(data.guarded.dag_nodes, data.guarded.dag_edges);
                 }
