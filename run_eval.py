@@ -13,7 +13,7 @@ from pathlib import Path
 import subprocess
 from datetime import datetime, timezone
 from benchmarks.runtime import Experiment
-from benchmarks.scenarios import BENCHMARK_SCENARIOS, ADVERSARIAL_TEST_CASES, BenchmarkScenario
+from benchmarks.scenarios import BENCHMARK_SCENARIOS, ADVERSARIAL_TEST_CASES, BenchmarkScenario, get_all_scenarios
 
 def evaluate_scenario(scenario, mode, is_benign=False, *, payload=None, client=None,
                       provider=None, max_rounds=6, evidence_dir=None):
@@ -78,7 +78,7 @@ def main(argv=None):
     from d2guard.llm_config import create_llm_client
     if create_llm_client(provider=args.provider)[0] is None:
         parser.error('No credentials configured. Supply environment variables or --env-file.')
-    available={s.scenario_id:s for s in BENCHMARK_SCENARIOS}
+    available={s.scenario_id:s for s in get_all_scenarios()}
     available.update({c['adv_id']:adversarial_scenario(c) for c in ADVERSARIAL_TEST_CASES})
     unknown=set(args.scenarios)-available.keys()
     if unknown: parser.error('Unknown scenario IDs: '+', '.join(sorted(unknown)))

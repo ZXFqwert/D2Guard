@@ -16,14 +16,14 @@ from fastapi import APIRouter, FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from benchmarks.runtime import Experiment
-from benchmarks.scenarios import BENCHMARK_SCENARIOS
+from benchmarks.scenarios import BENCHMARK_SCENARIOS, get_all_scenarios
 from d2guard.llm_config import get_llm_config
 from d2guard.redaction import OutboundRedactor
 
 SCENARIO_IDS = {'sc02_secret_leak':'SC-02','sc07_path_write':'SC-07',
     'sc08_chunked_leak':'SC-08','sc09_exec_pipe':'SC-09','sc10_git_push':'SC-10',
-    'sc11_subagent_leak':'SC-11'}
-SCENARIOS = {s.scenario_id:s for s in BENCHMARK_SCENARIOS}
+    'sc11_subagent_leak':'SC-11', 'cve_2025_53773':'CVE-2025-53773'}
+SCENARIOS = {s.scenario_id:s for s in get_all_scenarios()}
 
 class RunRequest(BaseModel):
     prompt: str = Field(default='', max_length=100000)
@@ -173,6 +173,13 @@ def present(report):
             edges.append(dict(**{'from':event['parent_event_id'],'to':event['event_id']},
                               is_critical=event.get('verdict')=='BLOCK',dashes=False))
     report['dag_nodes'],report['dag_edges']=nodes,edges
+    active_techs = []
+    from d2guard.mitre_atlas import AtlasThreatMapper
+    for event in report.get('events', []):
+        if event.get('verdict') in {'BLOCK', 'ASK'}:
+            tech = AtlasThreatMapper.map_policy_or_event(event.get('policy_id'), event.get('tool_name'), event.get('reason', ''))
+            active_techs.append(tech.technique_id)
+    report['mitre_atlas'] = AtlasThreatMapper.get_matrix_status(active_techs)
     return report
 
 
@@ -256,6 +263,27 @@ def reset(request:SessionRequest):
 def canary(request:SessionRequest):
     session=service.own(request.run_id,request.access_token)
     return {side:exp.public_report()['canary_status'] for side,exp in session['experiments'].items()}
+
+@router.get('/api/dag_report/{run_id}')
+def dag_report(run_id: str):
+    session = service.sessions.get(run_id)
+    if not session:
+        ev_dir = Path('runs/live_eval/evidence') / run_id
+        if ev_dir.exists():
+            files = list(ev_dir.glob('events_*.jsonl'))
+            if files:
+                from d2guard.models import D2Event
+                events = [D2Event(**json.loads(line)) for line in files[0].read_text(encoding='utf-8').strip().split('\n') if line]
+                from d2guard.provenance_dag import ProvenanceDAGVisualizer
+                html = ProvenanceDAGVisualizer.generate_html(events, session_id=run_id, output_path="")
+                return HTMLResponse(html)
+        raise HTTPException(404, '会话不存在或暂无事件记录')
+    exp = session['experiments'].get('guarded')
+    if not exp or not exp.core:
+        raise HTTPException(404, '该会话无内核审计事件')
+    from d2guard.provenance_dag import ProvenanceDAGVisualizer
+    html = ProvenanceDAGVisualizer.generate_html(exp.core.events, session_id=run_id, output_path="")
+    return HTMLResponse(html)
 
 app.include_router(router)
 app.include_router(router,prefix='/safe')

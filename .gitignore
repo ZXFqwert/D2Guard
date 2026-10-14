@@ -16,3 +16,7 @@ dist/
 
 # Browser verification traces contain temporary session capabilities.
 .playwright-cli/
+.codex-ppt-build/
+.codex-ppt-review/
+deepseek/
+汇报重构版/
