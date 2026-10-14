@@ -7,13 +7,14 @@
 4. 快慢双系统按需升级联动：快镜识别越权疑点 -> 唤醒慢镜输出结构化判词与因果链。
 """
 
+import pytest
 import os
 import sys
 import time
 from dotenv import load_dotenv
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-load_dotenv()
+
 
 from d2guard.fast_mirror import FastMirror
 from d2guard.slow_mirror import EvidencePack, SlowMirror
@@ -78,6 +79,8 @@ def test_fast_mirror_classification():
     print("\n[+] 快镜 System 1 单测全部通过！\n")
 
 
+@pytest.mark.live
+@pytest.mark.skipif(os.getenv("D2GUARD_LIVE_TESTS") != "1", reason="Live model test requires explicit opt-in")
 def test_slow_mirror_deepseek():
     print("=" * 70)
     print("【测试 2：慢镜 (System 2) DeepSeek-v3.2 深度因果分析裁判】")
@@ -110,6 +113,8 @@ def test_slow_mirror_deepseek():
     print("\n[+] DeepSeek 慢镜裁判实测通过！\n")
 
 
+@pytest.mark.live
+@pytest.mark.skipif(os.getenv("D2GUARD_LIVE_TESTS") != "1", reason="Live model test requires explicit opt-in")
 def test_slow_mirror_gpu1():
     print("=" * 70)
     print("【测试 3：慢镜 (System 2) 算力机 GPU1 (Qwen-27B) 深度因果分析裁判】")

@@ -1,142 +1,79 @@
-"""
-部件 1: 工具侧 Hook (执行刹车闸)
-定位：挂在 Agent 底层工具分发入口，执行物理拦截。
-职责：
-1. 拦截各类底层操作：fs, net, exec, git, mcp, subagent；
-2. 执行前申请裁决 (TOOL_PRE_EXEC)；
-3. 执行阻断 (BLOCK)、放行 (ALLOW) 或挂起等待用户单次审批 (ASK)；
-4. 执行完成后上报数据 (TOOL_POST_EXEC)，更新内核状态。
-"""
-
+"""Tool brake: ASK suspends; only an atomically consumed grant resumes execution."""
 from __future__ import annotations
+import copy
+import secrets
+import threading
 import time
-import uuid
-from typing import Any, Callable, Dict, Optional
-
-from .core import D2GuardCore
-from .models import (
-    ApprovalToken,
-    CallLifecycleStage,
-    D2Event,
-    VerdictType,
-)
-
+from dataclasses import asdict
+from .models import CallLifecycleStage, D2Event, VerdictType
 
 class ToolHook:
-    """工具侧 Hook 刹车闸"""
-
-    def __init__(
-        self,
-        core: D2GuardCore,
-        agent_id: str = "main",
-        user_prompt_callback: Optional[Callable[[ApprovalToken, str], bool]] = None
-    ):
-        self.core = core
-        self.agent_id = agent_id
-        # user_prompt_callback 用于在 ASK 时与终端或用户前端交互 (token, reason) -> bool
+    def __init__(self, core, agent_id="main", user_prompt_callback=None):
+        self.core, self.agent_id = core, agent_id
         self.user_prompt_callback = user_prompt_callback
+        self._pending, self._lock = {}, threading.RLock()
 
-    def execute_with_guard(
-        self,
-        tool_name: str,
-        tool_args: dict,
-        tool_func: Callable[..., Any],
-        call_id: Optional[str] = None,
-        source_type: str = "LOCAL_FILE"
-    ) -> Dict[str, Any]:
-        """
-        受 Hook 保护的工具执行入口
-        """
-        call_id = call_id or str(uuid.uuid4())
-        pre_event_id = f"EVT-HOOK-PRE-{uuid.uuid4().hex[:6]}"
+    def _reply(self, verdict):
+        return {"success": False, "blocked": verdict.verdict == VerdictType.BLOCK,
+                "pending": verdict.verdict == VerdictType.ASK, "verdict": verdict.verdict.value,
+                "reason": verdict.reason, "policy_id": verdict.policy_id,
+                "output": f"[D2Guard {verdict.verdict.value}] {verdict.reason}",
+                "approval_token": asdict(verdict.approval_token) if verdict.approval_token else None,
+                "fast_mirror": verdict.fast_mirror_signals,
+                "slow_mirror": verdict.evidence_summary, "guard_latency_ms": verdict.guard_latency_ms}
 
-        # 1. 构建工具预执行事件 (TOOL_PRE_EXEC)
-        pre_event = D2Event(
-            event_id=pre_event_id,
-            timestamp=time.time(),
-            session_id=self.core.session_id,
-            agent_id=self.agent_id,
-            call_id=call_id,
-            stage=CallLifecycleStage.TOOL_PRE_EXEC,
-            event_type="TOOL_CALL",
-            tool_name=tool_name,
-            tool_args=tool_args,
-            source_type=source_type,
-            raw_content=str(tool_args)
-        )
-
-        # 2. 向内核申请裁决
-        verdict = self.core.handle_hook_pre_exec(pre_event)
-
-        # 3. 处理 BLOCK
-        if verdict.verdict == VerdictType.BLOCK:
-            return {
-                "success": False,
-                "blocked": True,
-                "reason": verdict.reason,
-                "policy_id": verdict.policy_id,
-                "output": f"[D2Guard 阻断] 违反安全策略: {verdict.reason}"
-            }
-
-        # 4. 处理 ASK (挂起等待用户确认)
-        if verdict.verdict == VerdictType.ASK and verdict.approval_token:
-            token = verdict.approval_token
-            approved = False
-
-            # 若注册了交互回调函数，则唤起用户交互
-            if self.user_prompt_callback:
-                approved = self.user_prompt_callback(token, verdict.reason)
-            else:
-                # 默认模拟策略：在无交互前端时，根据 token 状态研判
-                approved = (token.status == "APPROVED")
-
-            if approved:
-                token.status = "APPROVED"
-                # 重新校验批准令牌后放行
-                recheck = self.core.handle_hook_pre_exec(pre_event, approval_token=token)
-                if recheck.verdict != VerdictType.ALLOW:
-                    return {
-                        "success": False,
-                        "blocked": True,
-                        "reason": f"授权校验失效: {recheck.reason}",
-                        "output": f"[D2Guard 阻断] 授权令牌未通过最终核验"
-                    }
-            else:
-                token.status = "REJECTED"
-                return {
-                    "success": False,
-                    "blocked": True,
-                    "reason": f"用户拒绝或响应超时: {verdict.reason}",
-                    "output": f"[D2Guard 阻断] 用户未授权执行此破坏性操作"
-                }
-
-        # 5. 执行真实工具 (ALLOW 阶段)
+    def _execute(self, event, func, verdict):
+        start = time.perf_counter()
         try:
-            result = tool_func(**tool_args)
-        except Exception as e:
-            result = f"工具执行异常: {str(e)}"
+            result, success = func(**copy.deepcopy(event.tool_args)), True
+        except Exception as exc:
+            result, success = f"工具执行失败: {type(exc).__name__}: {exc}", False
+        result = self.core.redactor().payload(result) if not success else result
+        self.core.handle_hook_post_exec(D2Event(event_id="post-" + secrets.token_hex(12),
+            timestamp=time.time(), session_id=self.core.session_id, agent_id=self.agent_id,
+            call_id=event.call_id, stage=CallLifecycleStage.TOOL_POST_EXEC, event_type="TOOL_RETURN",
+            tool_name=event.tool_name, tool_args=event.tool_args, tool_result=result,
+            source_type=event.source_type, raw_content=str(result), parent_event_id=event.event_id,
+            success=success))
+        reply = self._reply(verdict)
+        reply.update(success=success, blocked=False, pending=False, output=result,
+                     execution_ms=(time.perf_counter() - start) * 1000)
+        return reply
 
-        # 6. 构建并上报后执行事件 (TOOL_POST_EXEC)
-        post_event_id = f"EVT-HOOK-POST-{uuid.uuid4().hex[:6]}"
-        post_event = D2Event(
-            event_id=post_event_id,
-            timestamp=time.time(),
-            session_id=self.core.session_id,
-            agent_id=self.agent_id,
-            call_id=call_id,
-            stage=CallLifecycleStage.TOOL_POST_EXEC,
-            event_type="TOOL_RETURN",
-            tool_name=tool_name,
-            tool_args=tool_args,
-            tool_result=result,
-            source_type=source_type,
-            raw_content=str(result),
-            parent_event_id=pre_event_id
-        )
-        self.core.handle_hook_post_exec(post_event)
+    def execute_with_guard(self, tool_name, tool_args, tool_func, call_id=None, source_type="LOCAL_FILE"):
+        event = D2Event(event_id="pre-" + secrets.token_hex(12), timestamp=time.time(),
+            session_id=self.core.session_id, agent_id=self.agent_id,
+            call_id=call_id or secrets.token_hex(16), stage=CallLifecycleStage.TOOL_PRE_EXEC,
+            event_type="TOOL_CALL", tool_name=tool_name, tool_args=copy.deepcopy(tool_args),
+            source_type=source_type, raw_content=str(tool_args))
+        verdict = self.core.handle_hook_pre_exec(event)
+        if verdict.verdict == VerdictType.ASK:
+            token = verdict.approval_token
+            with self._lock:
+                self._pending[token.token_id] = (copy.deepcopy(event), tool_func, copy.deepcopy(token))
+            if self.user_prompt_callback:
+                if self.user_prompt_callback(copy.deepcopy(token), verdict.reason):
+                    self.core.approve_token(token.token_id, self.core.principal_id)
+                    return self.resume(token.token_id, self.core.principal_id)
+                self.core.reject_token(token.token_id, self.core.principal_id)
+                with self._lock: self._pending.pop(token.token_id,None)
+                verdict.verdict=VerdictType.BLOCK
+                verdict.reason="操作员拒绝单次授权"
+            return self._reply(verdict)
+        if verdict.verdict == VerdictType.BLOCK:
+            return self._reply(verdict)
+        return self._execute(event, tool_func, verdict)
 
-        return {
-            "success": True,
-            "blocked": False,
-            "output": result
-        }
+    def resume(self, token_id, principal_id):
+        with self._lock:
+            item = self._pending.get(token_id)
+            snapshot = self.core.active_tokens.get(token_id)
+            if not item or not snapshot or snapshot.status != "APPROVED" or principal_id != self.core.principal_id:
+                return {"success": False, "blocked": True, "pending": False, "verdict": "BLOCK",
+                        "output": "审批未批准、已拒绝/消费或主体不匹配"}
+            event, func, token = item
+            del self._pending[token_id]
+            verdict = self.core.handle_hook_pre_exec(event, token, principal_id)
+            if verdict.verdict != VerdictType.ALLOW:
+                return self._reply(verdict)
+            return self._execute(event, func, verdict)

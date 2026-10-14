@@ -11,7 +11,8 @@
 """
 
 from __future__ import annotations
-import hashlib
+import secrets
+from urllib.parse import urlsplit
 import os
 import re
 import uuid
@@ -19,6 +20,7 @@ import yaml
 from typing import Any, Dict, List, Optional, Tuple
 
 from .models import (
+    canonical_args_hash,
     ActionVerdict,
     ApprovalToken,
     D2Event,
@@ -28,6 +30,7 @@ from .models import (
     VerdictType,
 )
 from .contract import ContractCompiler, InvariantVerifier
+from .redaction import OutboundRedactor
 from .normalizer import AdversarialNormalizer
 from .slow_mirror import EvidencePack, SlowMirror
 from .taint_engine import DynamicTaintEngine
@@ -48,6 +51,7 @@ class PolicyDecisionEngine:
         self.slow_mirror = slow_mirror or SlowMirror()
         self.enable_state_aggregation = enable_state_aggregation
         self.policies, self.settings = self._load_policies()
+        self.outbound_redactor_provider = None
 
     def _load_policies(self) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
         """加载 YAML 策略配置"""
@@ -194,18 +198,14 @@ class PolicyDecisionEngine:
         if tool_name in ["net.fetch", "net_fetch"]:
             url = str(tool_args.get("url", ""))
             body = str(tool_args.get("body", "") or tool_args.get("data", ""))
-            target_domain = extracted.domains[0] if extracted.domains else ""
-            if not target_domain:
-                m = re.search(r'https?://([^/:\s]+)', url)
-                if m:
-                    target_domain = m.group(1)
+            target_domain = (urlsplit(url).hostname or "").lower()
 
             # 白名单检查
             trusted = state.effective_permissions.get("trusted_domains", [])
             for p in self.policies:
                 if p.get("id") == "POL-NET-SECRET-EXFIL":
                     trusted = trusted + p.get("trusted_domains", [])
-            is_trusted = any(td in target_domain for td in trusted) if target_domain else False
+            is_trusted = any(target_domain == td.lower() or target_domain.endswith("." + td.lower()) for td in trusted) if target_domain else False
 
             if not is_trusted:
                 payload_to_check = f"{url} {body}"
@@ -262,8 +262,8 @@ class PolicyDecisionEngine:
 
         # 6. 特权破坏性操作触发 ASK 询问 (fs.delete)
         if tool_name in ["fs.delete", "fs_delete", "fs.remove"]:
-            token_id = str(uuid.uuid4())[:8]
-            args_hash = hashlib.sha256(str(sorted(tool_args.items())).encode()).hexdigest()
+            token_id = secrets.token_urlsafe(32)
+            args_hash = canonical_args_hash(tool_args)
             token = ApprovalToken(token_id=token_id, call_id=call_id, args_hash=args_hash)
             return ActionVerdict(
                 verdict=VerdictType.ASK,
@@ -293,7 +293,7 @@ class PolicyDecisionEngine:
         text_nature = fast_signals.get("text_nature", "informational")
 
         # 当快镜标出越权、强指令诱导或高风险分
-        if risk_score >= 0.5 or action_compliance == "deviant" or text_nature == "directive":
+        if getattr(self, "enable_slow_mirror", True) and (risk_score >= 0.5 or action_compliance == "deviant" or text_nature == "directive"):
             evidence = EvidencePack(
                 initial_task=state.initial_task,
                 effective_permissions=state.effective_permissions,
@@ -302,13 +302,13 @@ class PolicyDecisionEngine:
                 matched_secrets=list(state.read_secrets.keys()) if self.enable_state_aggregation else [],
                 call_id=call_id
             )
-            slow_res = self.slow_mirror.judge(evidence)
+            slow_res = self.slow_mirror.judge(evidence, redactor=self.outbound_redactor_provider() if self.outbound_redactor_provider else OutboundRedactor.from_state(state))
             slow_verdict_str = slow_res.get("verdict", "ASK")
             verdict_type = VerdictType(slow_verdict_str)
 
             if verdict_type == VerdictType.ASK:
-                token_id = str(uuid.uuid4())[:8]
-                args_hash = hashlib.sha256(str(sorted(tool_args.items())).encode()).hexdigest()
+                token_id = secrets.token_urlsafe(32)
+                args_hash = canonical_args_hash(tool_args)
                 token = ApprovalToken(token_id=token_id, call_id=call_id, args_hash=args_hash)
                 return ActionVerdict(
                     verdict=VerdictType.ASK,
@@ -322,6 +322,8 @@ class PolicyDecisionEngine:
                     reason=f"慢镜阻断: {slow_res.get('reason')}",
                     evidence_summary=slow_res
                 )
+
+            return ActionVerdict(verdict=VerdictType.ALLOW, reason=slow_res.get("reason", "慢镜放行"), evidence_summary=slow_res)
 
         # 9. 常规安全操作放行
         return ActionVerdict(

@@ -174,9 +174,10 @@ class FastMirror:
         latency_ms = (time.perf_counter() - start_t) * 1000.0
 
         return {
+            "backend": "laya" if laya_signals else "rules",
             "text_nature": text_nature,
             "action_compliance": action_compliance,
             "risk_score": risk_score,
             "laya_signals": laya_signals,
-            "latency_ms": round(latency_ms, 2)
+            "latency_ms": latency_ms
         }
