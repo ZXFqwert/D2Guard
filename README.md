@@ -1,5 +1,31 @@
 # 双镜 D²Guard: 基于快慢双系统与增量 JSON 状态流的大模型智能体防御系统
 
+## 当前交付：桌面 App + 新版 Web 工作台（2026-10-15）
+
+新版已合入默认分支 `main`，源码位于 **[unified/](unified/)**。仓库根目录的 `d2guard/`、`web_demo.py`、`web_static/` 继续保留旧版 Arena，阅读新版请从下面的入口开始。
+
+| 入口 | 地址 |
+| --- | --- |
+| 新版源码与使用说明 | [unified/README.md](unified/README.md) |
+| Windows App 下载 | [D2Guard v1.0.0 Release](https://github.com/ZXFqwert/D2Guard/releases/tag/unified-v1.0.0) · 完整解压后双击 `D2Guard.exe`，无需 Python / Node |
+| 新版公网工作台 | [agent.li33.art/safe/desk/](https://agent.li33.art/safe/desk/) |
+| 部署、更新与回滚记录 | [unified/deployment/RELEASE.md](unified/deployment/RELEASE.md) |
+| 旧版 Arena | [agent.li33.art/safe/](https://agent.li33.art/safe/) |
+
+新版算力机一键更新：
+
+```bash
+cd /home/roots/d2guard-unified/unified
+bash deployment/deploy.sh --pull
+```
+
+Windows 与 Linux 各 192 项 pytest 通过；实际打包 App 和公网新版均完成六大剧本、ASK 批准/拒绝及真实模型链路验收。发行包不包含 API Key；私有仓库下载需要有权限的 GitHub 账号。
+
+**下方为旧版架构与协作资料。根目录 `deploy.sh` 面向旧版，新版使用 `unified/deployment/deploy.sh`。**
+
+---
+
+
 > **赛事名称**：“华为杯”第五届中国研究生网络安全创新大赛  
 > **参赛赛道**：揭榜挑战赛  
 > **赛题方向**：赛题 5 —— 面向大模型智能体与 MCP 工具链的提示注入与工具滥用的检测防御技术（出题单位：安天科技集团）  
@@ -7,7 +33,7 @@
 > **核心机制**：**$D^1$（Dual-System 快慢双系统） + $D^2$（Delta-JSON 增量状态流与安全状态聚合）**  
 > **三大接口**：`extract(event)` $\to$ `update_state(state, extracted)` $\to$ `decide(state, proposed_action)`
 
-> **团队协作入口**：源码在 [GitHub 团队私有仓库](https://github.com/ZXFqwert/D2Guard)，演示在 [公网体验平台](https://agent.li33.art/safe)。每位成员在自己的目录 clone、开发、提交；代码进入 `main` 后，由部署人在算力机运行 `./deploy.sh update` 发布。完整步骤见本文第七节；push 本身不会自动上线。
+> **旧版团队协作入口**：源码在 [GitHub 团队私有仓库](https://github.com/ZXFqwert/D2Guard)，演示在 [公网体验平台](https://agent.li33.art/safe)。每位成员在自己的目录 clone、开发、提交；代码进入 `main` 后，由部署人在算力机运行 `./deploy.sh update` 发布。完整步骤见本文第七节；push 本身不会自动上线。
 
 > **The Shield 验收入口**：本地整改分支的真实评测、HTTP 字节核验、模型脱敏与 ASK 接口见 [docs/SHIELD_ACCEPTANCE.md](docs/SHIELD_ACCEPTANCE.md)。该文档中的实施状态与测量口径优先于本文原 V2 能力介绍；未完成适配的场景不计作防护成功。
 
