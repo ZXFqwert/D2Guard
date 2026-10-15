@@ -24,6 +24,8 @@ export interface Evidence {
   summary?: ExtractedSummary;
 }
 export interface Decision {
+  executed?: boolean;
+  executionSuccess?: boolean;
   metric?: import("./desktopApi").MirrorMetric;
   response: ActionVerdictResponse;
   tool: string;
@@ -35,6 +37,13 @@ export interface Decision {
 }
 export interface Run {
   id: string;
+  runId?: string;
+  sessionId: string;
+  mode: import("../api/agentApi").AgentMode;
+  clean?: boolean;
+  workspacePath?: string;
+  model?: string;
+  result?: import("../api/agentApi").AgentRunResult;
   title: string;
   armor: boolean;
   started: string;
@@ -42,7 +51,7 @@ export interface Run {
   decisions: Decision[];
   evidence: Evidence[];
   telemetry?: TelemetrySnapshotResponse;
-  status: "running" | "complete" | "error";
+  status: import("../api/agentApi").AgentRunStatus;
   scenarioId?: string;
 }
 export interface Scenario extends RedTeamPlaybook {
@@ -50,6 +59,13 @@ export interface Scenario extends RedTeamPlaybook {
   expectedPolicy: string;
   expectedVerdict: Verdict;
   official?: boolean;
+  validation?: ScenarioValidation;
+  reliability?: ScenarioValidation;
+}
+export interface ScenarioValidation {
+  successes: number;
+  trials: number;
+  featured?: boolean;
 }
 export const categories = [
   "多源注入",
@@ -70,7 +86,7 @@ export const officialScenarios: Scenario[] = RED_TEAM_PLAYBOOKS.map((p, i) => ({
   ...p,
   category: meta[i][0],
   expectedPolicy: meta[i][1],
-  expectedVerdict: i === 5 ? "ASK" : "BLOCK",
+    expectedVerdict: "BLOCK",
   official: true,
 }));
 export const ms = (n: number) => `${n.toFixed(2)} ms`;

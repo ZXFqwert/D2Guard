@@ -1,6 +1,8 @@
 import { useEffect, useRef, ReactNode } from "react";
 import { X, ShieldCheck } from "lucide-react";
 import { Verdict } from "../api/d2guardClient";
+import agentNormal from "../assets/guardian/agent-normal.png";
+import agentProtected from "../assets/guardian/agent-protected.png";
 
 export function Logo({
   large = false,
@@ -15,85 +17,52 @@ export function Logo({
       role="img"
       aria-label={
         armor
-          ? "双镜 D²Guard：快慢双镜与增量状态流全链路接管中"
-          : "双镜 D²Guard：Codex 极简工作台模式"
+          ? "双镜 D²Guard：动漫猫盾与快慢双镜全链路护体中"
+          : "Codex Agent：无防护正常在线模式"
       }
     >
       <svg
-        className="d2-emblem-svg"
+        className="guardian-optical-ring"
         viewBox="0 0 64 64"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
         aria-hidden="true"
       >
         <defs>
-          <linearGradient id="d2CoreGrad" x1="8" y1="8" x2="56" y2="56" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor={armor ? "#1e3a8a" : "#1f4d3d"} />
-            <stop offset="55%" stopColor={armor ? "#2563eb" : "#2e6e56"} />
-            <stop offset="100%" stopColor={armor ? "#06b6d4" : "#529478"} />
-          </linearGradient>
-          <linearGradient id="d2LensGrad" x1="16" y1="14" x2="48" y2="50" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor={armor ? "#38bdf8" : "#65a38c"} stopOpacity="0.95" />
-            <stop offset="100%" stopColor={armor ? "#1d4ed8" : "#286b54"} stopOpacity="0.25" />
+          <linearGradient id="d2OpticalRing" x1="6" y1="6" x2="58" y2="58" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="#38bdf8" />
+            <stop offset="50%" stopColor="#2563eb" />
+            <stop offset="100%" stopColor="#fbbf24" />
           </linearGradient>
         </defs>
-        {/* Outer hexagonal armor chassis */}
-        <polygon
-          className="d2-emblem-chassis"
-          points="32,3 57,17.5 57,46.5 32,61 7,46.5 7,17.5"
-          fill="url(#d2CoreGrad)"
-          fillOpacity={armor ? "0.14" : "0.08"}
-          stroke="url(#d2CoreGrad)"
-          strokeWidth={armor ? "2.4" : "1.6"}
-        />
-        {/* Corner armor lock brackets (highlighted in Dual-Mirror Armor mode) */}
-        <path
-          className="d2-emblem-armor-wing"
-          d="M32 6 L53 18.2 M53 45.8 L32 58 M11 45.8 L11 18.2"
-          stroke={armor ? "#0ea5e9" : "#7b9384"}
-          strokeWidth={armor ? "2" : "1"}
-          strokeLinecap="round"
-          strokeDasharray={armor ? "6 3" : "2 4"}
-          opacity={armor ? "0.95" : "0.4"}
-        />
-        {/* Mirror 1 (Fast Mirror / System 1 Lens - Left/Upper) */}
-        <circle
-          className="d2-emblem-lens lens-fast"
-          cx="27"
-          cy="29"
-          r="12.5"
-          fill="url(#d2LensGrad)"
-          fillOpacity={armor ? "0.28" : "0.16"}
-          stroke={armor ? "#0284c7" : "#2e6e56"}
-          strokeWidth="2.1"
-        />
-        {/* Mirror 2 (Slow Mirror / System 2 Lens - Right/Lower intersecting) */}
-        <circle
-          className="d2-emblem-lens lens-slow"
-          cx="37"
-          cy="35"
-          r="12.5"
-          fill="url(#d2LensGrad)"
-          fillOpacity={armor ? "0.34" : "0.18"}
-          stroke={armor ? "#1d4ed8" : "#3b7a62"}
-          strokeWidth="2.1"
-        />
-        {/* Incremental State Stream (D² trajectory wave through intersection) */}
-        <path
-          className="d2-emblem-stream"
-          d="M14 32 C22 24, 29 40, 37 28 C42 21, 46 35, 50 32"
-          stroke={armor ? "#06b6d4" : "#286b54"}
-          strokeWidth="2.2"
-          strokeLinecap="round"
-        />
-        {/* Center Core Anchor Point */}
         <circle
           cx="32"
           cy="32"
-          r={armor ? "3.2" : "2.4"}
-          fill={armor ? "#0ea5e9" : "#286b54"}
+          r="29"
+          stroke="url(#d2OpticalRing)"
+          strokeWidth="1.8"
+          strokeDasharray="8 4"
+          opacity={armor ? "0.9" : "0"}
+        />
+        <polygon
+          points="32,2 58,17 58,47 32,62 6,47 6,17"
+          stroke="url(#d2OpticalRing)"
+          strokeWidth="1.3"
+          opacity={armor ? "0.65" : "0"}
         />
       </svg>
+      <img
+        className="guardian-agent guardian-agent-normal"
+        src={agentNormal}
+        alt=""
+        draggable={false}
+      />
+      <img
+        className="guardian-agent guardian-agent-protected"
+        src={agentProtected}
+        alt=""
+        draggable={false}
+      />
     </span>
   );
 }
@@ -282,19 +251,18 @@ export function ArmorFrame() {
       data-testid="armor-frame"
       aria-label="双镜铠甲护体中"
     >
-      <div className="armor-rail armor-rail-top" />
-      <div className="armor-rail armor-rail-bottom" />
-      <div className="armor-rail armor-rail-left" />
-      <div className="armor-rail armor-rail-right" />
-      <div className="armor-corner armor-corner-tl" />
-      <div className="armor-corner armor-corner-tr" />
-      <div className="armor-corner armor-corner-bl" />
-      <div className="armor-corner armor-corner-br" />
       <div className="armor-nameplate">
+        <img
+          src={agentProtected}
+          className="armor-crest-img"
+          alt=""
+          aria-hidden="true"
+          draggable={false}
+        />
         <span className="armor-pulse-dot" aria-hidden="true" />
         <ShieldCheck size={14} aria-hidden="true" />
-        <b>双镜铠甲护体中 · Hook + Gateway + Core 全链路接管</b>
-        <span className="armor-subtag">D¹ Laya · D² StateFlow</span>
+        <b>双镜 D²Guard 防护已开启</b>
+        <span className="armor-subtag">Hook + Gateway + D¹/D² 内核闭环</span>
       </div>
     </div>
   );

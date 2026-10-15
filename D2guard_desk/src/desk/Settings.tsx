@@ -233,7 +233,7 @@ export function SettingsPage({
       <PageHeading
         eyebrow="PREFERENCES"
         title="设置与接入"
-        detail="连接你的模型，检视每一道安全边界。"
+        detail="配置模型服务，查看运行环境与策略。"
       >
         <button onClick={refresh}>
           <RefreshCw size={15} />

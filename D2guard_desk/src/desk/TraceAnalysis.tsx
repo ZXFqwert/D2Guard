@@ -167,13 +167,13 @@ export function TraceAnalysis({
     if (!run || !telemetry) return;
     download(
       `D2Guard-${run.id}.md`,
-      `# 双镜 D²Guard 复盘报告\n\n- 会话：${run.id}\n- 场景：${run.title}\n- 模式：${run.armor ? "双镜铠甲" : "裸机"}\n- 初始任务：${telemetry.anchor_intent?.initial_task || "未锁定"}\n\n## 裁决与解释\n\n${run.decisions.map((d) => `### ${d.tool} · ${d.final}\n\n${d.response.explainable_report}\n\n- 快镜：${ms(d.response.fast_mirror_label.latency_ms)}\n- 慢镜：${d.metric?.slow_latency_ms != null ? ms(d.metric.slow_latency_ms) : "未触发"}\n- char_span：${d.response.char_span?.join(", ")}\n- token_span：${d.response.token_span?.join(", ")}\n`).join("\n")}\n## 影响范围\n${Object.entries(
+      `# 双镜 D²Guard 复盘报告\n\n- 会话：${run.id}\n- 场景：${run.title}\n- 模式：${run.armor ? "双镜防护" : "无防护 Agent"}\n- 初始任务：${telemetry.anchor_intent?.initial_task || "未锁定"}\n\n## 裁决与解释\n\n${run.decisions.map((d) => `### ${d.tool} · ${d.final}\n\n${d.response.explainable_report}\n\n- 快镜：${ms(d.response.fast_mirror_label.latency_ms)}\n- 慢镜：${d.metric?.slow_latency_ms != null ? ms(d.metric.slow_latency_ms) : "未触发"}\n- char_span：${d.response.char_span?.join(", ")}\n- token_span：${d.response.token_span?.join(", ")}\n`).join("\n")}\n## 影响范围\n${Object.entries(
         telemetry.impact_scope,
       )
         .map(([k, v]) => `- ${k}：${v.join("、") || "无"}`)
         .join(
           "\n",
-        )}\n\n## 调用图\n\n${telemetry.dag_nodes.map((n) => `- ${n.type} / ${n.label} / ${n.verdict || "—"}`).join("\n")}\n\n## 证据范围\n本报告反映真实内核裁决。演练不代表外部工具已执行。\n`,
+        )}\n\n## 调用图\n\n${telemetry.dag_nodes.map((n) => `- ${n.type} / ${n.label} / ${n.verdict || "—"}`).join("\n")}\n\n## 证据范围\n本报告反映真实内核裁决与隔离沙箱真实工具执行回执。\n`,
       "text/markdown",
     );
   };
@@ -196,7 +196,7 @@ export function TraceAnalysis({
       <PageHeading
         eyebrow="TRACEABILITY & IMPACT"
         title="溯源与结果分析"
-        detail="沿着证据回到源头，看清风险如何穿过每一个边界。"
+        detail="查看调用链、裁决证据与影响范围。"
       >
         <button disabled={!telemetry} onClick={exportMarkdown}>
           <Download size={15} />
@@ -218,7 +218,7 @@ export function TraceAnalysis({
             {!runs.length && <option value="">暂无会话</option>}
             {runs.map((r) => (
               <option key={r.id} value={r.id}>
-                {r.started} · {r.title} · {r.armor ? "铠甲" : "裸机"}
+                {r.started} · {r.title} · {r.armor ? "双镜防护" : "无防护 Agent"}
               </option>
             ))}
           </select>
@@ -243,8 +243,8 @@ export function TraceAnalysis({
       {!telemetry ? (
         <div className="panel">
           <Empty
-            title="还没有可以回溯的行动"
-            detail="前往工作台完成一次演练，调用图、证据与影响范围会同步到这里。"
+            title="暂无溯源记录"
+            detail="在工作台运行攻击场景环境后，全链路调用关系、可视化攻击路径有向无环图（DAG）、时序链路图与 Token 染色证据将在此完整还原。"
           />
         </div>
       ) : (

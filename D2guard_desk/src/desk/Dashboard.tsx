@@ -162,14 +162,14 @@ export function Dashboard({
       <PageHeading
         eyebrow="SECURITY OVERVIEW"
         title="防护总览"
-        detail="给 Agent 自由行动的空间，让安全边界始终清晰。"
+        detail="查看任务、策略命中与拦截记录。"
       >
         <span className="live-label">
           <span className="status-dot online" />
           实时会话统计
         </span>
         <button onClick={onRun}>
-          开始演练
+          进入工作台运行场景
           <ArrowUpRight size={16} />
         </button>
       </PageHeading>
@@ -180,13 +180,13 @@ export function Dashboard({
         <div>
           <h3>
             {armor
-              ? "双镜协同，守住每一次行动。"
-              : "一层铠甲，放心交给 Agent。"}
+              ? "防护模式已开启"
+              : "普通模式"}
           </h3>
           <p>
             {armor
-              ? "Hook → Gateway → Core 全链路防护已启用"
-              : "从一场攻防演练开始，观察双镜如何识别、溯源与阻断风险。"}
+              ? "查看当前会话的工具调用与裁决记录。"
+              : "运行场景，查看工具调用与裁决过程。"}
           </p>
         </div>
         <span className="banner-mark">D¹ + D²</span>
@@ -243,7 +243,7 @@ export function Dashboard({
       </div>
       <div className="dashboard-grid">
         <Panel
-          title="语义策略防线"
+          title="语义策略统计"
           subtitle="五大核心策略 · 命中与最终阻断"
           action={<span className="subtle-tag">累计 {ds.length} 次裁决</span>}
         >
@@ -306,11 +306,11 @@ export function Dashboard({
                       className={mode ? "guarded" : ""}
                     />
                   </div>
-                  <b>{mode ? "双镜铠甲" : "裸机模式"}</b>
+                  <b>{mode ? "双镜 D²Guard 防护" : "无防护正常 Agent"}</b>
                   <small>
                     {actions.length
                       ? `${actions.length} 个越权样本`
-                      : "尚无演练样本"}
+                      : "尚无运行样本"}
                   </small>
                 </div>
               );
@@ -374,7 +374,7 @@ export function Dashboard({
       </Panel>
       <Panel
         title="近期拦截事件"
-        subtitle="每一次阻断，都有可追溯的证据"
+        subtitle="查看近期拦截动作与裁决依据"
         action={<span className="small muted">点击记录查看详情</span>}
       >
         {recent.length ? (
@@ -427,13 +427,13 @@ export function Dashboard({
           </div>
         ) : (
           <Empty
-            title="每一次安全行动，都从这里开始"
-            detail="运行演练后，真实拦截记录将在此自动汇总。"
+            title="暂无拦截记录"
+            detail="运行场景后，拦截记录将显示在这里。"
           />
         )}
       </Panel>
       <p className="footnote">
-        统计范围：本次桌面打开后的全部会话。合规成功指内核授权通过；演练不执行外部攻击命令。没有样本的指标保留空值。
+        统计范围：本次桌面打开后的全部会话。合规成功指内核授权通过与任务目标闭环；真实运行在隔离沙箱中执行工具并检验物理后果。没有样本的指标保留空值。
       </p>
     </>
   );

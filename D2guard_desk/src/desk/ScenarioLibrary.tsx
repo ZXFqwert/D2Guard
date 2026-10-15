@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Search,
   Plus,
@@ -16,13 +16,16 @@ import {
 import {
   Scenario,
   categories,
-  officialScenarios,
+  officialScenarios as fallbackOfficialScenarios,
   download,
   readLocal,
   pretty,
 } from "./types";
 import { Badge, Empty, Modal, PageHeading } from "./ui";
+import { agentApi } from "../api/agentApi";
 const key = "d2guard.scenarios.v2";
+const validationOf = (scenario: Scenario) =>
+  scenario.validation ?? scenario.reliability;
 function validate(value: unknown): Scenario {
   const p = value as Scenario;
   if (
@@ -79,9 +82,9 @@ function validate(value: unknown): Scenario {
 const initialScenarios = () => {
   try {
     const saved = readLocal<Scenario[] | null>(key, null);
-    return saved ? saved.map(validate) : officialScenarios;
+    return saved ? saved.map(validate) : fallbackOfficialScenarios;
   } catch {
-    return officialScenarios;
+    return fallbackOfficialScenarios;
   }
 };
 function Editor({
@@ -238,9 +241,11 @@ function Editor({
 }
 export function ScenarioLibrary({
   busy,
+  officialScenarios,
   onRun,
 }: {
   busy: boolean;
+  officialScenarios: Scenario[];
   onRun: (s: Scenario) => void;
 }) {
   const [scenarios, setScenarios] = useState<Scenario[]>(initialScenarios);
@@ -254,9 +259,29 @@ export function ScenarioLibrary({
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const file = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!officialScenarios.length) return;
+    const officialIds = new Set(officialScenarios.map((scenario) => scenario.id));
+    const saved = readLocal<Scenario[]>(key, []);
+    const savedById = new Map(saved.map((scenario) => [scenario.id, scenario]));
+    const mergedOfficial = officialScenarios.map((scenario) => {
+      const edited = savedById.get(scenario.id);
+      return edited
+        ? {
+            ...scenario,
+            ...edited,
+            official: true,
+            validation: scenario.validation ?? scenario.reliability ?? edited.validation ?? edited.reliability,
+          }
+        : scenario;
+    });
+    const custom = saved.filter((scenario) => !officialIds.has(scenario.id));
+    setScenarios([...mergedOfficial, ...custom]);
+  }, [officialScenarios]);
   const save = (next: Scenario[]) => {
     localStorage.setItem(key, JSON.stringify(next));
     setScenarios(next);
+    agentApi.saveScenarios(next).catch(() => {});
   };
   const visible = scenarios.filter(
     (s) =>
@@ -293,9 +318,9 @@ export function ScenarioLibrary({
   return (
     <>
       <PageHeading
-        eyebrow="SCENARIO LIBRARY"
-        title="场景库管理"
-        detail="六大官方攻防剧本，以及属于你的安全测试场。"
+        eyebrow="ATTACK ENVIRONMENTS"
+        title="攻击场景环境库"
+        detail="围绕赛题五项核心攻击面广泛调研布置的 12 个真实攻击场景环境（提供受污染文件、恶意 MCP 节点、污染记忆与触发提示词），支持在无防护 Agent 与双镜 D²Guard 模式下对比运行。"
       >
         <button
           onClick={() =>
@@ -420,6 +445,7 @@ export function ScenarioLibrary({
                 <th>能力分类</th>
                 <th>风险等级</th>
                 <th>期望裁决</th>
+                <th>真实验证</th>
                 <th>操作</th>
               </tr>
             </thead>
@@ -432,7 +458,7 @@ export function ScenarioLibrary({
                       onClick={() => setDetail(s)}
                     >
                       <span className="scenario-id">{s.id}</span>
-                      <strong>{s.title.replace(/^剧本 \d+：/, "")}</strong>
+                      <strong>{s.title.replace(/^(?:剧本|场景)\s*\d+[：:]\s*/, "")}</strong>
                       <small>{s.description}</small>
                     </button>
                   </td>
@@ -448,6 +474,16 @@ export function ScenarioLibrary({
                     <Badge value={s.expectedVerdict} />
                   </td>
                   <td>
+                    {validationOf(s) ? (
+                      <span className="subtle-tag">
+                        {validationOf(s)!.featured ? "精选 · " : ""}
+                        {validationOf(s)!.successes}/{validationOf(s)!.trials} 成功
+                      </span>
+                    ) : (
+                      <span className="muted small">等待真实验证</span>
+                    )}
+                  </td>
+                  <td>
                     <div className="button-row">
                       <button
                         className="run-scenario"
@@ -456,7 +492,7 @@ export function ScenarioLibrary({
                         onClick={() => onRun(s)}
                       >
                         <Play size={13} />
-                        演练
+                        加载运行
                       </button>
                       <button
                         className="icon-button"
@@ -490,7 +526,7 @@ export function ScenarioLibrary({
                 <Badge value={s.expectedVerdict} />
               </div>
               <button className="text-button" onClick={() => setDetail(s)}>
-                <h3>{s.title.replace(/^剧本 \d+：/, "")}</h3>
+                <h3>{s.title.replace(/^(?:剧本|场景)\s*\d+[：:]\s*/, "")}</h3>
               </button>
               <p>{s.description}</p>
               <div className="row-between">
@@ -499,6 +535,12 @@ export function ScenarioLibrary({
                   {s.threatLevel}
                 </span>
               </div>
+              {validationOf(s) && (
+                <p className="small muted">
+                  {validationOf(s)!.featured ? "精选场景 · " : ""}
+                  真实模型成功 {validationOf(s)!.successes}/{validationOf(s)!.trials}
+                </p>
+              )}
               <div className="card-actions">
                 <button disabled={busy} onClick={() => onRun(s)}>
                   <Play size={13} />
@@ -521,8 +563,7 @@ export function ScenarioLibrary({
         </div>
       )}
       <p className="footnote">
-        官方场景可编辑；自定义场景可自由增删。所有场景通过原有 Agent Harness
-        与本地内核运行，参数和载荷均为演练输入。
+        每次运行均由真实模型在隔离工作区内自行决策和调用工具。场景仅提供环境、任务与攻击载荷；成功计数来自可核验的实际运行结果。
       </p>
       {edit && (
         <Editor
@@ -547,6 +588,7 @@ export function ScenarioLibrary({
             <button
               className="danger"
               onClick={() => {
+                agentApi.deleteScenario(remove.id).catch(() => {});
                 save(scenarios.filter((s) => s.id !== remove.id));
                 setRemove(undefined);
               }}
@@ -557,18 +599,24 @@ export function ScenarioLibrary({
         </Modal>
       )}
       {detail && (
-        <Modal title="场景详情" drawer onClose={() => setDetail(undefined)}>
+        <Modal title="攻击场景环境详情" drawer onClose={() => setDetail(undefined)}>
           <div className="row-between">
             <span className="scenario-id">{detail.id}</span>
             <Badge value={detail.expectedVerdict} />
           </div>
           <h2>{detail.title}</h2>
           <p>{detail.description}</p>
-          <h4>初始任务</h4>
+          <h4>初始任务（触发提示词）</h4>
           <div className="quiet-card">{detail.initialTask}</div>
           <h4>预期触发策略</h4>
           <code>{detail.expectedPolicy || "语义风险挂起 · 无硬策略"}</code>
-          <h4>污染源与原始攻击载荷</h4>
+          <h4>真实验证记录</h4>
+          <p>
+            {validationOf(detail)
+              ? `${validationOf(detail)!.featured ? "精选场景；" : ""}真实模型攻击成功 ${validationOf(detail)!.successes}/${validationOf(detail)!.trials} 次。`
+              : "尚无已登记的真实模型成功记录。"}
+          </p>
+          <h4>预置环境污染源与攻击载荷</h4>
           {detail.steps
             .filter((s) => s.actionType === "INGEST")
             .map((s, i) => (

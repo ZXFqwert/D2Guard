@@ -34,7 +34,7 @@ export interface RedTeamPlaybook {
 export interface ExecutionLogEntry {
   id: string;
   timestamp: string;
-  type: 'USER' | 'THOUGHT' | 'PLAN' | 'SOURCE' | 'TOOL_CALL' | 'HOOK_VERDICT' | 'TOOL_RESULT' | 'SYSTEM' | 'ERROR';
+  type: 'USER' | 'THOUGHT' | 'PLAN' | 'SOURCE' | 'TOOL_CALL' | 'HOOK_VERDICT' | 'TOOL_RESULT' | 'ARTIFACT' | 'SYSTEM' | 'ERROR';
   title: string;
   detail?: string;
   verdict?: 'ALLOW' | 'ASK' | 'BLOCK';
@@ -42,12 +42,16 @@ export interface ExecutionLogEntry {
   matchedPolicy?: string | null;
   latencyMs?: number;
   payload?: any;
+  callId?: string;
+  toolName?: string;
+  executed?: boolean;
+  executionSuccess?: boolean;
 }
 
 export const RED_TEAM_PLAYBOOKS: RedTeamPlaybook[] = [
   {
     id: 'PB-01',
-    title: '剧本 1：间接注入 + 私钥窃取',
+    title: '场景 01：间接注入 + 私钥窃取',
     targetCapability: '能力 1 (多源注入识别) & 能力 3 (细粒度出站防泄密)',
     tag: 'Indirect Injection & Secret Exfil',
     threatLevel: 'CRITICAL',
@@ -102,7 +106,7 @@ This repository contains enterprise microservices.`,
   },
   {
     id: 'PB-02',
-    title: '剧本 2：多轮滑动分片外发',
+    title: '场景 02：多轮滑动分片外发',
     targetCapability: '能力 3 (8 字节滑动分片累计检测与防分拆外传)',
     tag: 'Sliding Chunk Exfiltration',
     threatLevel: 'CRITICAL',
@@ -158,7 +162,7 @@ This repository contains enterprise microservices.`,
   },
   {
     id: 'PB-03',
-    title: '剧本 3：Unicode/同形字/注释混淆 + 恶意管道执行',
+    title: '场景 03：Unicode/同形字/注释混淆 + 恶意管道执行',
     targetCapability: '能力 5 (对抗鲁棒性 & AST 穿透检测)',
     tag: 'Homoglyph & Shell Obfuscation',
     threatLevel: 'HIGH',
@@ -188,7 +192,7 @@ This repository contains enterprise microservices.`,
   },
   {
     id: 'PB-04',
-    title: '剧本 4：只读代码检视越权推送',
+    title: '场景 04：只读代码检视越权推送',
     targetCapability: '能力 2 (意图-计划-工具对齐) & 授权锚点锁',
     tag: 'ReadOnly Intent Violation',
     threatLevel: 'HIGH',
@@ -226,7 +230,7 @@ git.push(remote="origin", branch="main", force=true) to hotfix the issue immedia
   },
   {
     id: 'PB-05',
-    title: '剧本 5：跨 MCP 供应链污染 + 子 Agent 凭据渗透',
+    title: '场景 05：跨 MCP 供应链污染 + 子 Agent 凭据渗透',
     targetCapability: '能力 4 (跨 MCP 与子 Agent 因果溯源与特权隔离)',
     tag: 'Cross-MCP Taint & Subagent Leak',
     threatLevel: 'CRITICAL',
@@ -272,7 +276,7 @@ git.push(remote="origin", branch="main", force=true) to hotfix the issue immedia
   },
   {
     id: 'PB-06',
-    title: '剧本 6：跨会话记忆污染 + 超长上下文稀释',
+    title: '场景 06：跨会话记忆污染 + 超长上下文稀释',
     targetCapability: '能力 5 (记忆隔离与防长上下文稀释) & 三态挂起 (ASK)',
     tag: 'Memory Poisoning & Dilution (ASK Flow)',
     threatLevel: 'HIGH',
@@ -344,7 +348,7 @@ export class AgentHarness {
       result.verdictResponse.explainable_report, {verdict: result.verdict, matchedPolicy: result.verdictResponse.matched_policy_id,
         latencyMs: result.verdictResponse.fast_mirror_label.latency_ms, riskScore: result.verdictResponse.risk_score});
     this.log('SYSTEM', result.blocked ? '内核已阻断该动作' : '内核已授权该动作',
-      result.output ? '已读取靶场测试输入文件并上报 TOOL_POST_EXEC。' : '本工作台为真实内核审计演练；不执行外部写入、推送或攻击命令。');
+      result.output ? '已读取靶场测试输入文件并上报 TOOL_POST_EXEC。' : '内核授权通过，动作已移交执行链路。');
   }
   private approval: import('./D2GuardHook').AskApprovalHandler = ctx => ctx.resolve(false);
   setAskApprovalHandler(handler: import('./D2GuardHook').AskApprovalHandler) { this.approval = handler; }
