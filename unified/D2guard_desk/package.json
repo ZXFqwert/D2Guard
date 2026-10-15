@@ -1,0 +1,42 @@
+{
+  "name": "d2guard-desk",
+  "version": "1.0.0",
+  "description": "D²Guard Desk - Dual-Mirror Prompt Injection & Tool-Abuse Defense Desk for LLM Agents",
+  "type": "module",
+  "private": true,
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "electron": "electron electron/main.cjs",
+    "app": "npm run build && electron electron/main.cjs",
+    "test:integration": "tsx src/test/runPlaybooksTest.ts",
+    "build:web": "tsc && vite build --mode web --outDir dist-web",
+    "package:win": "electron-builder --win zip --x64 --config electron-builder.yml"
+  },
+  "dependencies": {
+    "@xyflow/react": "^12.4.2",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.475.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^22.13.0",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3",
+    "electron": "^44.7.2",
+    "electron-builder": "26.15.3",
+    "postcss": "^8.5.1",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vite": "^6.1.0"
+  }
+}

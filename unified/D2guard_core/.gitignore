@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.test-tmp/
+.external-snapshots/
+.codex-integration/
+dist/
+*.log
+*.egg-info/
+data/
+.env
+*.sqlite3*

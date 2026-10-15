@@ -1,0 +1,23 @@
+appId: art.li33.d2guard
+productName: D2Guard
+electronDist: node_modules/electron/dist
+directories:
+  output: ../release
+files:
+  - electron/standalone.cjs
+  - package.json
+extraMetadata:
+  main: electron/standalone.cjs
+extraResources:
+  - from: dist
+    to: web
+  - from: ../build/core/D2GuardCore
+    to: core
+win:
+  icon: electron/icon.ico
+  target:
+    - zip
+  artifactName: D2Guard-${version}-Windows-x64.${ext}
+  signExecutable: false
+asar: true
+compression: normal

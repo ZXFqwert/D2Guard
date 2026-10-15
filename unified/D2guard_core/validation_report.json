@@ -1,0 +1,17 @@
+{
+  "checked_at": "2026-10-15T11:04:35.904664+08:00",
+  "service": "http://127.0.0.1:8765",
+  "contract_sha256": "72e3d423bc462e6523ee8587060e5605f731455550d3f3097d650654222f00a4",
+  "contract_unchanged": true,
+  "pytest": {
+    "passed": 112,
+    "skipped": 1,
+    "failures": 0,
+    "skip_reason": "Windows host disallows unprivileged symlink creation"
+  },
+  "real_http_smoke": "passed",
+  "sqlite_schema_version": "2",
+  "legacy_sessions_backed_up": 13,
+  "fast_mirror_weights_validated": false,
+  "remote_slow_mirror_credentials_configured": false
+}
