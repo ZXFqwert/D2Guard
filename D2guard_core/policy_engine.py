@@ -17,7 +17,7 @@ from extractor import normalize
 from mirrors import FastMirrorAdapter, SlowMirrorClient
 from models import ActionVerdict, ProposedAction, SecurityState, Verdict
 from state_machine import (
-    domain_of, full_secret_match, is_trusted, matches_for, payload_views,
+    build_security_chain_summary, domain_of, full_secret_match, is_trusted, matches_for, payload_views,
     record_outbound, register_call, trace_action, unique_append,
 )
 
@@ -147,7 +147,13 @@ class PolicyEngine:
                 pass
         policy, reason = self.hard_check(state, action)
         text, _ = normalize(str(action.tool_args))
-        label = self.fast.classify(text, action.current_plan)
+        chain_summary = build_security_chain_summary(
+            state,
+            tool_name=action.tool_name,
+            current_plan=action.current_plan,
+            agent_id=action.agent_id,
+        )
+        label = self.fast.classify(text, action.current_plan, state_chain=chain_summary)
         evidence = state.evidence_by_agent.get(action.agent_id)
         if evidence and (evidence.fast_mirror_label.content_nature == "directive" or evidence.fast_mirror_label.action_alignment == "deviant"):
             label = evidence.fast_mirror_label
@@ -205,12 +211,19 @@ class PolicyEngine:
     def enrich_report(self, state: SecurityState, result: ActionVerdict):
         if result.slow_mirror_triggered:
             ratio = max((r.coverage_ratio for r in state.accumulated_outbound.values()), default=0)
+            call_node = state.calls.get(result.call_id)
+            chain_summary = build_security_chain_summary(
+                state,
+                tool_name=call_node.tool_name if call_node else "",
+                agent_id=call_node.agent_id if call_node else "main",
+            )
             result.explainable_report = self.slow.review({
                 "verdict": result.verdict.value, "matched_policy_id": result.matched_policy_id,
                 "content_nature": result.fast_mirror_label.content_nature.value,
                 "action_alignment": result.fast_mirror_label.action_alignment.value,
                 "coverage_ratio": ratio,
                 "anchor_type": state.anchor_intent.task_type if state.anchor_intent else "unknown",
+                "security_chain": chain_summary,
             }, result.explainable_report)
 
 

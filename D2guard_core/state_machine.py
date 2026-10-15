@@ -261,3 +261,62 @@ def update_state(state: SecurityState, extracted: ExtractedData) -> SecurityStat
             except ValueError:
                 pass  # Malformed network actions are blocked by the policy engine.
     return result
+
+
+def build_security_chain_summary(
+    state: SecurityState | None,
+    *,
+    tool_name: str = "",
+    current_plan: str = "",
+    agent_id: str = "main",
+) -> dict[str, object]:
+    """Compress long-horizon session state S_{t-1} into bounded security components."""
+    if state is None:
+        return {
+            "anchor_type": "unanchored",
+            "intent_locked": False,
+            "taint_active": False,
+            "taint_nature": "informational",
+            "taint_alignment": "expected",
+            "taint_token_span": [0, 0],
+            "secret_ledger_count": 0,
+            "max_coverage_ratio": 0.0,
+            "dag_node_count": 0,
+            "prior_call_chain": [],
+            "proposed_tool": tool_name or "none",
+            "has_plan": bool(current_plan.strip()),
+        }
+    anchor_type = state.anchor_intent.task_type if state.anchor_intent else "unanchored"
+    evidence = state.evidence_by_agent.get(agent_id)
+    if not evidence and state.evidence_by_agent:
+        evidence = next(iter(state.evidence_by_agent.values()))
+    taint_active = bool(
+        evidence
+        and (
+            evidence.fast_mirror_label.content_nature == "directive"
+            or evidence.fast_mirror_label.action_alignment == "deviant"
+        )
+    )
+    prior_chain = [
+        f"{rec.agent_id}:{rec.tool_name}"
+        for rec in list(state.calls.values())[-6:]
+    ]
+    max_cov = round(
+        max((r.coverage_ratio for r in state.accumulated_outbound.values()), default=0.0),
+        4,
+    )
+    return {
+        "anchor_type": anchor_type,
+        "intent_locked": state.anchor_intent is not None,
+        "taint_active": taint_active,
+        "taint_nature": evidence.fast_mirror_label.content_nature.value if evidence else "informational",
+        "taint_alignment": evidence.fast_mirror_label.action_alignment.value if evidence else "expected",
+        "taint_token_span": list(evidence.token_span) if evidence else [0, 0],
+        "secret_ledger_count": len(state.secret_ledger),
+        "max_coverage_ratio": max_cov,
+        "dag_node_count": len(state.dag_nodes),
+        "prior_call_chain": prior_chain,
+        "proposed_tool": tool_name or "none",
+        "has_plan": bool(current_plan.strip()),
+    }
+

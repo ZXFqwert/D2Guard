@@ -16,6 +16,11 @@ def create_host(core=None, static_dir=None, prefix=None, managed=None):
     from fastapi.staticfiles import StaticFiles
     from starlette.middleware.base import BaseHTTPMiddleware
     if core is None:
+        for cand in (ROOT / 'D2guard_core' / 'weights' / 'laya_d2_distilled.json', ROOT / 'weights' / 'laya_d2_distilled.json'):
+            if cand.is_file() and not os.getenv('D2GUARD_FAST_MODEL_PATH'):
+                os.environ['D2GUARD_FAST_MODEL_PATH'] = str(cand)
+                os.environ.setdefault('D2GUARD_FAST_BACKEND', 'laya-distilled')
+                break
         from server import app as core
     prefix = (prefix if prefix is not None else os.getenv('D2GUARD_PREFIX', '')).rstrip('/')
     managed = managed if managed is not None else os.getenv('D2GUARD_MANAGED', '0') == '1'
@@ -67,6 +72,17 @@ def create_host(core=None, static_dir=None, prefix=None, managed=None):
         @host.get(prefix)
         def trailing_slash():
             return RedirectResponse(prefix + '/', status_code=307)
+        if prefix == '/safe':
+            @host.get('/')
+            def root_to_safe():
+                return RedirectResponse('/safe/', status_code=307)
+            @host.get('/safe/desk/healthz')
+            def legacy_desk_health():
+                return {'application': 'D2Guard', 'mode': 'web' if managed else 'desktop', 'ready': True}
+            @host.get('/safe/desk')
+            @host.get('/safe/desk/')
+            def legacy_desk_redirect():
+                return RedirectResponse('/safe/', status_code=307)
     # Mount core only under the edition prefix, without exposing another copy.
     from starlette.routing import Mount
     host.router.routes.append(Mount(prefix + '/api', app=ApiPrefix(core)))

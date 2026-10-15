@@ -1,6 +1,7 @@
 """Contract-only FastAPI routes. Run with `python server.py`."""
 from contextlib import asynccontextmanager
 import logging
+import os
 import time
 
 from fastapi import FastAPI, HTTPException, Request
@@ -9,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from approval import ApprovalManager, InvalidApproval
-from config import CONTRACT, Settings
+from config import CONTRACT, ROOT, Settings
 from execution import SafeExecutor
 from desktop_api import install_desktop_api
 from extractor import extract
@@ -19,14 +20,19 @@ from models import (
     D2Event, ExtractedSummary, IngestResponse, ProposedAction, TelemetrySnapshot, Verdict, digest,
 )
 from policy_engine import PolicyEngine
-from state_machine import StateConflict, domain_of, trace_action, unique_append, update_state
+from state_machine import StateConflict, build_security_chain_summary, domain_of, trace_action, unique_append, update_state
 from storage import Store
 
 log = logging.getLogger(__name__)
 
 
 def create_app(settings: Settings | None = None, *, fast=None, slow=None) -> FastAPI:
-    settings = settings or Settings()
+    if settings is None:
+        default_ckpt = ROOT / "weights" / "laya_d2_distilled.json"
+        if default_ckpt.is_file() and not os.getenv("D2GUARD_FAST_MODEL_PATH"):
+            settings = Settings(fast_model_path=str(default_ckpt), fast_backend="laya-distilled")
+        else:
+            settings = Settings()
     store = Store(settings.db_path)
     fast = fast or FastMirrorAdapter(model_path=settings.fast_model_path, backend_type=settings.fast_backend)
     slow = slow or SlowMirrorClient(settings.slow_base_url, settings.slow_api_key, settings.slow_model, settings.slow_timeout)
@@ -38,6 +44,8 @@ def create_app(settings: Settings | None = None, *, fast=None, slow=None) -> Fas
     async def lifespan(app):
         log.info("D2Guard contract=%s initialized", CONTRACT["contract_version"])
         yield
+        if hasattr(app.state, "agent_runtime") and app.state.agent_runtime:
+            app.state.agent_runtime.close()
 
     app = FastAPI(title="d2guard_core", version=CONTRACT["contract_version"], lifespan=lifespan)
     app.state.store, app.state.engine, app.state.approvals = store, engine, approvals
@@ -69,9 +77,6 @@ def create_app(settings: Settings | None = None, *, fast=None, slow=None) -> Fas
     @app.post(paths["1_ingest_event"]["path"], response_model=IngestResponse)
     def ingest(event: D2Event):
         fingerprint = digest(event.model_dump(mode="json"))
-        extracted = extract(event, fast)
-        summary = ExtractedSummary.model_validate(extracted.model_dump(include=set(ExtractedSummary.model_fields)))
-        response = IngestResponse(event_id=event.event_id, extracted_summary=summary)
         with store.transaction() as conn:
             state = store.load(conn, event.session_id, create=True)
             previous = conn.execute("SELECT payload_hash,response_json FROM events WHERE session_id=? AND event_id=?",
@@ -80,6 +85,15 @@ def create_app(settings: Settings | None = None, *, fast=None, slow=None) -> Fas
                 if previous[0] != fingerprint:
                     raise StateConflict("event_id reused with different content")
                 return IngestResponse.model_validate_json(previous[1])
+            chain_summary = build_security_chain_summary(
+                state,
+                tool_name=event.tool_name,
+                current_plan=event.current_plan,
+                agent_id=event.agent_id,
+            )
+            extracted = extract(event, fast, state_chain=chain_summary)
+            summary = ExtractedSummary.model_validate(extracted.model_dump(include=set(ExtractedSummary.model_fields)))
+            response = IngestResponse(event_id=event.event_id, extracted_summary=summary)
             state = update_state(state, extracted)
             store.save(conn, state)
             conn.execute("""INSERT INTO events(session_id,event_id,payload_hash,payload_json,extracted_json,response_json)

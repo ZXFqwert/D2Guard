@@ -1,71 +1,24 @@
-# 双镜桌面版与服务器版
+# 双镜 D²Guard 桌面版与服务器版部署说明
 
-两种运行方式使用相同的前端、真实审计内核和五条 API 契约。新版是仓库根目录的主版本；旧版 Arena 的代码、赛题文档和历史材料归档在 `legacy/`。
+桌面版与公网体验版共享同一套前端（Codex 极简风 + 双镜光学战术装甲 + 五页导航）、同一套真实审计内核（`D2guard_core`）与五条标准 API 契约，并默认加载由双 NVIDIA A100 80GB 算力机微调蒸馏的 Laya 快镜权重（`D2guard_core/weights/laya_d2_distilled.json`）。
 
-## Windows App
+## 1. Windows 桌面版（普通电脑即开即用）
 
-下载 `D2Guard-1.0.0-Windows-x64.zip`，完整解压后双击 `D2Guard.exe`。
-不需要安装 Python 或 Node。关闭窗口自动关闭随附的内核；重复启动会聚焦原窗口。
-若 8765 已被占用，会明确提示，不会终止其他进程。
+- **桌面快捷方式**：双击桌面上的 **`双镜 D2Guard`** 快捷方式（指向 `release\win-unpacked\D2Guard.exe`）。
+- **独立发行包**：解压 `release\D2Guard-1.0.0-Windows-x64.zip` 后双击 `D2Guard.exe`，无需安装 Python、Node.js 或独立显卡。
+- 关闭窗口自动回收随附的本地内核进程；重复启动自动聚焦已有窗口。
+- 用户个人模型配置与会话数据库保存在 `%APPDATA%/D2Guard/`。
+- 从源码重新打包：在项目根目录执行 `pwsh -File scripts/build-desktop.ps1`。
 
-用户数据与模型密钥保存在 `%APPDATA%/D2Guard/`，升级时不会被安装目录覆盖。
-发行包不含开发者的模型密钥、历史会话或本地数据库。首次使用可在设置页录入个人模型。
-该构建尚未进行 Windows 代码签名。
-
-从源码构建：在 Windows 执行 `pwsh -File scripts/build-desktop.ps1`。
-原 `start_all.py`、三个底层通信文件及 `electron/main.cjs` 保留，供原开发流程使用。
-新发行入口为 `electron/standalone.cjs`，PyInstaller 打包的内核同时提供静态页面和 API。
-
-## Linux / 算力机
+## 2. 算力机与公网体验站（`https://agent.li33.art/safe`）
 
 ```bash
-git clone https://github.com/ZXFqwert/D2Guard.git
-cd D2Guard
-bash deployment/deploy.sh
-# 后续更新
+cd /home/roots/d2guard-current
 bash deployment/deploy.sh --pull
 ```
 
-需要 Python 3.11+、Node 22+、npm、用户级 systemd；私有仓库需先配置自己的 GitHub 登录。
-程序独立运行在 127.0.0.1:8766；数据在 `~/.local/share/d2guard-unified/`。
-部署不改动旧版 `.venv`、`.env`、数据库及源码。服务配置可用 `systemctl --user cat d2guard-unified` 检查。
-
-构建 Web 版时 Vite 将 API 地址替换为当前网站的 `/safe/desk`，源码中的原通信函数保持不变。
-静态资源使用 `/safe/desk/` 基路径；所有 HTTP 接口走相同域名。
-公共体验站禁止访客改写共享模型或通过测试接口使用服务器密钥请求任意地址；个人桌面版可完整配置模型。
-服务器管理员可通过仅绑定回环的临时本地管理实例配置独立数据库，或离线写入 `desktop_config`。
-运行时环境设置放在数据目录 `runtime.env`，不要放入 Git。
-
-## 与旧版 /safe 共存
-
-优先在反向代理增加更具体的路由：
-
-```nginx
-location = /safe/desk { return 307 /safe/desk/; }
-location /safe/desk/ {
-    proxy_pass http://10.33.0.30:8766;
-    proxy_set_header Host $host;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_read_timeout 90s;
-}
-```
-
-8766 默认仅监听回环，跨机器代理需配合 SSH 隧道或受防火墙限制的绑定地址。
-已有 VPS 固定转发至算力机 8000 时，可用 `legacy_bridge.py` 包装旧版入口：
-它仅转发 `/safe/desk` 至新版，其他请求原样交给旧版应用。旧版功能与流式响应不经过代理。
-在旧版目录，以旧版 Python 启动：
-
-```bash
-export D2GUARD_LEGACY_DIR=/home/roots/D2Guard
-export PYTHONPATH=/path/to/D2Guard
-/home/roots/D2Guard/.venv/bin/python -m uvicorn deployment.legacy_bridge:app --host 0.0.0.0 --port 8000
-```
-
-切换前先在空闲端口测试。回滚时停止包装服务，在旧目录恢复原命令：
-`python -m uvicorn web_demo:app --host 0.0.0.0 --port 8000`。
-新版服务可独立停止：`systemctl --user stop d2guard-unified`。
-
-
-## 从旧目录布局迁移
-
-已 clone 旧布局的开发者，在仓库根目录执行 `git pull --ff-only`，随后执行 `bash deployment/deploy.sh`。不要从残留的 `unified/` 子目录运行旧部署脚本。当前算力机运行目录是 `/home/roots/d2guard-current`，原 checkout 保留作回滚；数据目录与服务名不变。
+- 服务名称：`systemctl --user status d2guard-unified`
+- 监听地址：`0.0.0.0:8000`（由 VPS 直接代理至公网 `https://agent.li33.art/safe/`，同时自动兼容 `/safe/desk/` 307 跳转至 `/safe/`）
+- 持久化数据目录：`~/.local/share/d2guard-unified/`
+- 快镜模型：默认加载 `D2guard_core/weights/laya_d2_distilled.json`（`laya-distilled` 后端，`status: ready`）
+- 慢镜与主模型：公网体验站默认配置 `huihui-qwen3.8-27b`，公共访客不可篡改服务器共享模型配置；个人桌面版支持在“设置与接入”页自由配置任意 OpenAI / DeepSeek / Qwen 兼容接口。

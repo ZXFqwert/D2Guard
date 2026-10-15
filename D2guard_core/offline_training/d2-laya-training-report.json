@@ -1,0 +1,52 @@
+{
+  "model": "convaiinnovations/laya-multilingual -> d2guard-laya-distilled-v1",
+  "device": "NVIDIA A100 80GB PCIe",
+  "cuda_available": true,
+  "laya_teacher_loaded": true,
+  "laya_teacher_path": "/home/roots/d2guard-v4-lab/models/verified-laya-e4e9ddf",
+  "dataset_total": 1280,
+  "train_samples": 1088,
+  "val_samples": 192,
+  "vocab_size": 333,
+  "hidden_dim": 32,
+  "epochs": 80,
+  "training_duration_sec": 10.836,
+  "final_metrics": {
+    "epoch": 80,
+    "loss": 0.00085,
+    "val_nature_acc": 0.974,
+    "val_align_acc": 1.0,
+    "val_joint_acc": 0.974
+  },
+  "history": [
+    {
+      "epoch": 20,
+      "loss": 0.05604,
+      "val_nature_acc": 0.974,
+      "val_align_acc": 1.0,
+      "val_joint_acc": 0.974
+    },
+    {
+      "epoch": 40,
+      "loss": 0.0139,
+      "val_nature_acc": 0.974,
+      "val_align_acc": 1.0,
+      "val_joint_acc": 0.974
+    },
+    {
+      "epoch": 60,
+      "loss": 0.00214,
+      "val_nature_acc": 0.974,
+      "val_align_acc": 1.0,
+      "val_joint_acc": 0.974
+    },
+    {
+      "epoch": 80,
+      "loss": 0.00085,
+      "val_nature_acc": 0.974,
+      "val_align_acc": 1.0,
+      "val_joint_acc": 0.974
+    }
+  ],
+  "exported_checkpoint": "/home/roots/d2guard-v4-lab/weights/laya_d2_distilled.json"
+}

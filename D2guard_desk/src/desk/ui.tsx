@@ -1,34 +1,100 @@
 import { useEffect, useRef, ReactNode } from "react";
-import { X, ArrowUpRight, ShieldCheck } from "lucide-react";
+import { X, ShieldCheck } from "lucide-react";
 import { Verdict } from "../api/d2guardClient";
 
-export function Logo({ large = false }: { large?: boolean }) {
+export function Logo({
+  large = false,
+  armor = false,
+}: {
+  large?: boolean;
+  armor?: boolean;
+}) {
   return (
-    <svg
-      className={large ? "brand-logo large" : "brand-logo"}
-      viewBox="0 0 48 48"
-      fill="none"
-      aria-label="双镜 D²Guard 徽章"
+    <span
+      className={`brand-logo guardian-logo${large ? " large" : ""}${armor ? " is-protected" : ""}`}
+      role="img"
+      aria-label={
+        armor
+          ? "双镜 D²Guard：快慢双镜与增量状态流全链路接管中"
+          : "双镜 D²Guard：Codex 极简工作台模式"
+      }
     >
-      <path
-        d="M8 9 23 3 38 9v15c0 9-9 16-15 20C17 40 8 33 8 24Z"
-        fill="#e0eee7"
-        stroke="#26715b"
-        strokeWidth="1.8"
-      />
-      <path
-        d="m19 12 14-5 10 5v13c0 7-6 13-12 17-6-4-12-10-12-17Z"
-        fill="#f5f7f1"
-        stroke="#26715b"
-        strokeWidth="1.8"
-      />
-      <path
-        d="m19 12 12 13 12-13M31 25v17M8 9l15 16 15-16M23 25v19"
-        stroke="#26715b"
-        strokeWidth="1.3"
-      />
-      <path d="m23 3 10 4" stroke="#c39450" strokeWidth="2" />
-    </svg>
+      <svg
+        className="d2-emblem-svg"
+        viewBox="0 0 64 64"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        aria-hidden="true"
+      >
+        <defs>
+          <linearGradient id="d2CoreGrad" x1="8" y1="8" x2="56" y2="56" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor={armor ? "#1e3a8a" : "#1f4d3d"} />
+            <stop offset="55%" stopColor={armor ? "#2563eb" : "#2e6e56"} />
+            <stop offset="100%" stopColor={armor ? "#06b6d4" : "#529478"} />
+          </linearGradient>
+          <linearGradient id="d2LensGrad" x1="16" y1="14" x2="48" y2="50" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor={armor ? "#38bdf8" : "#65a38c"} stopOpacity="0.95" />
+            <stop offset="100%" stopColor={armor ? "#1d4ed8" : "#286b54"} stopOpacity="0.25" />
+          </linearGradient>
+        </defs>
+        {/* Outer hexagonal armor chassis */}
+        <polygon
+          className="d2-emblem-chassis"
+          points="32,3 57,17.5 57,46.5 32,61 7,46.5 7,17.5"
+          fill="url(#d2CoreGrad)"
+          fillOpacity={armor ? "0.14" : "0.08"}
+          stroke="url(#d2CoreGrad)"
+          strokeWidth={armor ? "2.4" : "1.6"}
+        />
+        {/* Corner armor lock brackets (highlighted in Dual-Mirror Armor mode) */}
+        <path
+          className="d2-emblem-armor-wing"
+          d="M32 6 L53 18.2 M53 45.8 L32 58 M11 45.8 L11 18.2"
+          stroke={armor ? "#0ea5e9" : "#7b9384"}
+          strokeWidth={armor ? "2" : "1"}
+          strokeLinecap="round"
+          strokeDasharray={armor ? "6 3" : "2 4"}
+          opacity={armor ? "0.95" : "0.4"}
+        />
+        {/* Mirror 1 (Fast Mirror / System 1 Lens - Left/Upper) */}
+        <circle
+          className="d2-emblem-lens lens-fast"
+          cx="27"
+          cy="29"
+          r="12.5"
+          fill="url(#d2LensGrad)"
+          fillOpacity={armor ? "0.28" : "0.16"}
+          stroke={armor ? "#0284c7" : "#2e6e56"}
+          strokeWidth="2.1"
+        />
+        {/* Mirror 2 (Slow Mirror / System 2 Lens - Right/Lower intersecting) */}
+        <circle
+          className="d2-emblem-lens lens-slow"
+          cx="37"
+          cy="35"
+          r="12.5"
+          fill="url(#d2LensGrad)"
+          fillOpacity={armor ? "0.34" : "0.18"}
+          stroke={armor ? "#1d4ed8" : "#3b7a62"}
+          strokeWidth="2.1"
+        />
+        {/* Incremental State Stream (D² trajectory wave through intersection) */}
+        <path
+          className="d2-emblem-stream"
+          d="M14 32 C22 24, 29 40, 37 28 C42 21, 46 35, 50 32"
+          stroke={armor ? "#06b6d4" : "#286b54"}
+          strokeWidth="2.2"
+          strokeLinecap="round"
+        />
+        {/* Center Core Anchor Point */}
+        <circle
+          cx="32"
+          cy="32"
+          r={armor ? "3.2" : "2.4"}
+          fill={armor ? "#0ea5e9" : "#286b54"}
+        />
+      </svg>
+    </span>
   );
 }
 export function Badge({ value }: { value: Verdict }) {
@@ -216,35 +282,19 @@ export function ArmorFrame() {
       data-testid="armor-frame"
       aria-label="双镜铠甲护体中"
     >
-      <svg className="armor-texture" width="100%" height="100%">
-        <defs>
-          <pattern
-            id="armor-pattern"
-            width="38"
-            height="38"
-            patternUnits="userSpaceOnUse"
-          >
-            <path
-              d="M0 8 8 0M0 30 30 0M8 38 38 8M30 38 38 30"
-              stroke="currentColor"
-              strokeWidth=".7"
-            />
-          </pattern>
-        </defs>
-        <rect width="100%" height="100%" fill="url(#armor-pattern)" />
-      </svg>
-      {["tl", "tr", "bl", "br"].map((c) => (
-        <svg key={c} className={`armor-corner ${c}`} viewBox="0 0 60 60">
-          <path d="M3 56V17L17 3h39M11 44V21l10-10h23" />
-          <path className="gold" d="M3 28 28 3M16 38V24l8-8h14" />
-          <circle cx="22" cy="22" r="2" />
-        </svg>
-      ))}
+      <div className="armor-rail armor-rail-top" />
+      <div className="armor-rail armor-rail-bottom" />
+      <div className="armor-rail armor-rail-left" />
+      <div className="armor-rail armor-rail-right" />
+      <div className="armor-corner armor-corner-tl" />
+      <div className="armor-corner armor-corner-tr" />
+      <div className="armor-corner armor-corner-bl" />
+      <div className="armor-corner armor-corner-br" />
       <div className="armor-nameplate">
-        <ShieldCheck size={13} />
-        <b>双镜铠甲护体中</b>
-        <span>Hook + Gateway + Core 全链路接管</span>
-        <ArrowUpRight size={12} />
+        <span className="armor-pulse-dot" aria-hidden="true" />
+        <ShieldCheck size={14} aria-hidden="true" />
+        <b>双镜铠甲护体中 · Hook + Gateway + Core 全链路接管</b>
+        <span className="armor-subtag">D¹ Laya · D² StateFlow</span>
       </div>
     </div>
   );

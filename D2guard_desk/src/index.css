@@ -163,13 +163,15 @@ small,
   line-height: 1.8;
 }
 .desktop {
+  --armor-space: 32px;
+  --armor-art-width: 52px;
   height: 100dvh;
   min-height: 500px;
-  transition: padding 0.5s;
-  background: #cbd9ce;
+  transition: padding 0.36s ease;
+  background: #e6eaf0;
 }
 .desktop.armored {
-  padding: 14px;
+  padding: var(--armor-space);
 }
 .app-shell {
   height: 100%;
@@ -180,10 +182,8 @@ small,
   transition: border-radius 0.5s;
 }
 .armored .app-shell {
-  border-radius: 10px;
-  box-shadow:
-    0 0 0 1px #6e9f87,
-    0 0 18px #2f8a6970;
+  border-radius: 9px;
+  box-shadow: 0 0 0 1px #acb9cb;
 }
 .sidebar {
   width: 228px;
@@ -201,9 +201,33 @@ small,
   padding: 0 8px;
 }
 .brand-logo {
-  width: 37px;
-  height: 42px;
+  width: 36px;
+  height: 36px;
   flex-shrink: 0;
+}
+.guardian-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  vertical-align: middle;
+}
+.d2-emblem-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  transition: transform 0.36s cubic-bezier(0.22, 1, 0.36, 1), filter 0.36s ease;
+}
+.guardian-logo.is-protected .d2-emblem-svg {
+  transform: scale(1.04);
+  filter: drop-shadow(0 2px 8px rgba(14, 165, 233, 0.28));
+}
+.guardian-logo.is-protected .d2-emblem-armor-wing {
+  animation: d2-wing-pulse 3.2s ease-in-out infinite;
+}
+@keyframes d2-wing-pulse {
+  0%, 100% { opacity: 0.72; }
+  50% { opacity: 1; }
 }
 .brand strong {
   font-size: 17px;
@@ -1093,9 +1117,9 @@ summary {
   padding: 30px 20px 50px;
 }
 .brand-logo.large {
-  width: 65px;
-  height: 73px;
-  margin-bottom: 22px;
+  width: 112px;
+  height: 112px;
+  margin-bottom: 20px;
 }
 .welcome .eyebrow {
   font-size: 9px;
@@ -1103,20 +1127,20 @@ summary {
   letter-spacing: 2px;
 }
 .welcome h1 {
-  font-size: 33px;
-  line-height: 1.65;
-  letter-spacing: -1px;
-  color: #3b5138;
-  margin-top: 6px;
+  font-size: 27px;
+  line-height: 1.45;
+  letter-spacing: -0.6px;
+  color: #203858;
+  margin-top: 0;
 }
 .welcome h1 span {
   color: #879a75;
 }
 .welcome > p {
-  color: #879b76;
-  font-size: 11px;
-  line-height: 2.1;
-  margin: 17px 0 29px;
+  color: #626f68;
+  font-size: 13px;
+  line-height: 1.8;
+  margin: 12px 0 28px;
 }
 .welcome-shortcuts {
   display: flex;
@@ -2042,106 +2066,195 @@ summary {
   min-width: 5px;
   margin-bottom: 5px;
 }
+/* Tactical Optical Dual-Mirror Armor Frame around the Codex workspace */
 .armor-frame {
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 90;
-  border: 14px solid transparent;
-  border-image: linear-gradient(
-      140deg,
-      #729781,
-      #b9c9a5 35%,
-      #c3b58b 55%,
-      #7da58c
-    )
-    1;
-  animation: armor-breathe 4s ease-in-out infinite;
+  border: var(--armor-space) solid rgba(15, 23, 42, 0.92);
+  box-shadow:
+    inset 0 0 0 1.5px rgba(56, 189, 248, 0.55),
+    inset 0 0 24px rgba(14, 165, 233, 0.18);
+  background:
+    repeating-linear-gradient(
+      135deg,
+      rgba(56, 189, 248, 0.04) 0px,
+      rgba(56, 189, 248, 0.04) 2px,
+      transparent 2px,
+      transparent 10px
+    );
+  animation: armor-arrive 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
-.armor-texture {
+.armor-rail {
   position: fixed;
-  inset: 0;
-  color: #415e474d;
-  clip-path: polygon(
-    0 0,
-    100% 0,
-    100% 100%,
-    0 100%,
-    0 0,
-    14px 14px,
-    14px calc(100% - 14px),
-    calc(100% - 14px) calc(100% - 14px),
-    calc(100% - 14px) 14px,
-    14px 14px
+  pointer-events: none;
+  z-index: 91;
+}
+.armor-rail-top,
+.armor-rail-bottom {
+  left: calc(var(--armor-space) + 18px);
+  right: calc(var(--armor-space) + 18px);
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(56, 189, 248, 0.65) 18%,
+    rgba(37, 99, 235, 0.9) 50%,
+    rgba(56, 189, 248, 0.65) 82%,
+    transparent 100%
   );
+}
+.armor-rail-top {
+  top: calc(var(--armor-space) - 6px);
+}
+.armor-rail-bottom {
+  bottom: calc(var(--armor-space) - 6px);
+}
+.armor-rail-left,
+.armor-rail-right {
+  top: calc(var(--armor-space) + 18px);
+  bottom: calc(var(--armor-space) + 18px);
+  width: 2px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(56, 189, 248, 0.65) 20%,
+    rgba(37, 99, 235, 0.85) 50%,
+    rgba(56, 189, 248, 0.65) 80%,
+    transparent 100%
+  );
+}
+.armor-rail-left {
+  left: calc(var(--armor-space) - 6px);
+}
+.armor-rail-right {
+  right: calc(var(--armor-space) - 6px);
 }
 .armor-corner {
   position: fixed;
-  width: 48px;
-  height: 48px;
-  fill: none;
-  stroke: #406c50;
-  stroke-width: 1.5;
+  width: 28px;
+  height: 28px;
+  border-color: #38bdf8;
+  border-style: solid;
+  pointer-events: none;
+  z-index: 92;
+  filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.55));
 }
-.armor-corner.tl {
-  top: 1px;
-  left: 1px;
+.armor-corner-tl {
+  top: 8px;
+  left: 8px;
+  border-width: 2.5px 0 0 2.5px;
+  border-top-left-radius: 6px;
 }
-.armor-corner.tr {
-  right: 1px;
-  top: 1px;
-  transform: rotate(90deg);
+.armor-corner-tr {
+  top: 8px;
+  right: 8px;
+  border-width: 2.5px 2.5px 0 0;
+  border-top-right-radius: 6px;
 }
-.armor-corner.br {
-  bottom: 1px;
-  right: 1px;
-  transform: rotate(180deg);
+.armor-corner-bl {
+  bottom: 8px;
+  left: 8px;
+  border-width: 0 0 2.5px 2.5px;
+  border-bottom-left-radius: 6px;
 }
-.armor-corner.bl {
-  bottom: 1px;
-  left: 1px;
-  transform: rotate(270deg);
-}
-.armor-corner .gold {
-  stroke: #a99051;
+.armor-corner-br {
+  bottom: 8px;
+  right: 8px;
+  border-width: 0 2.5px 2.5px 0;
+  border-bottom-right-radius: 6px;
 }
 .armor-nameplate {
   position: fixed;
-  top: 3px;
+  top: 5px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 10px;
-  border: 1px solid #a6b893;
-  padding: 6px 18px;
-  background: linear-gradient(100deg, #e9f3e1, #f4f2dd);
-  color: #638452;
-  border-radius: 3px 3px 12px 12px;
-  box-shadow: 0 3px 10px #385a2720;
+  justify-content: center;
+  gap: 8px;
+  padding: 5px 16px;
+  background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+  color: #e0f2fe;
+  border: 1px solid rgba(56, 189, 248, 0.55);
+  border-radius: 6px 6px 12px 12px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.35), 0 0 12px rgba(14, 165, 233, 0.25);
   white-space: nowrap;
-  font-size: 9px;
+  font-size: 11px;
+  z-index: 95;
+}
+.armor-pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #38bdf8;
+  box-shadow: 0 0 8px #38bdf8;
 }
 .armor-nameplate b {
-  font-size: 10px;
-  letter-spacing: 0.5px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  color: #f8fafc;
 }
-.armor-nameplate span {
-  font-size: 8px;
-  color: #7e9567;
+.armor-subtag {
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 9.5px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(14, 165, 233, 0.18);
+  border: 1px solid rgba(56, 189, 248, 0.38);
+  color: #7dd3fc;
 }
-@keyframes armor-breathe {
-  0%,
-  100% {
-    box-shadow:
-      inset 0 0 0 1px #79aa87,
-      inset 0 0 15px #4b9a5a25;
-  }
-  50% {
-    box-shadow:
-      inset 0 0 0 1px #bbb77a,
-      inset 0 0 26px #94a84a55;
-  }
+@keyframes armor-arrive {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.armored {
+  --green: #274b78;
+  --line: #dce3eb;
+}
+.armored .sidebar {
+  background: #f1f4f7;
+  border-right-color: #dce3eb;
+}
+.armored .brand strong,
+.armored .mode-label {
+  color: #203858;
+}
+.armored nav button.active {
+  background: #e3eaf3;
+  border-color: #d3deeb;
+  color: #264b76;
+}
+.armored nav button.active:before {
+  background: #274b78;
+}
+.armored .guard-card.on {
+  background: #ecf1f7;
+  border-color: #c4d2e4;
+}
+.armored .guard-card.on strong {
+  color: #274b78;
+}
+.armored .guard-card.on button,
+.armored .send-button {
+  background: #274b78;
+  border-color: #274b78;
+  color: #fff;
+}
+.armored .input-dock {
+  border-color: #cbd8e8;
+}
+.armored .welcome-shortcuts button {
+  border-color: #d6e0ec;
+  color: #456388;
+}
+.armored .welcome-shortcuts button > div {
+  color: #3d5777;
+}
+.armored .welcome-shortcuts small {
+  color: #5f7088;
 }
 @media (min-width: 1700px) {
   .page-content {
@@ -2719,4 +2832,30 @@ summary {
 .scenario-table td {
   padding-top: 17px;
   padding-bottom: 17px;
+}
+
+/* Guardian chrome stays subordinate to task controls on smaller viewports. */
+@media (max-width: 1200px) {
+  .desktop { --armor-space: 26px; --armor-art-width: 44px; }
+}
+@media (max-width: 960px) {
+  .desktop { --armor-space: 20px; --armor-art-width: 34px; }
+  .armor-nameplate { top: 3px; padding: 4px 13px; }
+  .armor-nameplate b { font-size: 10px; }
+}
+@media (max-width: 640px) {
+  .desktop { --armor-space: 12px; --armor-art-width: 22px; }
+  .desktop.armored { padding: var(--armor-space); }
+  .armor-frame { border-width: var(--armor-space); }
+  .armor-nameplate { top: 0; padding: 2px 9px; gap: 5px; border-radius: 0 0 7px 7px; }
+  .armor-nameplate b { font-size: 8px; letter-spacing: 0.3px; }
+  .armor-nameplate svg { width: 11px; height: 11px; }
+  .guardian-logo { width: 32px; height: 32px; }
+  .brand-logo.large { width: 88px; height: 88px; margin-bottom: 14px; }
+  .welcome h1 { font-size: 23px; line-height: 1.4; }
+  .welcome > p { font-size: 12px; margin: 10px 0 22px; }
+}
+@media (max-height: 760px) and (min-width: 641px) {
+  .brand-logo.large { width: 88px; height: 88px; margin-bottom: 12px; }
+  .welcome { padding-top: 20px; padding-bottom: 24px; }
 }

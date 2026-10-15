@@ -29,23 +29,28 @@ WorkingDirectory=$ROOT
 Environment=D2GUARD_DB=$DATA/d2guard.sqlite3
 Environment=D2GUARD_EXEC_ROOT=$DATA/workspace
 Environment=D2GUARD_STATIC=$ROOT/D2guard_desk/dist-web
-Environment=D2GUARD_PREFIX=/safe/desk
+Environment=D2GUARD_PREFIX=/safe
 Environment=D2GUARD_MANAGED=1
+Environment=D2GUARD_FAST_MODEL_PATH=$ROOT/D2guard_core/weights/laya_d2_distilled.json
+Environment=D2GUARD_FAST_BACKEND=laya-distilled
 Environment=PATH=$ROOT/.venv-server/bin:/usr/local/bin:/usr/bin:/bin
 EnvironmentFile=$DATA/runtime.env
-ExecStart=$ROOT/.venv-server/bin/python deployment/runtime.py --port 8766
+ExecStart=$ROOT/.venv-server/bin/python deployment/runtime.py --host 0.0.0.0 --port 8000
 Restart=on-failure
 RestartSec=3
 UMask=0077
 [Install]
 WantedBy=default.target
 EOF
+systemctl --user stop d2guard-bridge.service d2guard.service d2guard-tunnel.service 2>/dev/null || true
+systemctl --user disable d2guard-bridge.service d2guard.service d2guard-tunnel.service 2>/dev/null || true
+rm -f "$HOME/.config/systemd/user/d2guard-bridge.service" "$HOME/.config/systemd/user/d2guard.service" "$HOME/.config/systemd/user/d2guard-tunnel.service"
 systemctl --user daemon-reload
 systemctl --user enable --now d2guard-unified.service
 systemctl --user restart d2guard-unified.service
 for i in {1..30}; do
-    if curl --fail --silent http://127.0.0.1:8766/safe/desk/healthz; then
-        printf '\nD2Guard ready. Public route: /safe/desk/\n'
+    if curl --fail --silent http://127.0.0.1:8000/safe/healthz; then
+        printf '\nD2Guard ready. Public route: /safe/\n'
         exit 0
     fi
     sleep 1

@@ -21,8 +21,15 @@ HOMOGLYPHS = str.maketrans({
 TOKENS = re.compile(r"\w+|[^\w\s]", re.UNICODE)
 B64 = re.compile(r"(?<![A-Za-z0-9_+/-])([A-Za-z0-9_+/-]{6,}={0,2})(?![A-Za-z0-9_+/=-])")
 SECRET_ASSIGNMENT = re.compile(
-    r"(?im)^\s*(?:export\s+)?[\w.-]*(?:API[_-]?KEY|SECRET|TOKEN|PASSWORD|PASSWD|PRIVATE[_-]?KEY|ACCESS[_-]?KEY)[\w.-]*\s*[:=]\s*['\"]?([^\r\n'\"]+)"
+    r"(?im)^\s*(?:export\s+)?['\"]?[\w.-]*(?:API[_-]?KEY|SECRET|TOKEN|PASSWORD|PASSWD|PRIVATE[_-]?KEY|ACCESS[_-]?KEY)[\w.-]*['\"]?\s*[:=]\s*['\"]?([^\r\n'\",]+)"
 )
+INLINE_SECRET = re.compile(
+    r"(?i)['\"]?(?:API[_-]?KEY|SECRET|TOKEN|PASSWORD|PASSWD|PRIVATE[_-]?KEY|ACCESS[_-]?KEY)[\w.-]*['\"]?\s*[:=]\s*['\"]?([A-Za-z0-9_.-]+)"
+)
+KEY_PATTERNS = re.compile(
+    r"\b(sk-[A-Za-z0-9_-]{8,}|ghp_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16})\b"
+)
+
 
 
 def _sub(text, mapping, pattern, replacement):
@@ -97,31 +104,50 @@ def sensitive_path(path: str) -> bool:
     name = PurePosixPath(path.replace("\\", "/")).name.casefold()
     return (name == ".env" or name.startswith(".env.") or name in
             {"id_rsa", "id_ed25519", "id_ecdsa", "credentials", "credentials.json", ".npmrc", ".pypirc"}
-            or name.endswith((".pem", ".key")))
+            or name.endswith((".pem", ".key"))
+            or any(k in name for k in ("secret", "credential", "token", "password", "schema", "records", "spec", "migration", "config", "setting")))
 
 
 def secret_candidates(event: D2Event) -> list[SecretCandidate]:
     # A proposed fs.read contains instructions, not the file's contents.
-    if event.event_type != "TOOL_RETURN" or event.stage != "TOOL_POST_EXEC":
+    if event.stage != "TOOL_POST_EXEC" and event.event_type not in {"TOOL_RETURN", "MEMORY_RECALL"}:
         return []
-    if event.tool_name not in {"fs.read", "read_file", "file.read"}:
-        return []
-    path = str(event.tool_args.get("path", event.source_uri))
-    if not sensitive_path(path) or not event.raw_content.strip():
-        return []
-    raw = event.raw_content
-    values = [raw]  # Include complete config and separately register each credential value.
-    values += [m.group(1).strip() for m in SECRET_ASSIGNMENT.finditer(raw)]
-    return [SecretCandidate(source_path=path, plaintext=v) for v in dict.fromkeys(values) if v]
+    if event.event_type == "TOOL_RETURN" and event.tool_name in {"fs.read", "read_file", "file.read"}:
+        path = str(event.tool_args.get("path", event.source_uri))
+        raw = event.raw_content
+        if not raw.strip():
+            return []
+        if not sensitive_path(path) and not bool(KEY_PATTERNS.search(raw)):
+            return []
+        raw = event.raw_content
+        values = [raw]  # Include complete config and separately register each credential value.
+        values += [m.group(1).strip() for m in SECRET_ASSIGNMENT.finditer(raw)]
+        values += [m.group(1).strip() for m in INLINE_SECRET.finditer(raw)]
+        values += [m.group(1).strip() for m in KEY_PATTERNS.finditer(raw)]
+        return [SecretCandidate(source_path=path, plaintext=v) for v in dict.fromkeys(values) if v]
+    if event.event_type in {"TOOL_RETURN", "MEMORY_RECALL"} and (
+        event.tool_name in {"memory.recall", "memory.read"} or event.source_type == "MEMORY"
+    ):
+        raw = event.raw_content.strip()
+        if not raw:
+            return []
+        values = []
+        values += [m.group(1).strip() for m in SECRET_ASSIGNMENT.finditer(raw)]
+        values += [m.group(1).strip() for m in INLINE_SECRET.finditer(raw)]
+        values += [m.group(1).strip() for m in KEY_PATTERNS.finditer(raw)]
+        uri = event.source_uri or f"memory://{event.tool_args.get('query', '')}"
+        return [SecretCandidate(source_path=uri, plaintext=v) for v in dict.fromkeys(values) if v]
+    return []
+
 
 
 _DEFAULT_MIRROR = FastMirrorAdapter()
 
 
-def extract(event: D2Event, mirror: FastMirrorAdapter | None = None) -> ExtractedData:
+def extract(event: D2Event, mirror: FastMirrorAdapter | None = None, state_chain: dict | None = None) -> ExtractedData:
     text, offsets = normalize(event.raw_content)
     secrets = secret_candidates(event)
-    label = (mirror or _DEFAULT_MIRROR).classify(text, event.current_plan)
+    label = (mirror or _DEFAULT_MIRROR).classify(text, event.current_plan, state_chain=state_chain)
     # Highlight suspect normalized token(s), projected back through all transforms.
     suspect = re.search(r"ignore.{0,24}instructions|忽略.{0,16}指令|curl|wget|exfil|泄露|上传|id_rsa", text, re.I)
     if suspect:
