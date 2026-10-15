@@ -1,22 +1,22 @@
-# Local credentials at the contest root and in future code directories.
+**/__pycache__/
+**/.pytest_cache/
+**/.venv/
+**/node_modules/
+**/.node_modules.external-link
+**/data/
+.test-runs/
+.playwright-cli/
+output/logs/
+**/.venv-server/
+**/dist/
+**/dist-web/
+build/
+release/
+*.spec
 .env
 .env.*
 !.env.example
-!.env.*.example
-
-# Dependency and local runtime output.
-node_modules/
-.venv/
-__pycache__/
-*.pyc
-runs/
-logs/
-dist/
-~
-
-# Browser verification traces contain temporary session capabilities.
-.playwright-cli/
-.codex-ppt-build/
-.codex-ppt-review/
-deepseek/
-汇报重构版/
+*.sqlite3
+*.sqlite3-*
+*.pem
+*.key

@@ -12,7 +12,7 @@
 ## 算力机更新
 
 ```bash
-cd /home/roots/d2guard-unified/unified
+cd /home/roots/d2guard-current
 bash deployment/deploy.sh --pull
 ```
 
@@ -20,8 +20,9 @@ bash deployment/deploy.sh --pull
 
 | 项目 | 实际位置 |
 | --- | --- |
-| GitHub 新版代码 | `unified/` |
-| 算力机新版 checkout | `/home/roots/d2guard-unified` |
+| GitHub 新版代码 | 仓库根目录 `D2guard_core/`、`D2guard_desk/` |
+| GitHub 旧版归档 | `legacy/` |
+| 算力机新版 checkout | `/home/roots/d2guard-current` |
 | 新版服务 | `systemctl --user status d2guard-unified` |
 | 兼容入口 | `systemctl --user status d2guard-bridge` |
 | 新版后端 | `127.0.0.1:8766` |
@@ -53,3 +54,8 @@ bash /home/roots/d2guard-unified/rollback-bridge.sh
 - 三个原通信文件、三个原启动文件及旧 Electron 入口共 7 个冻结文件 SHA256 保持一致。
 - 旧版首页在兼容入口切换前后内容一致。
 - ZIP SHA256：`f769edb32087f327db3d10b4a0edb1a34a53b683739060f5f091a67e7a6869c9`。
+
+
+## 仓库主版本整理
+
+新版已提升到仓库根目录。旧版代码、文档和材料完整归入 `legacy/`；旧版在线实例仍使用 `/home/roots/D2Guard`，不从归档目录直接启动。当前服务从 `/home/roots/d2guard-current` 运行，沿用原持久化数据和模型配置。原 `/home/roots/d2guard-unified` checkout 保留用于回退。

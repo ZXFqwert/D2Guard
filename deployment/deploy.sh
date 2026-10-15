@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
-# Run inside the checked-out unified edition. No secrets or private dependencies in Git.
+# Run from the current repository root. Runtime data stays outside the checkout.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 if [[ "${1:-}" == "--pull" ]]; then
     git pull --ff-only
+    UPDATED_ROOT="$(git rev-parse --show-toplevel)"
+    if [[ "$ROOT" != "$UPDATED_ROOT" && -f "$UPDATED_ROOT/D2guard_core/server.py" ]]; then
+        exec bash "$UPDATED_ROOT/deployment/deploy.sh"
+    fi
 fi
 python3 -m venv .venv-server
 .venv-server/bin/python -m pip install -r D2guard_core/requirements.lock.txt

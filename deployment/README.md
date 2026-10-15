@@ -1,6 +1,6 @@
 # 双镜桌面版与服务器版
 
-两种运行方式使用相同的前端、真实审计内核和五条 API 契约。旧版 Arena 保留在仓库原路径；本版放在 `unified/`，不覆盖旧版实现。
+两种运行方式使用相同的前端、真实审计内核和五条 API 契约。新版是仓库根目录的主版本；旧版 Arena 的代码、赛题文档和历史材料归档在 `legacy/`。
 
 ## Windows App
 
@@ -20,7 +20,7 @@
 
 ```bash
 git clone https://github.com/ZXFqwert/D2Guard.git
-cd D2Guard/unified
+cd D2Guard
 bash deployment/deploy.sh
 # 后续更新
 bash deployment/deploy.sh --pull
@@ -57,10 +57,15 @@ location /safe/desk/ {
 
 ```bash
 export D2GUARD_LEGACY_DIR=/home/roots/D2Guard
-export PYTHONPATH=/path/to/D2Guard/unified
+export PYTHONPATH=/path/to/D2Guard
 /home/roots/D2Guard/.venv/bin/python -m uvicorn deployment.legacy_bridge:app --host 0.0.0.0 --port 8000
 ```
 
 切换前先在空闲端口测试。回滚时停止包装服务，在旧目录恢复原命令：
 `python -m uvicorn web_demo:app --host 0.0.0.0 --port 8000`。
 新版服务可独立停止：`systemctl --user stop d2guard-unified`。
+
+
+## 从旧目录布局迁移
+
+已 clone 旧布局的开发者，在仓库根目录执行 `git pull --ff-only`，随后执行 `bash deployment/deploy.sh`。不要从残留的 `unified/` 子目录运行旧部署脚本。当前算力机运行目录是 `/home/roots/d2guard-current`，原 checkout 保留作回滚；数据目录与服务名不变。
