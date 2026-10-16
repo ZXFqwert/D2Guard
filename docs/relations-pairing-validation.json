@@ -1,0 +1,17 @@
+{
+  "batch": "matrix-20261016-153448",
+  "run_ids": [
+    "20261016-153449-731cbd",
+    "20261016-153532-c8710b",
+    "20261016-153613-c630e8",
+    "20261016-153711-41dace"
+  ],
+  "checks": {
+    "same_task": true,
+    "same_source": true,
+    "same_clean_files": true,
+    "same_attack_files": true,
+    "same_canary": true
+  },
+  "all_passed": true
+}

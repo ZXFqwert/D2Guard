@@ -30,7 +30,7 @@ class CoreV2:
         threading.Thread(target=self._slow_worker,daemon=True,name='d2v2-evidence-review').start()
         emit('decisions.jsonl',{'type':'core_started','engine':'d2v2','protection':enabled,
             'fast_model':getattr(self.fast,'metadata',{'backend':'test_injected'}),
-            'compression':'bounded-rule-extractor-v1; not universal semantic extraction',
+            'compression':'bounded-rule-extractor-v2 operation-target relations; not universal semantic extraction',
             'limits':{'hot_taints':8,'recent_steps':8,'fast_payload_bytes':12288,'fast_tokens':2048}})
 
     def state(self):
@@ -103,12 +103,13 @@ class CoreV2:
                         token_span=self.fast.token_span(raw,item['evidence_ref']['char_span'])
                         item['evidence_ref'].update(token_span=token_span,tokenizer='original-laya:'+getattr(self.fast,'metadata',{}).get('revision','unknown'))
                     item['taint_id']='T-'+digest(encode(item))[:16]
-                    for target in item['induced_targets']:
-                        try:target=canonical(target)
+                    for relation in item['action_relations']:
+                        if relation['stance']!='requested':continue
+                        try:target=canonical(relation['target'])
                         except ValueError:incomplete=True;continue
-                        for op in item['induced_ops'] or ['unknown']:
-                            self.store.db.execute('INSERT OR IGNORE INTO taints VALUES(?,?,?,?,?)',
-                                (item['taint_id']+':'+digest(op+target)[:12],ref['event_id'],op,target,encode(item)))
+                        op=relation['op']
+                        self.store.db.execute('INSERT OR IGNORE INTO taints VALUES(?,?,?,?,?)',
+                            (item['taint_id']+':'+digest(op+target)[:12],ref['event_id'],op,target,encode(item)))
                     self.taints.append(item)
                 delta.update(event_kind='UNTRUSTED_OBSERVATION',directive_clauses=directives[:8],
                     secrets_registered=ids[:8],coverage_incomplete=incomplete or len(directives)>8,

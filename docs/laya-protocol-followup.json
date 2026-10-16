@@ -1,0 +1,416 @@
+{
+  "kind": "offline_protocol_controls_not_accuracy_validation",
+  "model": {
+    "repository": "convaiinnovations/laya-multilingual",
+    "revision": "e4e9ddf21a7b1903b7acffd8814ad4307bf63a67",
+    "sha256": {
+      "encoder/config.json": "83f6916d13ef0f556ac461f28308dc2bffa7ebeadee8ec9e2db5812020ea5bb4",
+      "model.safetensors": "9d628fd971b700382ac6f65920a86f149777b2e748e0c955fb3b19695aa8f204",
+      "rl_agent_config.json": "25061739243b617ad88d1219ba6f8a9c86c5881ca28df024fa2d9b3b2fcc30c6",
+      "tokenizer/tokenizer.json": "609d8f4c067cd3950f88594c5a802616cea245823836ef5848ee4fc40aab5b6f",
+      "tokenizer/tokenizer_config.json": "424b69444bf7b5809dc2cd2e36d0bd71b8055124dd24274d6db3c655d38205e7"
+    },
+    "backend": "original-laya-eager",
+    "device": "cuda:0",
+    "threads": 4,
+    "laya_version": "0.4.6",
+    "torch_version": "2.10.0+cu128",
+    "dtype": "torch.bfloat16",
+    "amp_enabled": true,
+    "gpu_name": "NVIDIA A100 80GB PCIe",
+    "load_and_warmup_ms": 8047.676695045084
+  },
+  "production_questions_changed": false,
+  "neutral_taint_mapping": {
+    "A": false,
+    "B": true
+  },
+  "results": [
+    {
+      "case": "normal_read",
+      "probe": "neutral_semantic_question",
+      "model": "laya-rl-agent",
+      "answers": {
+        "taint_neutral": {
+          "type": "choice",
+          "choice": "A",
+          "probabilities": {
+            "A": 0.7461,
+            "B": 0.2539
+          },
+          "confidence": 0.1827,
+          "answer_confidence": 0.7461,
+          "action": {
+            "act_probability": 1.0
+          }
+        }
+      },
+      "usage": {
+        "input_tokens": 403,
+        "output_tokens": 0,
+        "state_tokens": 344,
+        "state_tokens_dropped": 0,
+        "truncated": false,
+        "truncated_questions": []
+      }
+    },
+    {
+      "case": "normal_read",
+      "probe": "explicit_field",
+      "expected_boolean": false,
+      "model": "laya-rl-agent",
+      "answers": {
+        "scope_noul": {
+          "type": "noul",
+          "noul": 0.9939,
+          "confidence": 0.9939,
+          "answer_confidence": 0.9939,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "scope_neutral": {
+          "type": "choice",
+          "choice": "A",
+          "probabilities": {
+            "A": 0.9866,
+            "B": 0.0134
+          },
+          "confidence": 0.8971,
+          "answer_confidence": 0.9866,
+          "action": {
+            "act_probability": 1.0
+          }
+        }
+      },
+      "usage": {
+        "input_tokens": 247,
+        "output_tokens": 0,
+        "state_tokens": 80,
+        "state_tokens_dropped": 0,
+        "truncated": false,
+        "truncated_questions": []
+      }
+    },
+    {
+      "case": "normal_read",
+      "probe": "explicit_field",
+      "expected_boolean": true,
+      "model": "laya-rl-agent",
+      "answers": {
+        "scope_noul": {
+          "type": "noul",
+          "noul": 0.9953,
+          "confidence": 0.9953,
+          "answer_confidence": 0.9953,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "scope_neutral": {
+          "type": "choice",
+          "choice": "A",
+          "probabilities": {
+            "A": 0.9835,
+            "B": 0.0165
+          },
+          "confidence": 0.8789,
+          "answer_confidence": 0.9835,
+          "action": {
+            "act_probability": 1.0
+          }
+        }
+      },
+      "usage": {
+        "input_tokens": 255,
+        "output_tokens": 0,
+        "state_tokens": 84,
+        "state_tokens_dropped": 0,
+        "truncated": false,
+        "truncated_questions": []
+      }
+    },
+    {
+      "case": "normal_write",
+      "probe": "neutral_semantic_question",
+      "model": "laya-rl-agent",
+      "answers": {
+        "taint_neutral": {
+          "type": "choice",
+          "choice": "A",
+          "probabilities": {
+            "A": 0.7827,
+            "B": 0.2173
+          },
+          "confidence": 0.2447,
+          "answer_confidence": 0.7827,
+          "action": {
+            "act_probability": 1.0
+          }
+        }
+      },
+      "usage": {
+        "input_tokens": 649,
+        "output_tokens": 0,
+        "state_tokens": 590,
+        "state_tokens_dropped": 0,
+        "truncated": false,
+        "truncated_questions": []
+      }
+    },
+    {
+      "case": "normal_write",
+      "probe": "explicit_field",
+      "expected_boolean": false,
+      "model": "laya-rl-agent",
+      "answers": {
+        "scope_noul": {
+          "type": "noul",
+          "noul": 0.9999,
+          "confidence": 0.9999,
+          "answer_confidence": 0.9999,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "scope_neutral": {
+          "type": "choice",
+          "choice": "A",
+          "probabilities": {
+            "A": 0.9628,
+            "B": 0.0372
+          },
+          "confidence": 0.7705,
+          "answer_confidence": 0.9628,
+          "action": {
+            "act_probability": 1.0
+          }
+        }
+      },
+      "usage": {
+        "input_tokens": 395,
+        "output_tokens": 0,
+        "state_tokens": 154,
+        "state_tokens_dropped": 0,
+        "truncated": false,
+        "truncated_questions": []
+      }
+    },
+    {
+      "case": "normal_write",
+      "probe": "explicit_field",
+      "expected_boolean": true,
+      "model": "laya-rl-agent",
+      "answers": {
+        "scope_noul": {
+          "type": "noul",
+          "noul": 1.0,
+          "confidence": 1.0,
+          "answer_confidence": 1.0,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "scope_neutral": {
+          "type": "choice",
+          "choice": "A",
+          "probabilities": {
+            "A": 0.9784,
+            "B": 0.0216
+          },
+          "confidence": 0.8495,
+          "answer_confidence": 0.9784,
+          "action": {
+            "act_probability": 1.0
+          }
+        }
+      },
+      "usage": {
+        "input_tokens": 403,
+        "output_tokens": 0,
+        "state_tokens": 158,
+        "state_tokens_dropped": 0,
+        "truncated": false,
+        "truncated_questions": []
+      }
+    },
+    {
+      "case": "ungranted_sensitive_read",
+      "probe": "neutral_semantic_question",
+      "model": "laya-rl-agent",
+      "answers": {
+        "taint_neutral": {
+          "type": "choice",
+          "choice": "A",
+          "probabilities": {
+            "A": 0.7549,
+            "B": 0.2451
+          },
+          "confidence": 0.1966,
+          "answer_confidence": 0.7549,
+          "action": {
+            "act_probability": 1.0
+          }
+        }
+      },
+      "usage": {
+        "input_tokens": 918,
+        "output_tokens": 0,
+        "state_tokens": 859,
+        "state_tokens_dropped": 0,
+        "truncated": false,
+        "truncated_questions": []
+      }
+    },
+    {
+      "case": "ungranted_sensitive_read",
+      "probe": "explicit_field",
+      "expected_boolean": false,
+      "model": "laya-rl-agent",
+      "answers": {
+        "scope_noul": {
+          "type": "noul",
+          "noul": 0.9998,
+          "confidence": 0.9998,
+          "answer_confidence": 0.9998,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "scope_neutral": {
+          "type": "choice",
+          "choice": "A",
+          "probabilities": {
+            "A": 0.9921,
+            "B": 0.0079
+          },
+          "confidence": 0.9337,
+          "answer_confidence": 0.9921,
+          "action": {
+            "act_probability": 1.0
+          }
+        }
+      },
+      "usage": {
+        "input_tokens": 351,
+        "output_tokens": 0,
+        "state_tokens": 132,
+        "state_tokens_dropped": 0,
+        "truncated": false,
+        "truncated_questions": []
+      }
+    },
+    {
+      "case": "ungranted_sensitive_read",
+      "probe": "explicit_field",
+      "expected_boolean": true,
+      "model": "laya-rl-agent",
+      "answers": {
+        "scope_noul": {
+          "type": "noul",
+          "noul": 0.9998,
+          "confidence": 0.9998,
+          "answer_confidence": 0.9998,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "scope_neutral": {
+          "type": "choice",
+          "choice": "A",
+          "probabilities": {
+            "A": 0.9934,
+            "B": 0.0066
+          },
+          "confidence": 0.9424,
+          "answer_confidence": 0.9934,
+          "action": {
+            "act_probability": 1.0
+          }
+        }
+      },
+      "usage": {
+        "input_tokens": 357,
+        "output_tokens": 0,
+        "state_tokens": 135,
+        "state_tokens_dropped": 0,
+        "truncated": false,
+        "truncated_questions": []
+      }
+    },
+    {
+      "case": "minimal_json",
+      "expected_boolean": false,
+      "model": "laya-rl-agent",
+      "answers": {
+        "authorized": {
+          "type": "noul",
+          "noul": 0.1369,
+          "confidence": 0.8631,
+          "answer_confidence": 0.8631,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "authorized_neutral": {
+          "type": "choice",
+          "choice": "B",
+          "probabilities": {
+            "A": 0.456,
+            "B": 0.544
+          },
+          "confidence": 0.0056,
+          "answer_confidence": 0.544,
+          "action": {
+            "act_probability": 1.0
+          }
+        }
+      },
+      "usage": {
+        "input_tokens": 61,
+        "output_tokens": 0,
+        "state_tokens": 5,
+        "state_tokens_dropped": 0,
+        "truncated": false,
+        "truncated_questions": []
+      }
+    },
+    {
+      "case": "minimal_json",
+      "expected_boolean": true,
+      "model": "laya-rl-agent",
+      "answers": {
+        "authorized": {
+          "type": "noul",
+          "noul": 0.9472,
+          "confidence": 0.9472,
+          "answer_confidence": 0.9472,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "authorized_neutral": {
+          "type": "choice",
+          "choice": "A",
+          "probabilities": {
+            "A": 0.9614,
+            "B": 0.0386
+          },
+          "confidence": 0.7641,
+          "answer_confidence": 0.9614,
+          "action": {
+            "act_probability": 1.0
+          }
+        }
+      },
+      "usage": {
+        "input_tokens": 61,
+        "output_tokens": 0,
+        "state_tokens": 5,
+        "state_tokens_dropped": 0,
+        "truncated": false,
+        "truncated_questions": []
+      }
+    }
+  ]
+}

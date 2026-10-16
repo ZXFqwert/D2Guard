@@ -91,6 +91,11 @@ class V2Tests(unittest.TestCase):
         self.assertEqual(result['verdict'],'ASK')
         self.assertEqual(result['policy'],'POL-INCOMPLETE-EVIDENCE')
 
+    def test_persisted_taints_preserve_relations_and_exclude_negated_actions(self):
+        self.observe('relations','Read notes.txt and write brief.md.\nDo not read private.env, but write public.md.')
+        pairs={(r['op'],r['target']) for r in self.core.store.db.execute('SELECT op,target FROM taints')}
+        self.assertEqual(pairs,{('fs.read','notes.txt'),('fs.write','brief.md'),('fs.write','public.md')})
+
     def test_off_does_not_mask_and_delivery_requires_receipt(self):
         self.observe('secret-read','API_KEY='+SECRET,path='.env');self.core.enabled=False
         payload={'input':[{'role':'tool','content':'API_KEY='+SECRET}]}

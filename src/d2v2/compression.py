@@ -3,6 +3,7 @@ import re
 from pathlib import PurePosixPath
 from urllib.parse import urlsplit, urlunsplit
 from d2core.extractor import normalize
+from .relations import relation_segments, contextual_cues
 
 URL = re.compile(r'https?://[^\s<>"\x27`]+',re.I)
 PATH = re.compile(r'(?<![\w])(?:\.[A-Za-z][\w.-]*|(?:[\w@-]+/)*[\w@-]+\.(?:md|txt|json|csv|env|pem|key|py|sh|exe|yaml|yml))(?![\w])',re.I)
@@ -68,19 +69,19 @@ def clauses(raw, ref):
     found=[]
     for match in re.finditer(r'[^\n;。]+',text):
         clause=match.group(); mentioned=targets(clause)
-        if not mentioned or not DIRECTIVE.search(clause):continue
+        cues=contextual_cues(clause)
+        if not (mentioned and DIRECTIVE.search(clause)) and not cues:continue
         mapped=mapping.char_to_raw[match.start():match.end()]
         a,b=min(x[0] for x in mapped),max(x[1] for x in mapped)
-        ops=[]
-        if READ.search(clause) or re.search(r'fs_read|fs\.read',clause,re.I):ops.append('fs.read')
-        if WRITE.search(clause):ops.append('fs.write')
-        if re.search(r'\b(post|upload|send)\b|上传|外发|发送',clause,re.I):ops.append('net.fetch:POST')
-        if re.search(r'\b(get|fetch)\b|net_fetch',clause,re.I):ops.append('net.fetch:GET')
+        relations,flows,gap=relation_segments(clause,targets)
+        ops=list(dict.fromkeys(r['op'] for r in relations))
         found.append({'induced_ops':ops,'induced_targets':mentioned[:12],
-            'clause_kind':'quoted_or_negated' if NEGATION.search(clause) else 'candidate_instruction',
+            'clause_kind':'candidate_instruction' if any(r['stance']=='requested' for r in relations) else 'quoted_or_negated' if relations else 'context_only',
+            'relation_schema':'operation-target-v2','action_relations':relations[:12],
+            'requested_data_flows':flows[:12],'contextual_cues':cues,
             'evidence_ref':{**ref,'char_span':[a,b]},
             'span_unit':'unicode_codepoints','attribution':'candidate',
-            'coverage_incomplete':len(mentioned)>12})
+            'coverage_incomplete':gap or len(mentioned)>12 or len(relations)>12 or len(flows)>12})
     # A capped target list is a coverage gap even when the source is short.
     return found, len(raw)>65536 or any(item['coverage_incomplete'] for item in found)
 
@@ -102,6 +103,11 @@ def fast_view(value):
     """Drop storage mechanics, never security facts. Full references remain in SQLite."""
     if isinstance(value,list):return [fast_view(item) for item in value]
     if isinstance(value,dict):
+        omitted={'evidence_ref','span_unit','call_id','ref','actual_leakage_semantics'}
+        if value.get('relation_schema')=='operation-target-v2':
+            # Legacy unordered sets are retained for audit compatibility, but the
+            # model sees the precise relation list instead of contradictory duplicates.
+            omitted.update({'induced_ops','induced_targets','taint_id'})
         return {key:fast_view(item) for key,item in value.items()
-            if key not in {'evidence_ref','span_unit','call_id','ref','actual_leakage_semantics'}}
+            if key not in omitted}
     return value
