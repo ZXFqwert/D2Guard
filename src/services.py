@@ -13,9 +13,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--run-dir', required=True)
     parser.add_argument('--protect', choices=['off', 'on'], required=True)
+    parser.add_argument('--engine', choices=['m1', 'd2core'], default='m1')
     args = parser.parse_args()
     folder = Path(args.run_dir)
-    guard = Guard(args.protect == 'on')
     token = os.environ['D2_CONTROL_TOKEN']
     lock = threading.RLock()
     sequence = 0
@@ -28,6 +28,13 @@ def main():
             with (folder / filename).open('a', encoding='utf-8') as f:
                 f.write(json.dumps(item, ensure_ascii=False) + '\n')
             return item
+
+    if args.engine == 'd2core':
+        from core_guard import CoreGuard
+        provider = json.loads(os.environ['D2_CORE_PROVIDER'])
+        guard = CoreGuard(args.protect == 'on', folder, provider, append)
+    else:
+        guard = Guard(args.protect == 'on')
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
@@ -61,13 +68,16 @@ def main():
                 return self.respond(403, {'error': 'control authentication required'})
             try:
                 data = json.loads(raw)
+                if self.path == '/finalize':
+                    return self.respond(200, guard.drain() if args.engine == 'd2core' else {'pending_reviews': 0})
                 if self.path == '/audit':
                     guard.observe(data)
                     append('audit.jsonl', data)
                     return self.respond(200, {'ok': True})
                 if self.path == '/decision':
                     start = time.perf_counter_ns()
-                    result = guard.decide(data['tool'], data['args'])
+                    result = (guard.decide(data['tool'], data['args'], data) if args.engine == 'd2core'
+                              else guard.decide(data['tool'], data['args']))
                     result['latency_ms'] = (time.perf_counter_ns() - start) / 1e6
                     append('audit.jsonl', {**data, 'type': 'guard_decision', **result})
                     return self.respond(200, result)

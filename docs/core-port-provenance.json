@@ -1,0 +1,81 @@
+{
+  "changes": "Only package-relative imports on initial port. Training provenance and performance claims remain unverified.",
+  "files": [
+    {
+      "source": "D2guard_core/models.py",
+      "target": "src/d2core/models.py",
+      "original_sha256": "5235e11178e52704e86d0210d022439f03b3e389721e367d6183c9e7f4900e94",
+      "ported_sha256": "5235e11178e52704e86d0210d022439f03b3e389721e367d6183c9e7f4900e94",
+      "current_sha256": "0715a658840ed4e7f2636667b816b595f287635722a46b5631df0a6812949bd0"
+    },
+    {
+      "source": "D2guard_core/config.py",
+      "target": "src/d2core/config.py",
+      "original_sha256": "1d27be6a195cff6dfa2f370f7002d67e23f4469f459d15e656c03bf8cfe0334b",
+      "ported_sha256": "1d27be6a195cff6dfa2f370f7002d67e23f4469f459d15e656c03bf8cfe0334b",
+      "current_sha256": "1d27be6a195cff6dfa2f370f7002d67e23f4469f459d15e656c03bf8cfe0334b"
+    },
+    {
+      "source": "D2guard_core/extractor.py",
+      "target": "src/d2core/extractor.py",
+      "original_sha256": "fdb279a21abc1f084fd66059c36fcaf0e5eb07eb4cbb59ee2b44d04e984461da",
+      "ported_sha256": "3c1853fa9c443c587ee37d0261a4ce3d43c4c3b68bbcb55ce1c8309ad262c00f",
+      "current_sha256": "3c1853fa9c443c587ee37d0261a4ce3d43c4c3b68bbcb55ce1c8309ad262c00f"
+    },
+    {
+      "source": "D2guard_core/mirrors.py",
+      "target": "src/d2core/mirrors.py",
+      "original_sha256": "516ae93d8dbaea93813d19d8c43036c991abcbcb8b4bb41ba26cd5cc2a85ad35",
+      "ported_sha256": "c0ae0619e8edd629c90215f7c323c9d7e6940b7f58dd1a1b2c55705dae4ec21c",
+      "current_sha256": "e11896a5eae22f81b131981a5f1b7fcffc84724ebcf716cd1cd0ad8c22da9995"
+    },
+    {
+      "source": "D2guard_core/state_machine.py",
+      "target": "src/d2core/state_machine.py",
+      "original_sha256": "88cc41058e365bfdc0bffe1d4d1a175a25d53b986e4e689c4fa2652c25b9bc3c",
+      "ported_sha256": "a83048481bc7f4adba4deaba6b566f6b9cf2a7d7a12586a265d1c9db22945529",
+      "current_sha256": "a80d2ccb74e1fb279c73c33b485e0680771cdfc3e8804e7bba71c0b0afe2c01e"
+    },
+    {
+      "source": "D2guard_core/policy_engine.py",
+      "target": "src/d2core/policy_engine.py",
+      "original_sha256": "fa8ce7762cbdfa780592d1327ee8dd0dbc30ae315cdef3706c8ed6d73fe899c2",
+      "ported_sha256": "ba0da80cc51762e97a81f486b47d471266ffe2a5b8a3d504143d4223f994384d",
+      "current_sha256": "8de4e50a7f832b3bd7f403d3424eee38ff41ec8eca483c1d9531f9125891f108"
+    },
+    {
+      "source": "D2guard_core/execution.py",
+      "target": "src/d2core/execution.py",
+      "original_sha256": "06fff6a73652c62c4e40f3c4514f536a75afce91bf03a0451e9d625002f78e85",
+      "ported_sha256": "c8537760a91dfed83ac6377198ccb75cad61db68ae4150183a1e328a0325c7bf",
+      "current_sha256": "c8537760a91dfed83ac6377198ccb75cad61db68ae4150183a1e328a0325c7bf"
+    },
+    {
+      "source": "D2guard_core/policies.yaml",
+      "target": "src/d2core/policies.yaml",
+      "original_sha256": "d3d33ad17c5cbd5edca7bd347516a22fdae22002cd589bec353bc7888cee90fa",
+      "ported_sha256": "d3d33ad17c5cbd5edca7bd347516a22fdae22002cd589bec353bc7888cee90fa",
+      "current_sha256": "d3d33ad17c5cbd5edca7bd347516a22fdae22002cd589bec353bc7888cee90fa"
+    },
+    {
+      "source": "D2guard_core/D2guard_contract.json",
+      "target": "src/d2core/D2guard_contract.json",
+      "original_sha256": "72e3d423bc462e6523ee8587060e5605f731455550d3f3097d650654222f00a4",
+      "ported_sha256": "820397e278f90926ca4ceeb9168a598451c1efc5c69460584f2bac9a48aed576",
+      "current_sha256": "820397e278f90926ca4ceeb9168a598451c1efc5c69460584f2bac9a48aed576"
+    },
+    {
+      "source": "D2guard_core/weights/laya_d2_distilled.json",
+      "target": "src/d2core/weights/laya_d2_distilled.json",
+      "original_sha256": "15e14e9dfcacad95d84aafa7d995fe3c642e2470e4b9a96a465b38354a5e1ef0",
+      "ported_sha256": "15e14e9dfcacad95d84aafa7d995fe3c642e2470e4b9a96a465b38354a5e1ef0",
+      "current_sha256": "15e14e9dfcacad95d84aafa7d995fe3c642e2470e4b9a96a465b38354a5e1ef0"
+    }
+  ],
+  "subsequent_changes": [
+    "FastMirror records actual model use and heuristic overrides.",
+    "Classification nature directive plus expected alignment no longer implies a threat.",
+    "Trusted USER anchor is excluded from untrusted taint; ordinary evidence is not automatically an injection source.",
+    "Reports name lexical spans truthfully; no claim of tokenizer offsets."
+  ]
+}

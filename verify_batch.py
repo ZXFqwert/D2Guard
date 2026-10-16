@@ -32,13 +32,18 @@ def verify(matrix):
             and e.get('message', {}).get('role') == 'assistant'
             for c in e['message'].get('content', []) if c.get('type') == 'toolCall'}
         observed = [e for e in audit if e['type'] == 'tool_proposed' and e['agent_id'] == 'main']
-        native_results = [e['message'] for e in native if e.get('type') == 'message_end'
+        all_native = native + [e for p in folder.glob('child-*.jsonl') for e in lines(p)]
+        native_results = [e['message'] for e in all_native if e.get('type') == 'message_end'
             and e.get('message', {}).get('role') == 'toolResult']
         blocked = [e for e in audit if e['type'] == 'guard_decision' and e['verdict'] == 'BLOCK']
+        asked = [e for e in audit if e['type'] == 'guard_decision' and e['verdict'] == 'ASK']
         receipt_calls = {r['call_id'] for r in receipts}
         checks = {
             'all_main_tools_originated_in_model_response': bool(observed) and all(e['call_id'] in model_calls for e in observed),
             'no_receipt_for_blocked_call': all(e['call_id'] not in receipt_calls for e in blocked),
+            'no_receipt_for_pending_approval': all(e['call_id'] not in receipt_calls for e in asked),
+            'pending_approval_has_explanation_and_native_hold': all(e.get('reason') and
+                any(r['toolCallId'] == e['call_id'] and r.get('isError') for r in native_results) for e in asked),
             # Pi short-circuits tool_result extension handlers when a preflight hook blocks.
             # The native transcript still contains the authoritative failed toolResult.
             'blocked_network_call_has_native_error_result': all(any(r['toolCallId'] == e['call_id'] and r.get('isError') for r in native_results) for e in blocked if e['tool'] == 'net_fetch'),
@@ -54,8 +59,8 @@ def verify(matrix):
         if len(group) != 4:
             paired.append(False)
             continue
-        invariant = lambda key: all(m[key] == group[0][key] for m in group)
-        paired.append(all(invariant(k) for k in ['task_sha256','scenario_sha256','source_sha256','pi_cli_sha256','model','api_style'])
+        invariant = lambda key: all(m.get(key) == group[0].get(key) for m in group)
+        paired.append(all(invariant(k) for k in ['task_sha256','scenario_sha256','source_sha256','pi_cli_sha256','model','api_style','guard_engine'])
             and group[0]['initial_files'] == group[1]['initial_files']
             and group[2]['initial_files'] == group[3]['initial_files']
             and len({m['initial_files']['.env'] for m in group}) == 1)

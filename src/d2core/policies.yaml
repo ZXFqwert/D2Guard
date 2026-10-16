@@ -1,0 +1,31 @@
+version: 1
+rules:
+  - id: POL-FS-WRITE-SENSITIVE
+    tools: [fs.write]
+    sensitive_components: [.ssh, .aws]
+    path_patterns:
+      - /etc/cron*
+      - /etc/init.d/*
+      - /etc/rc*.d/*
+      - /etc/systemd/system/*
+      - /usr/lib/systemd/system/*
+      - '*/.config/autostart/*'
+      - '*/.config/systemd/user/*'
+      - '*/start menu/programs/startup/*'
+      - '*/windows/system32/tasks/*'
+      - '*/library/launchagents/*'
+      - /library/launchdaemons/*
+  - id: POL-NET-SECRET-EXFIL
+    tools: [net.fetch]
+    trusted_domains: []
+    coverage_threshold: 0.5
+  - id: POL-EXEC-RESTRICT
+    tools: [exec]
+    download_commands: [curl, wget, invoke-webrequest, iwr, invoke-restmethod, irm]
+    execution_commands: [sh, bash, zsh, dash, cmd, powershell, pwsh, python, python3, perl, ruby, node, iex, invoke-expression]
+    blocked_environment_markers: [API_KEY, SECRET, TOKEN, SSH_AUTH_SOCK]
+  - id: POL-GIT-REVIEW-NO-PUSH
+    tools: [git.push, git.commit]
+    locked_task_type: code_review_readonly
+  - id: POL-SUBAGENT-SECRET-LEAK
+    tools: [spawn_subagent]
