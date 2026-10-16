@@ -1,0 +1,7 @@
+.local/
+runs/
+__pycache__/
+*.pyc
+node_modules/
+.env
+*.sqlite3*

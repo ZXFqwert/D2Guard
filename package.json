@@ -1,0 +1,9 @@
+{
+  "name": "d2guard-next",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {"test": "node --test tests/boundary.test.mjs"},
+  "engines": {"node": ">=22.19"},
+  "description": "Real Pi CLI experiments with independently observable tool interception"
+}

@@ -1,0 +1,11 @@
+{
+  "pi_package": "@earendil-works/pi-coding-agent",
+  "pi_version": "0.85.1",
+  "integration": "official CLI JSON mode and explicit TypeScript extension",
+  "installed_node_observed": "24.15.0",
+  "node_minimum": "22.19.0",
+  "python_minimum": "3.11",
+  "python_dependencies": "standard library only",
+  "installation_scope": "existing global Pi; no user-wide settings changed",
+  "per_run_integrity": "CLI bundle and project runtime SHA256 stored in manifest.json"
+}
