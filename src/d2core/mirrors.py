@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 from contextvars import ContextVar
 import logging
 from pathlib import Path
@@ -17,6 +18,24 @@ from .models import FastMirrorLabel, ContentNature, ActionAlignment
 
 log = logging.getLogger(__name__)
 slow_review_mode = ContextVar("slow_review_mode", default="not_triggered")
+
+
+def describe_fast_input(text: str, plan: str, state_chain: dict | None) -> dict:
+    """Exact classifier-boundary metadata, without logging raw text or secrets.
+
+    These are the actual call-time state components, not the caller's earlier
+    state_before snapshot (which may precede registration/prospective accounting).
+    The heuristic sees full strings; the learned backend sees bounded strings.
+    """
+    sha = lambda value: hashlib.sha256(value.encode('utf-8')).hexdigest()
+    chain = json.loads(json.dumps(state_chain or {}, ensure_ascii=False))
+    return {'schema': 'fast-input-observation-v1',
+        'full_delta_sha256': sha(text), 'full_delta_chars': len(text),
+        'model_delta_sha256': sha(text[:8192]), 'model_delta_chars': len(text[:8192]),
+        'model_plan_sha256': sha(plan[:4096]), 'model_plan_chars': len(plan[:4096]),
+        'plan_available': bool(plan.strip()), 'state_chain': chain,
+        'state_chain_sha256': sha(json.dumps(chain, sort_keys=True, ensure_ascii=False)),
+        'state_chain_json_utf8_bytes': len(json.dumps(chain, sort_keys=True, ensure_ascii=False).encode('utf-8'))}
 
 
 def heuristic(text: str, plan: str, state_chain: dict | None = None) -> tuple[str, str]:
@@ -221,7 +240,8 @@ class FastMirrorAdapter:
         self.last_trace = {"model_used": model_value is not None, "model_label": model_value,
                            "heuristic_label": fallback, "final_label": value,
                            "heuristic_override": model_value is not None and value != model_value,
-                           "latency_ms": latency}
+                           "latency_ms": latency,
+                           "input": describe_fast_input(text, plan, state_chain)}
         return FastMirrorLabel(content_nature=value[0], action_alignment=value[1], latency_ms=latency)
 
 

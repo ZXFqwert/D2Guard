@@ -5,7 +5,8 @@
   "installed_node_observed": "24.15.0",
   "node_minimum": "22.19.0",
   "python_minimum": "3.11",
-  "python_dependencies": "standard library only",
+  "python_dependencies": "requirements-core.txt; original Laya: requirements-laya.txt",
   "installation_scope": "existing global Pi; no user-wide settings changed",
-  "per_run_integrity": "CLI bundle and project runtime SHA256 stored in manifest.json"
+  "per_run_integrity": "CLI bundle and project runtime SHA256 stored in manifest.json",
+  "default_engine": "d2v2"
 }

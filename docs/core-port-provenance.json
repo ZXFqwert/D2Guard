@@ -27,7 +27,7 @@
       "target": "src/d2core/mirrors.py",
       "original_sha256": "516ae93d8dbaea93813d19d8c43036c991abcbcb8b4bb41ba26cd5cc2a85ad35",
       "ported_sha256": "c0ae0619e8edd629c90215f7c323c9d7e6940b7f58dd1a1b2c55705dae4ec21c",
-      "current_sha256": "e11896a5eae22f81b131981a5f1b7fcffc84724ebcf716cd1cd0ad8c22da9995"
+      "current_sha256": "ad4c0f7a792e3e50fdcf4a107e083e75fd25db39d9eee429b0ab3086f8cb0b97"
     },
     {
       "source": "D2guard_core/state_machine.py",

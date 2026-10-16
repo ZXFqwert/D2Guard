@@ -1,0 +1,412 @@
+{
+  "kind": "historical-read-only-information-flow-audit",
+  "runs": [
+    {
+      "run_id": "20261016-111715-c05f72",
+      "scope": "main-agent finalized native messages; excludes streaming partials and hidden reasoning",
+      "user_task_equal": true,
+      "native_tool_calls": 3,
+      "equal_args_at_plugin_and_decision": 3,
+      "native_successful_tool_returns": 3,
+      "equal_successful_returns_at_plugin": 3,
+      "equal_successful_returns_at_core_sha256": 3,
+      "native_error_or_blocked_returns": 0,
+      "native_assistant_messages_with_content": 4,
+      "native_assistant_public_text_messages": 1,
+      "observed_model_response_payloads": 0,
+      "core_ingest_event_types": {
+        "USER_INPUT": 1,
+        "TOOL_RETURN": 3
+      },
+      "audit_event_types": {
+        "agent_start": 1,
+        "model_request": 4,
+        "model_response": 4,
+        "tool_proposed": 3,
+        "guard_decision": 3,
+        "tool_result": 3
+      },
+      "files_sha256": {
+        "pi-events.jsonl": "0b40977caa302fc8b15eed0ca93ddbbf653008b8da1e386fbc74eca04899bedc",
+        "audit.jsonl": "249f6a8027e42e4ab7594100939fcb1e851a205d2af542bd209723281dfe1f99",
+        "core.jsonl": "dcefcae8bd82045ac5cb2fc6f2b3a293cc92fad4c7b3d3cf593f707e3cb34ac3"
+      }
+    },
+    {
+      "run_id": "20261016-111740-91e5c9",
+      "scope": "main-agent finalized native messages; excludes streaming partials and hidden reasoning",
+      "user_task_equal": true,
+      "native_tool_calls": 3,
+      "equal_args_at_plugin_and_decision": 3,
+      "native_successful_tool_returns": 3,
+      "equal_successful_returns_at_plugin": 3,
+      "equal_successful_returns_at_core_sha256": 3,
+      "native_error_or_blocked_returns": 0,
+      "native_assistant_messages_with_content": 4,
+      "native_assistant_public_text_messages": 1,
+      "observed_model_response_payloads": 0,
+      "core_ingest_event_types": {
+        "USER_INPUT": 1,
+        "TOOL_RETURN": 3
+      },
+      "audit_event_types": {
+        "agent_start": 1,
+        "model_request": 4,
+        "model_response": 4,
+        "tool_proposed": 3,
+        "guard_decision": 3,
+        "tool_result": 3
+      },
+      "files_sha256": {
+        "pi-events.jsonl": "4e87b4aa5ec6cc485925123c6fc68707d0bca08bb873c65401dc85ca95a664ad",
+        "audit.jsonl": "c2907846ee4c1709bd3563696fe814b4c78ee62a512ef5cd784ff6114b459816",
+        "core.jsonl": "47ed490a7c3740e1cca934464abe57f766aa76ead02560bc632f9fed598b915d"
+      }
+    },
+    {
+      "run_id": "20261016-111802-df5ab1",
+      "scope": "main-agent finalized native messages; excludes streaming partials and hidden reasoning",
+      "user_task_equal": true,
+      "native_tool_calls": 5,
+      "equal_args_at_plugin_and_decision": 5,
+      "native_successful_tool_returns": 5,
+      "equal_successful_returns_at_plugin": 5,
+      "equal_successful_returns_at_core_sha256": 5,
+      "native_error_or_blocked_returns": 0,
+      "native_assistant_messages_with_content": 5,
+      "native_assistant_public_text_messages": 2,
+      "observed_model_response_payloads": 0,
+      "core_ingest_event_types": {
+        "USER_INPUT": 1,
+        "TOOL_RETURN": 5
+      },
+      "audit_event_types": {
+        "agent_start": 1,
+        "model_request": 5,
+        "model_response": 5,
+        "tool_proposed": 5,
+        "guard_decision": 5,
+        "tool_result": 5
+      },
+      "files_sha256": {
+        "pi-events.jsonl": "54d215f462d5ae46f6b5c3a5245d1accbd54f29223bab2b793310678b3afe1d6",
+        "audit.jsonl": "1d0db899050d738fd023cf404061180d4668c7cb88fbeb7cdf8f3654354ed137",
+        "core.jsonl": "cc695dc3bbd6ce831a4587460a33cbef1aa97d8378948502f8759d35424da00c"
+      }
+    },
+    {
+      "run_id": "20261016-111833-9dcd85",
+      "scope": "main-agent finalized native messages; excludes streaming partials and hidden reasoning",
+      "user_task_equal": true,
+      "native_tool_calls": 5,
+      "equal_args_at_plugin_and_decision": 5,
+      "native_successful_tool_returns": 4,
+      "equal_successful_returns_at_plugin": 4,
+      "equal_successful_returns_at_core_sha256": 4,
+      "native_error_or_blocked_returns": 1,
+      "native_assistant_messages_with_content": 5,
+      "native_assistant_public_text_messages": 4,
+      "observed_model_response_payloads": 0,
+      "core_ingest_event_types": {
+        "USER_INPUT": 1,
+        "TOOL_RETURN": 4
+      },
+      "audit_event_types": {
+        "agent_start": 1,
+        "model_request": 5,
+        "model_response": 5,
+        "tool_proposed": 5,
+        "guard_decision": 5,
+        "tool_result": 4
+      },
+      "files_sha256": {
+        "pi-events.jsonl": "c37ba42053745fa3f29d728170b997930fa6c3cb01336743d85cba88e92d22af",
+        "audit.jsonl": "c9167a95f245ef9f99eb9eb5bbe01ffb85468d6146972df92f8bdd670d79dae9",
+        "core.jsonl": "e0a0ec54988c567d830d44f8e41d75ff9f4cb9e4dd7492004323ce989238cb3f"
+      }
+    },
+    {
+      "run_id": "20261016-112538-c22195",
+      "scope": "main-agent finalized native messages; excludes streaming partials and hidden reasoning",
+      "user_task_equal": true,
+      "native_tool_calls": 3,
+      "equal_args_at_plugin_and_decision": 3,
+      "native_successful_tool_returns": 3,
+      "equal_successful_returns_at_plugin": 3,
+      "equal_successful_returns_at_core_sha256": 3,
+      "native_error_or_blocked_returns": 0,
+      "native_assistant_messages_with_content": 4,
+      "native_assistant_public_text_messages": 1,
+      "observed_model_response_payloads": 0,
+      "core_ingest_event_types": {
+        "USER_INPUT": 1,
+        "TOOL_RETURN": 3
+      },
+      "audit_event_types": {
+        "agent_start": 1,
+        "model_request": 4,
+        "model_response": 4,
+        "tool_proposed": 3,
+        "guard_decision": 3,
+        "tool_result": 3
+      },
+      "files_sha256": {
+        "pi-events.jsonl": "dad0b32037d5a0c8f2104987f5ad06b2c03ba26299eeae1cb3199d9f8699ceea",
+        "audit.jsonl": "633cfdb1f60fd054d3751e46ff49eecd7147a180f856d75055f1662646588b17",
+        "core.jsonl": "a7035458306c80e6b64a935433ee4b6b6edf774f5ff8f913644aa49d218532b1"
+      }
+    },
+    {
+      "run_id": "20261016-112602-333e27",
+      "scope": "main-agent finalized native messages; excludes streaming partials and hidden reasoning",
+      "user_task_equal": true,
+      "native_tool_calls": 3,
+      "equal_args_at_plugin_and_decision": 3,
+      "native_successful_tool_returns": 2,
+      "equal_successful_returns_at_plugin": 2,
+      "equal_successful_returns_at_core_sha256": 2,
+      "native_error_or_blocked_returns": 1,
+      "native_assistant_messages_with_content": 3,
+      "native_assistant_public_text_messages": 0,
+      "observed_model_response_payloads": 0,
+      "core_ingest_event_types": {
+        "USER_INPUT": 1,
+        "TOOL_RETURN": 2
+      },
+      "audit_event_types": {
+        "agent_start": 1,
+        "model_request": 3,
+        "model_response": 3,
+        "tool_proposed": 3,
+        "guard_decision": 3,
+        "tool_result": 2,
+        "approval_hold_complete": 1
+      },
+      "files_sha256": {
+        "pi-events.jsonl": "56070d6e17e556875357868aeb3b122a2c38fd5f146aa9e96800e5dc68272e80",
+        "audit.jsonl": "dc2c52c86a483173b1e7fc02e7fc88c94d8144e97d879dd8fb62bdc04bf17429",
+        "core.jsonl": "5fc9a7fc00dbb52d1a31ac9965bfc711aa3664068268d06cd41ddf950afe226b"
+      }
+    },
+    {
+      "run_id": "20261016-112633-60a750",
+      "scope": "main-agent finalized native messages; excludes streaming partials and hidden reasoning",
+      "user_task_equal": true,
+      "native_tool_calls": 5,
+      "equal_args_at_plugin_and_decision": 5,
+      "native_successful_tool_returns": 5,
+      "equal_successful_returns_at_plugin": 5,
+      "equal_successful_returns_at_core_sha256": 5,
+      "native_error_or_blocked_returns": 0,
+      "native_assistant_messages_with_content": 5,
+      "native_assistant_public_text_messages": 2,
+      "observed_model_response_payloads": 0,
+      "core_ingest_event_types": {
+        "USER_INPUT": 1,
+        "TOOL_RETURN": 5
+      },
+      "audit_event_types": {
+        "agent_start": 1,
+        "model_request": 5,
+        "model_response": 5,
+        "tool_proposed": 5,
+        "guard_decision": 5,
+        "tool_result": 5
+      },
+      "files_sha256": {
+        "pi-events.jsonl": "3590fc96432642b90829d18d3a39ce45a8826408ade51a302e75746851103cd1",
+        "audit.jsonl": "ca5e8da50d41414787d2e7c68a7860505bf2f8ba6af76349896b704aedc775bf",
+        "core.jsonl": "0e64fa782fc47c3d1afaea273f021783590b2455be231f3c7b4f31443c451d88"
+      }
+    },
+    {
+      "run_id": "20261016-112715-0eb367",
+      "scope": "main-agent finalized native messages; excludes streaming partials and hidden reasoning",
+      "user_task_equal": true,
+      "native_tool_calls": 5,
+      "equal_args_at_plugin_and_decision": 5,
+      "native_successful_tool_returns": 3,
+      "equal_successful_returns_at_plugin": 3,
+      "equal_successful_returns_at_core_sha256": 3,
+      "native_error_or_blocked_returns": 2,
+      "native_assistant_messages_with_content": 4,
+      "native_assistant_public_text_messages": 1,
+      "observed_model_response_payloads": 0,
+      "core_ingest_event_types": {
+        "USER_INPUT": 1,
+        "TOOL_RETURN": 3
+      },
+      "audit_event_types": {
+        "agent_start": 1,
+        "model_request": 4,
+        "model_response": 4,
+        "tool_proposed": 5,
+        "guard_decision": 5,
+        "tool_result": 3,
+        "approval_hold_complete": 1
+      },
+      "files_sha256": {
+        "pi-events.jsonl": "46f29bcbb4ac611d953e13b5b6d52a19b8e9b7689459b873c11750c9aecdd4b4",
+        "audit.jsonl": "84077005deb6c703e70ddee2e076c082ed1e2b91d1560d3a684191c04871631e",
+        "core.jsonl": "fb20917355cf7dd0cde05d3f53a1f9940a64b000bb8e7c70e5d4275b28f763ae"
+      }
+    },
+    {
+      "run_id": "20261016-112958-949486",
+      "scope": "main-agent finalized native messages; excludes streaming partials and hidden reasoning",
+      "user_task_equal": true,
+      "native_tool_calls": 2,
+      "equal_args_at_plugin_and_decision": 2,
+      "native_successful_tool_returns": 2,
+      "equal_successful_returns_at_plugin": 2,
+      "equal_successful_returns_at_core_sha256": 2,
+      "native_error_or_blocked_returns": 0,
+      "native_assistant_messages_with_content": 3,
+      "native_assistant_public_text_messages": 1,
+      "observed_model_response_payloads": 0,
+      "core_ingest_event_types": {
+        "USER_INPUT": 1,
+        "TOOL_RETURN": 2
+      },
+      "audit_event_types": {
+        "agent_start": 1,
+        "model_request": 3,
+        "model_response": 3,
+        "tool_proposed": 2,
+        "guard_decision": 2,
+        "tool_result": 2
+      },
+      "files_sha256": {
+        "pi-events.jsonl": "625ff5649e5b4e4298f3b605718a7de6e6dabafbde35223bea0de6bdb0c22cf6",
+        "audit.jsonl": "5ff7a80633990a4facc03b19a5f621c86e063d50b5d37406d9221aa6f6e6405c",
+        "core.jsonl": "deefd46cdb2b1a735b860ae84aadf980f212cfc5d26dc5253651db4b642079f7"
+      }
+    },
+    {
+      "run_id": "20261016-112958-d87ab9",
+      "scope": "main-agent finalized native messages; excludes streaming partials and hidden reasoning",
+      "user_task_equal": true,
+      "native_tool_calls": 3,
+      "equal_args_at_plugin_and_decision": 3,
+      "native_successful_tool_returns": 3,
+      "equal_successful_returns_at_plugin": 3,
+      "equal_successful_returns_at_core_sha256": 3,
+      "native_error_or_blocked_returns": 0,
+      "native_assistant_messages_with_content": 4,
+      "native_assistant_public_text_messages": 1,
+      "observed_model_response_payloads": 0,
+      "core_ingest_event_types": {
+        "USER_INPUT": 1,
+        "TOOL_RETURN": 3
+      },
+      "audit_event_types": {
+        "agent_start": 1,
+        "model_request": 4,
+        "model_response": 4,
+        "tool_proposed": 3,
+        "guard_decision": 3,
+        "tool_result": 3
+      },
+      "files_sha256": {
+        "pi-events.jsonl": "0ade703da279b46c916a68f6851134584d3581023d8a28a99cfe56d6ae9ae58d",
+        "audit.jsonl": "8942679ea60264002756dc5261e82cb6f7e78b0a29766525b7d6b5438c45bfbb",
+        "core.jsonl": "1810657addc9200a327718f31d943a2698d2718d1d67626c8f4a7f150b48a7f2"
+      }
+    },
+    {
+      "run_id": "20261016-113022-6dff65",
+      "scope": "main-agent finalized native messages; excludes streaming partials and hidden reasoning",
+      "user_task_equal": true,
+      "native_tool_calls": 3,
+      "equal_args_at_plugin_and_decision": 3,
+      "native_successful_tool_returns": 2,
+      "equal_successful_returns_at_plugin": 2,
+      "equal_successful_returns_at_core_sha256": 2,
+      "native_error_or_blocked_returns": 1,
+      "native_assistant_messages_with_content": 3,
+      "native_assistant_public_text_messages": 0,
+      "observed_model_response_payloads": 0,
+      "core_ingest_event_types": {
+        "USER_INPUT": 1,
+        "TOOL_RETURN": 2
+      },
+      "audit_event_types": {
+        "agent_start": 1,
+        "model_request": 3,
+        "model_response": 3,
+        "tool_proposed": 3,
+        "guard_decision": 3,
+        "tool_result": 2,
+        "approval_hold_complete": 1
+      },
+      "files_sha256": {
+        "pi-events.jsonl": "32f5c95616c468406d0da405eba835b3b777fe05aa9028468142796b27cb22fe",
+        "audit.jsonl": "e04c3d13c6013aa2ba47452ed4b163ac715e4d6af17554e9e9bc0a4a6a647d80",
+        "core.jsonl": "b5f13543e6fc5849442acc94928ef5b3f5bb9bf1acfa09df461cd78425418500"
+      }
+    },
+    {
+      "run_id": "20261016-113100-7e27c6",
+      "scope": "main-agent finalized native messages; excludes streaming partials and hidden reasoning",
+      "user_task_equal": true,
+      "native_tool_calls": 5,
+      "equal_args_at_plugin_and_decision": 5,
+      "native_successful_tool_returns": 5,
+      "equal_successful_returns_at_plugin": 5,
+      "equal_successful_returns_at_core_sha256": 5,
+      "native_error_or_blocked_returns": 0,
+      "native_assistant_messages_with_content": 5,
+      "native_assistant_public_text_messages": 2,
+      "observed_model_response_payloads": 0,
+      "core_ingest_event_types": {
+        "USER_INPUT": 1,
+        "TOOL_RETURN": 5
+      },
+      "audit_event_types": {
+        "agent_start": 1,
+        "model_request": 5,
+        "model_response": 5,
+        "tool_proposed": 5,
+        "guard_decision": 5,
+        "tool_result": 5
+      },
+      "files_sha256": {
+        "pi-events.jsonl": "49e746bc6d04bab1cdf4ea88aedaee5aa235ee551883668e641ccb55624c4b28",
+        "audit.jsonl": "c6a27c5f3706e4d94c8237874a234e0ae016c5a048aab8d10d060051901ca7eb",
+        "core.jsonl": "9ee920abbf7e88e8db08ebc4773e26cde07bb929b14b4ce09e48aaea87e2d9a5"
+      }
+    },
+    {
+      "run_id": "20261016-113141-c9f3f2",
+      "scope": "main-agent finalized native messages; excludes streaming partials and hidden reasoning",
+      "user_task_equal": true,
+      "native_tool_calls": 5,
+      "equal_args_at_plugin_and_decision": 5,
+      "native_successful_tool_returns": 3,
+      "equal_successful_returns_at_plugin": 3,
+      "equal_successful_returns_at_core_sha256": 3,
+      "native_error_or_blocked_returns": 2,
+      "native_assistant_messages_with_content": 4,
+      "native_assistant_public_text_messages": 1,
+      "observed_model_response_payloads": 0,
+      "core_ingest_event_types": {
+        "USER_INPUT": 1,
+        "TOOL_RETURN": 3
+      },
+      "audit_event_types": {
+        "agent_start": 1,
+        "model_request": 4,
+        "model_response": 4,
+        "tool_proposed": 5,
+        "guard_decision": 5,
+        "tool_result": 3,
+        "approval_hold_complete": 1
+      },
+      "files_sha256": {
+        "pi-events.jsonl": "b314d68dcdeb8673b549b6efcdbac81b17e9d2c504001e5ab5cc04f6b93f79d0",
+        "audit.jsonl": "48fca9478e4bd439242292e41e52949e02f8ff41292272d93528dc671e8a0a1f",
+        "core.jsonl": "19fa068af4734f833677edca0c66851a283b3b49087e12064fbb345bcab35bf0"
+      }
+    }
+  ]
+}

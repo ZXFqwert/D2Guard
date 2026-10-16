@@ -140,12 +140,14 @@ def run(args, canary=None, batch_id=None):
         '--no-prompt-templates', '--no-themes', '--no-context-files', '--no-approve', '--offline',
         '-e', str(ROOT / 'extensions' / 'lab.ts')]
     env = {**os.environ, 'D2_MODEL_API_KEY': cfg['api_key'], 'D2_CONTROL_TOKEN': secrets.token_hex(24),
+        'D2_ENGINE': args.engine,
         'D2_WORKSPACE': str(workspace), 'D2_RUN_DIR': str(folder), 'D2_AGENT_ID': 'main', 'D2_DEPTH': '0',
         'PI_CODING_AGENT_DIR': str(agent_dir), 'PI_TELEMETRY': '0', 'PI_OFFLINE': '1',
         'D2_PI_CLI': str(pi_cli), 'D2_PI_BASE_ARGS': json.dumps(base_args)}
     service_env = {**env, 'D2_CORE_PROVIDER': json.dumps(cfg)}
     source_paths = [ROOT / 'lab.py', *sorted((ROOT / 'src').glob('*.py')), *sorted((ROOT / 'src').glob('*.mjs')), ROOT / 'extensions' / 'lab.ts']
     source_paths += sorted(p for p in (ROOT / 'src/d2core').rglob('*') if p.is_file() and p.suffix in ('.py', '.json', '.yaml'))
+    source_paths += sorted((ROOT / 'src/d2v2').glob('*.py'))
     manifest = {'run_id': run_id, 'batch_id': batch_id, 'scenario': args.scenario, 'scenario_version': scenario['version'],
         'environment': args.environment, 'protection': args.protect, 'pi_version': version,
         'guard_engine': args.engine,
@@ -159,6 +161,11 @@ def run(args, canary=None, batch_id=None):
         'initial_files': {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in workspace.iterdir()},
         'timeout_seconds': args.timeout}
     save(folder / 'manifest.json', manifest)
+    if args.engine == 'd2v2':
+        original = load(ROOT / '.local/laya.json')
+        manifest['fast_model'] = {k: original[k] for k in ('repository','revision','sha256')}
+        manifest['gateway'] = 'local authenticated streaming proxy; off observes, on masks registered credentials'
+        save(folder / 'manifest.json', manifest)
     service = None
     child = None
     timeout = False
@@ -171,12 +178,20 @@ def run(args, canary=None, batch_id=None):
         with (folder / 'services.log').open('w', encoding='utf-8') as log:
             service = subprocess.Popen([sys.executable, str(ROOT / 'src' / 'services.py'), '--run-dir', str(folder),
                 '--protect', args.protect, '--engine', args.engine], env=service_env, stdout=log, stderr=log)
-        deadline = time.monotonic() + 10
+        deadline = time.monotonic() + (180 if args.engine == 'd2v2' else 10)
         while not (folder / 'service.json').exists():
             if service.poll() is not None or time.monotonic() > deadline:
                 raise RuntimeError('Local services did not start; see services.log')
             time.sleep(.05)
         env['D2_SERVICE_ORIGIN'] = load(folder / 'service.json')['origin']
+        if args.engine == 'd2v2':
+            models = load(agent_dir / 'models.json')
+            models['providers']['d2-lab']['baseUrl'] = env['D2_SERVICE_ORIGIN'] + '/llm-proxy'
+            save(agent_dir / 'models.json', models)
+            env['D2_MODEL_API_KEY'] = env['D2_CONTROL_TOKEN']
+            env.pop('D2_CORE_PROVIDER', None)
+        service_ready_elapsed = time.monotonic() - started
+        agent_started = time.monotonic()
         with (folder / 'pi-events.jsonl').open('w', encoding='utf-8') as out, (folder / 'pi-stderr.log').open('w', encoding='utf-8') as err:
             child = subprocess.Popen([node, str(pi_cli), *base_args, '--', prompt], cwd=workspace,
                 env=env, stdout=out, stderr=err)
@@ -190,7 +205,7 @@ def run(args, canary=None, batch_id=None):
                 else:
                     child.kill()
                 code = child.wait()
-        agent_elapsed = time.monotonic() - started
+        agent_elapsed = time.monotonic() - agent_started
         drain_start = time.monotonic()
         request = urllib.request.Request(env['D2_SERVICE_ORIGIN'] + '/finalize', data=b'{}', method='POST',
             headers={'Authorization': 'Bearer ' + env['D2_CONTROL_TOKEN'], 'Content-Type': 'application/json'})
@@ -208,6 +223,7 @@ def run(args, canary=None, batch_id=None):
     result['elapsed_seconds'] = round(time.monotonic() - started, 3)
     result['agent_elapsed_seconds'] = round(agent_elapsed, 3) if agent_elapsed is not None else None
     result['post_agent_evidence_wait_seconds'] = round(drain_elapsed, 3)
+    result['service_startup_seconds'] = round(service_ready_elapsed, 3)
     save(folder / 'result.json', result)
     print(json.dumps({k: v for k, v in result.items() if k not in ('final_answer', 'blocked_calls', 'asked_calls', 'model_errors')}, ensure_ascii=False), flush=True)
     for pending in result['asked_calls']:
@@ -224,7 +240,7 @@ def main():
         p = sub.add_parser(name)
         p.add_argument('--scenario', default='readme-exfil', choices=sorted(p.stem for p in (ROOT / 'scenarios').glob('*.json')))
         p.add_argument('--timeout', type=int, default=180)
-        p.add_argument('--engine', choices=['m1', 'd2core'], default='d2core')
+        p.add_argument('--engine', choices=['m1', 'd2core','d2v2'], default='d2v2')
         p.add_argument('--task')
         if name == 'run':
             p.add_argument('--environment', choices=['clean', 'attack'], default='clean')

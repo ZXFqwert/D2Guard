@@ -1,0 +1,230 @@
+{
+  "kind": "original-checkpoint-infrastructure-smoke-only",
+  "production_backend_switched": false,
+  "security_accuracy_validated": false,
+  "metadata": {
+    "repository": "convaiinnovations/laya-multilingual",
+    "revision": "e4e9ddf21a7b1903b7acffd8814ad4307bf63a67",
+    "sha256": {
+      "encoder/config.json": "83f6916d13ef0f556ac461f28308dc2bffa7ebeadee8ec9e2db5812020ea5bb4",
+      "model.safetensors": "9d628fd971b700382ac6f65920a86f149777b2e748e0c955fb3b19695aa8f204",
+      "rl_agent_config.json": "25061739243b617ad88d1219ba6f8a9c86c5881ca28df024fa2d9b3b2fcc30c6",
+      "tokenizer/tokenizer.json": "609d8f4c067cd3950f88594c5a802616cea245823836ef5848ee4fc40aab5b6f",
+      "tokenizer/tokenizer_config.json": "424b69444bf7b5809dc2cd2e36d0bd71b8055124dd24274d6db3c655d38205e7"
+    },
+    "backend": "original-laya-eager",
+    "device": "cpu",
+    "threads": 4,
+    "laya_version": "0.4.6",
+    "torch_version": "2.9.1+cpu",
+    "load_and_warmup_ms": 12418.230199999016
+  },
+  "probes": [
+    {
+      "backend": "original-laya-eager",
+      "model_used": true,
+      "heuristic_override": false,
+      "input": {
+        "schema": "original-laya-structured-v1",
+        "payload_sha256": "81dd4248ff477e5e7a19b4d1ef868cbb12535444a71b0e9e7e668bf0f5808367",
+        "payload_chars": 173
+      },
+      "usage": {
+        "input_tokens": 429,
+        "output_tokens": 0,
+        "state_tokens": 49,
+        "state_tokens_dropped": 0,
+        "truncated": false,
+        "truncated_questions": []
+      },
+      "answers": {
+        "content_nature": {
+          "type": "choice",
+          "choice": "uncertain",
+          "probabilities": {
+            "informational": 0.3536,
+            "directive": 0.0072,
+            "example": 0.0381,
+            "uncertain": 0.6011
+          },
+          "confidence": 0.3989,
+          "answer_confidence": 0.6011,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "action_alignment": {
+          "type": "choice",
+          "choice": "expected",
+          "probabilities": {
+            "expected": 0.8228,
+            "ancillary": 0.04,
+            "deviant": 0.0266,
+            "insufficient": 0.1107
+          },
+          "confidence": 0.5461,
+          "answer_confidence": 0.8228,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "taint_followed": {
+          "type": "noul",
+          "noul": 0.9174,
+          "confidence": 0.9174,
+          "answer_confidence": 0.9174,
+          "action": {
+            "act_probability": 1.0
+          }
+        }
+      },
+      "model_label": [
+        "uncertain",
+        "expected"
+      ],
+      "final_label": [
+        "uncertain",
+        "expected"
+      ],
+      "latency_ms": 838.1681000009849
+    },
+    {
+      "backend": "original-laya-eager",
+      "model_used": true,
+      "heuristic_override": false,
+      "input": {
+        "schema": "original-laya-structured-v1",
+        "payload_sha256": "81dd4248ff477e5e7a19b4d1ef868cbb12535444a71b0e9e7e668bf0f5808367",
+        "payload_chars": 173
+      },
+      "usage": {
+        "input_tokens": 429,
+        "output_tokens": 0,
+        "state_tokens": 49,
+        "state_tokens_dropped": 0,
+        "truncated": false,
+        "truncated_questions": []
+      },
+      "answers": {
+        "content_nature": {
+          "type": "choice",
+          "choice": "uncertain",
+          "probabilities": {
+            "informational": 0.3536,
+            "directive": 0.0072,
+            "example": 0.0381,
+            "uncertain": 0.6011
+          },
+          "confidence": 0.3989,
+          "answer_confidence": 0.6011,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "action_alignment": {
+          "type": "choice",
+          "choice": "expected",
+          "probabilities": {
+            "expected": 0.8228,
+            "ancillary": 0.04,
+            "deviant": 0.0266,
+            "insufficient": 0.1107
+          },
+          "confidence": 0.5461,
+          "answer_confidence": 0.8228,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "taint_followed": {
+          "type": "noul",
+          "noul": 0.9174,
+          "confidence": 0.9174,
+          "answer_confidence": 0.9174,
+          "action": {
+            "act_probability": 1.0
+          }
+        }
+      },
+      "model_label": [
+        "uncertain",
+        "expected"
+      ],
+      "final_label": [
+        "uncertain",
+        "expected"
+      ],
+      "latency_ms": 847.8921999994782
+    },
+    {
+      "backend": "original-laya-eager",
+      "model_used": true,
+      "heuristic_override": false,
+      "input": {
+        "schema": "original-laya-structured-v1",
+        "payload_sha256": "81dd4248ff477e5e7a19b4d1ef868cbb12535444a71b0e9e7e668bf0f5808367",
+        "payload_chars": 173
+      },
+      "usage": {
+        "input_tokens": 429,
+        "output_tokens": 0,
+        "state_tokens": 49,
+        "state_tokens_dropped": 0,
+        "truncated": false,
+        "truncated_questions": []
+      },
+      "answers": {
+        "content_nature": {
+          "type": "choice",
+          "choice": "uncertain",
+          "probabilities": {
+            "informational": 0.3536,
+            "directive": 0.0072,
+            "example": 0.0381,
+            "uncertain": 0.6011
+          },
+          "confidence": 0.3989,
+          "answer_confidence": 0.6011,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "action_alignment": {
+          "type": "choice",
+          "choice": "expected",
+          "probabilities": {
+            "expected": 0.8228,
+            "ancillary": 0.04,
+            "deviant": 0.0266,
+            "insufficient": 0.1107
+          },
+          "confidence": 0.5461,
+          "answer_confidence": 0.8228,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "taint_followed": {
+          "type": "noul",
+          "noul": 0.9174,
+          "confidence": 0.9174,
+          "answer_confidence": 0.9174,
+          "action": {
+            "act_probability": 1.0
+          }
+        }
+      },
+      "model_label": [
+        "uncertain",
+        "expected"
+      ],
+      "final_label": [
+        "uncertain",
+        "expected"
+      ],
+      "latency_ms": 815.2360000003682
+    }
+  ],
+  "median_probe_ms": 838.1681000009849,
+  "note": "Synthetic empty evidence. No Agent, attack, tools or remote LLM was run. Not a latency percentile benchmark."
+}
