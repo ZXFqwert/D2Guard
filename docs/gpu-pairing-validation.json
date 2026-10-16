@@ -1,0 +1,11 @@
+{
+  "batch": "matrix-20261016-150758",
+  "checks": {
+    "same_runtime_sources": true,
+    "same_task": true,
+    "clean_pair_same_initial_files": true,
+    "attack_pair_same_initial_files": true,
+    "local_remote_verification_equal": true
+  },
+  "all_passed": true
+}

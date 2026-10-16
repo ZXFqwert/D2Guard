@@ -71,6 +71,11 @@ class OriginalLaya:
             with (path / name).open('rb') as stream:
                 if hashlib.file_digest(stream, 'sha256').hexdigest() != expected:
                     raise ValueError('Original Laya artifact hash mismatch')
+        device = config.get('device', 'cpu')
+        if device not in ('cpu', 'cuda:0'):
+            raise ValueError('Unsupported explicit device')
+        if device.startswith('cuda') and not torch.cuda.is_available():
+            raise RuntimeError('Configured CUDA is unavailable; no silent CPU fallback')
         torch.set_num_threads(4)
         start = time.perf_counter()
         # Laya 0.4.6 repairs tokenizer_config.json in place. Isolate that
@@ -82,11 +87,13 @@ class OriginalLaya:
             target=runtime/source.relative_to(path);target.parent.mkdir(parents=True,exist_ok=True)
             if source.name=='model.safetensors':os.link(source,target)
             else:shutil.copy2(source,target)
-        self.agent = laya.load(str(runtime), device='cpu', backend='eager')
+        self.agent = laya.load(str(runtime), device=device, backend='eager')
         self.last_trace = {}
         self.metadata = {k: config[k] for k in ('repository', 'revision', 'sha256')}
-        self.metadata.update(backend='original-laya-eager', device='cpu', threads=4,
+        self.metadata.update(backend='original-laya-eager', device=device, threads=4,
                              laya_version=laya.__version__, torch_version=torch.__version__)
+        self.metadata.update(dtype=str(self.agent.dtype), amp_enabled=self.agent.amp_enabled,
+                             gpu_name=torch.cuda.get_device_name(0) if device.startswith('cuda') else None)
         self.agent.system_one(payload_for({'authorization_known': False}, {'event_kind': 'tool_return', 'facts': []}), QUESTIONS, max_len=2048)
         self.metadata['load_and_warmup_ms'] = (time.perf_counter()-start)*1000
         self.model_loaded = True

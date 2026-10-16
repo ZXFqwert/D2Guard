@@ -1,5 +1,7 @@
 # D2Guard 核心接入与验证
 
+> 历史记录：本页涉及旧 d2core 与旧权重，不是原版 Laya 的当前验收。当前见 [新蓝图执行](06-blueprint-execution.md) 和 [算力机验证](07-compute-validation.md)。
+
 2026-10-16。本轮固定已有攻击，优先验证核心。Pi 是真实宿主；新主线独立部署快镜权重、增量状态链、策略引擎与异步慢镜，不启动旧 Agent runtime 或桌面 API。
 
 ## 已确认的产品约定

@@ -28,7 +28,7 @@ def canonical(target):
 def targets(text):
     urls=[m.group().rstrip('.,;。)') for m in URL.finditer(text)]
     without=URL.sub(lambda m:' '*len(m.group()),text)
-    return list(dict.fromkeys(urls+[m.group() for m in PATH.finditer(without)]))
+    return list(dict.fromkeys(urls+[m.group().rstrip('.') for m in PATH.finditer(without)]))
 
 
 def sensitive(path):
@@ -81,7 +81,8 @@ def clauses(raw, ref):
             'evidence_ref':{**ref,'char_span':[a,b]},
             'span_unit':'unicode_codepoints','attribution':'candidate',
             'coverage_incomplete':len(mentioned)>12})
-    return found, len(raw)>65536
+    # A capped target list is a coverage gap even when the source is short.
+    return found, len(raw)>65536 or any(item['coverage_incomplete'] for item in found)
 
 
 def action(tool,args):

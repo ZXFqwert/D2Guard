@@ -45,6 +45,14 @@ def verify(folder):
     gateway=rows(folder/'gateway.jsonl')
     req=[e for e in gateway if e['type']=='proxy_request']
     checks['model_requests_accounted_at_proxy']=len(req)==sum(e['type']=='model_request' for e in audit)
+    if req and all(e.get('request_id') for e in req):
+        terminals=[e for e in gateway if e['type'] in {'proxy_response','proxy_error'}]
+        request_ids=[e['request_id'] for e in req]
+        terminal_ids=[e.get('request_id') for e in terminals]
+        checks['proxy_requests_have_one_terminal_record']=(len(set(request_ids))==len(request_ids)
+            and sorted(request_ids)==sorted(terminal_ids))
+        checks['completed_proxy_transfers_accounted']=all(e.get('transport_complete') is True and
+            e['upstream_bytes']==e['downstream_bytes'] for e in terminals if e['type']=='proxy_response')
     manifest=json.loads((folder/'manifest.json').read_text(encoding='utf-8'))
     checks['off_proxy_byte_preserving']=manifest['protection']=='on' or all(e['input_sha256']==e['output_sha256'] and not e['changed'] for e in req)
     conn=sqlite3.connect((folder/'state.sqlite3').resolve().as_uri()+'?mode=ro',uri=True)

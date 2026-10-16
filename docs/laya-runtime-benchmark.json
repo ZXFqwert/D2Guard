@@ -1,0 +1,1475 @@
+{
+  "kind": "offline_runtime_comparison_not_defense_validation",
+  "model": {
+    "repository": "convaiinnovations/laya-multilingual",
+    "revision": "e4e9ddf21a7b1903b7acffd8814ad4307bf63a67",
+    "sha256": {
+      "encoder/config.json": "83f6916d13ef0f556ac461f28308dc2bffa7ebeadee8ec9e2db5812020ea5bb4",
+      "model.safetensors": "9d628fd971b700382ac6f65920a86f149777b2e748e0c955fb3b19695aa8f204",
+      "rl_agent_config.json": "25061739243b617ad88d1219ba6f8a9c86c5881ca28df024fa2d9b3b2fcc30c6",
+      "tokenizer/tokenizer.json": "609d8f4c067cd3950f88594c5a802616cea245823836ef5848ee4fc40aab5b6f",
+      "tokenizer/tokenizer_config.json": "424b69444bf7b5809dc2cd2e36d0bd71b8055124dd24274d6db3c655d38205e7"
+    },
+    "backend": "original-laya-eager",
+    "device": "cpu",
+    "threads": 4,
+    "laya_version": "0.4.6",
+    "torch_version": "2.9.1+cpu",
+    "load_and_warmup_ms": 16406.5928
+  },
+  "cases": [
+    {
+      "name": "normal_read",
+      "run_id": "20261016-135333-36e8d4",
+      "payload_sha256": "b5904879a59c9a375b19f063a4a98523170dacbc35408a8b87778bcd5020383f"
+    },
+    {
+      "name": "normal_write",
+      "run_id": "20261016-135333-36e8d4",
+      "payload_sha256": "ffc6bf01ec490f83277fd0f97e512f7724454eb3d8eaf026672dbf71ca431b23"
+    },
+    {
+      "name": "ungranted_sensitive_read",
+      "run_id": "20261016-135159-540bea",
+      "payload_sha256": "6e0a5f54d22ebff07232476b6f452de340b5a0aa378a42cab9594aef57a8f3c8"
+    }
+  ],
+  "questions_sha256": "e8c0dc426fd237823522583f5e148fd19975526ebbd52b4f26323ac207406752",
+  "measurements": [
+    {
+      "repeat": 0,
+      "case": "normal_read",
+      "threads": 4,
+      "inference_mode": false,
+      "elapsed_ms": 2448.7805999997363,
+      "forward_ms": 2444.565400001011,
+      "forward_calls": 1,
+      "usage": {
+        "input_tokens": 1314,
+        "output_tokens": 0,
+        "state_tokens": 344,
+        "state_tokens_dropped": 0,
+        "truncated": false,
+        "truncated_questions": []
+      },
+      "answers": {
+        "content_nature": {
+          "type": "choice",
+          "choice": "informational",
+          "probabilities": {
+            "informational": 0.5581,
+            "directive": 0.0409,
+            "example": 0.2167,
+            "uncertain": 0.1843
+          },
+          "confidence": 0.207,
+          "answer_confidence": 0.5581,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "action_alignment": {
+          "type": "choice",
+          "choice": "expected",
+          "probabilities": {
+            "expected": 0.9116,
+            "ancillary": 0.0202,
+            "deviant": 0.0238,
+            "insufficient": 0.0444
+          },
+          "confidence": 0.7184,
+          "answer_confidence": 0.9116,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "taint_followed": {
+          "type": "noul",
+          "noul": 0.9797,
+          "confidence": 0.9797,
+          "answer_confidence": 0.9797,
+          "action": {
+            "act_probability": 1.0
+          }
+        }
+      }
+    },
+    {
+      "repeat": 0,
+      "case": "ungranted_sensitive_read",
+      "threads": 4,
+      "inference_mode": false,
+      "elapsed_ms": 5971.807500000068,
+      "forward_ms": 5966.768700000102,
+      "forward_calls": 1,
+      "usage": {
+        "input_tokens": 2859,
+        "output_tokens": 0,
+        "state_tokens": 859,
+        "state_tokens_dropped": 0,
+        "truncated": false,
+        "truncated_questions": []
+      },
+      "answers": {
+        "content_nature": {
+          "type": "choice",
+          "choice": "uncertain",
+          "probabilities": {
+            "informational": 0.2702,
+            "directive": 0.0932,
+            "example": 0.2126,
+            "uncertain": 0.424
+          },
+          "confidence": 0.0855,
+          "answer_confidence": 0.424,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "action_alignment": {
+          "type": "choice",
+          "choice": "expected",
+          "probabilities": {
+            "expected": 0.8802,
+            "ancillary": 0.0252,
+            "deviant": 0.0519,
+            "insufficient": 0.0426
+          },
+          "confidence": 0.6443,
+          "answer_confidence": 0.8802,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "taint_followed": {
+          "type": "noul",
+          "noul": 0.9717,
+          "confidence": 0.9717,
+          "answer_confidence": 0.9717,
+          "action": {
+            "act_probability": 1.0
+          }
+        }
+      }
+    },
+    {
+      "repeat": 0,
+      "case": "normal_write",
+      "threads": 4,
+      "inference_mode": true,
+      "elapsed_ms": 4114.0853999986575,
+      "forward_ms": 4108.127499999682,
+      "forward_calls": 1,
+      "usage": {
+        "input_tokens": 2052,
+        "output_tokens": 0,
+        "state_tokens": 590,
+        "state_tokens_dropped": 0,
+        "truncated": false,
+        "truncated_questions": []
+      },
+      "answers": {
+        "content_nature": {
+          "type": "choice",
+          "choice": "informational",
+          "probabilities": {
+            "informational": 0.4461,
+            "directive": 0.0823,
+            "example": 0.2555,
+            "uncertain": 0.2161
+          },
+          "confidence": 0.1017,
+          "answer_confidence": 0.4461,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "action_alignment": {
+          "type": "choice",
+          "choice": "expected",
+          "probabilities": {
+            "expected": 0.8931,
+            "ancillary": 0.0229,
+            "deviant": 0.0444,
+            "insufficient": 0.0396
+          },
+          "confidence": 0.6728,
+          "answer_confidence": 0.8931,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "taint_followed": {
+          "type": "noul",
+          "noul": 0.968,
+          "confidence": 0.968,
+          "answer_confidence": 0.968,
+          "action": {
+            "act_probability": 1.0
+          }
+        }
+      }
+    },
+    {
+      "repeat": 0,
+      "case": "normal_write",
+      "threads": 2,
+      "inference_mode": false,
+      "elapsed_ms": 5964.157899999918,
+      "forward_ms": 5959.641399998873,
+      "forward_calls": 1,
+      "usage": {
+        "input_tokens": 2052,
+        "output_tokens": 0,
+        "state_tokens": 590,
+        "state_tokens_dropped": 0,
+        "truncated": false,
+        "truncated_questions": []
+      },
+      "answers": {
+        "content_nature": {
+          "type": "choice",
+          "choice": "informational",
+          "probabilities": {
+            "informational": 0.4461,
+            "directive": 0.0823,
+            "example": 0.2555,
+            "uncertain": 0.2161
+          },
+          "confidence": 0.1017,
+          "answer_confidence": 0.4461,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "action_alignment": {
+          "type": "choice",
+          "choice": "expected",
+          "probabilities": {
+            "expected": 0.8931,
+            "ancillary": 0.0229,
+            "deviant": 0.0444,
+            "insufficient": 0.0396
+          },
+          "confidence": 0.6728,
+          "answer_confidence": 0.8931,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "taint_followed": {
+          "type": "noul",
+          "noul": 0.968,
+          "confidence": 0.968,
+          "answer_confidence": 0.968,
+          "action": {
+            "act_probability": 1.0
+          }
+        }
+      }
+    },
+    {
+      "repeat": 0,
+      "case": "ungranted_sensitive_read",
+      "threads": 1,
+      "inference_mode": false,
+      "elapsed_ms": 13188.158700000713,
+      "forward_ms": 13184.192900000198,
+      "forward_calls": 1,
+      "usage": {
+        "input_tokens": 2859,
+        "output_tokens": 0,
+        "state_tokens": 859,
+        "state_tokens_dropped": 0,
+        "truncated": false,
+        "truncated_questions": []
+      },
+      "answers": {
+        "content_nature": {
+          "type": "choice",
+          "choice": "uncertain",
+          "probabilities": {
+            "informational": 0.2702,
+            "directive": 0.0932,
+            "example": 0.2126,
+            "uncertain": 0.424
+          },
+          "confidence": 0.0855,
+          "answer_confidence": 0.424,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "action_alignment": {
+          "type": "choice",
+          "choice": "expected",
+          "probabilities": {
+            "expected": 0.8802,
+            "ancillary": 0.0252,
+            "deviant": 0.0519,
+            "insufficient": 0.0426
+          },
+          "confidence": 0.6443,
+          "answer_confidence": 0.8802,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "taint_followed": {
+          "type": "noul",
+          "noul": 0.9717,
+          "confidence": 0.9717,
+          "answer_confidence": 0.9717,
+          "action": {
+            "act_probability": 1.0
+          }
+        }
+      }
+    },
+    {
+      "repeat": 0,
+      "case": "normal_read",
+      "threads": 2,
+      "inference_mode": false,
+      "elapsed_ms": 3383.405100001255,
+      "forward_ms": 3380.273599999782,
+      "forward_calls": 1,
+      "usage": {
+        "input_tokens": 1314,
+        "output_tokens": 0,
+        "state_tokens": 344,
+        "state_tokens_dropped": 0,
+        "truncated": false,
+        "truncated_questions": []
+      },
+      "answers": {
+        "content_nature": {
+          "type": "choice",
+          "choice": "informational",
+          "probabilities": {
+            "informational": 0.5581,
+            "directive": 0.0409,
+            "example": 0.2167,
+            "uncertain": 0.1843
+          },
+          "confidence": 0.207,
+          "answer_confidence": 0.5581,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "action_alignment": {
+          "type": "choice",
+          "choice": "expected",
+          "probabilities": {
+            "expected": 0.9116,
+            "ancillary": 0.0202,
+            "deviant": 0.0238,
+            "insufficient": 0.0444
+          },
+          "confidence": 0.7184,
+          "answer_confidence": 0.9116,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "taint_followed": {
+          "type": "noul",
+          "noul": 0.9797,
+          "confidence": 0.9797,
+          "answer_confidence": 0.9797,
+          "action": {
+            "act_probability": 1.0
+          }
+        }
+      }
+    },
+    {
+      "repeat": 0,
+      "case": "normal_write",
+      "threads": 4,
+      "inference_mode": false,
+      "elapsed_ms": 4256.162400000903,
+      "forward_ms": 4252.168400000301,
+      "forward_calls": 1,
+      "usage": {
+        "input_tokens": 2052,
+        "output_tokens": 0,
+        "state_tokens": 590,
+        "state_tokens_dropped": 0,
+        "truncated": false,
+        "truncated_questions": []
+      },
+      "answers": {
+        "content_nature": {
+          "type": "choice",
+          "choice": "informational",
+          "probabilities": {
+            "informational": 0.4461,
+            "directive": 0.0823,
+            "example": 0.2555,
+            "uncertain": 0.2161
+          },
+          "confidence": 0.1017,
+          "answer_confidence": 0.4461,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "action_alignment": {
+          "type": "choice",
+          "choice": "expected",
+          "probabilities": {
+            "expected": 0.8931,
+            "ancillary": 0.0229,
+            "deviant": 0.0444,
+            "insufficient": 0.0396
+          },
+          "confidence": 0.6728,
+          "answer_confidence": 0.8931,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "taint_followed": {
+          "type": "noul",
+          "noul": 0.968,
+          "confidence": 0.968,
+          "answer_confidence": 0.968,
+          "action": {
+            "act_probability": 1.0
+          }
+        }
+      }
+    },
+    {
+      "repeat": 0,
+      "case": "ungranted_sensitive_read",
+      "threads": 2,
+      "inference_mode": false,
+      "elapsed_ms": 8050.495699999374,
+      "forward_ms": 8045.21129999921,
+      "forward_calls": 1,
+      "usage": {
+        "input_tokens": 2859,
+        "output_tokens": 0,
+        "state_tokens": 859,
+        "state_tokens_dropped": 0,
+        "truncated": false,
+        "truncated_questions": []
+      },
+      "answers": {
+        "content_nature": {
+          "type": "choice",
+          "choice": "uncertain",
+          "probabilities": {
+            "informational": 0.2702,
+            "directive": 0.0932,
+            "example": 0.2126,
+            "uncertain": 0.424
+          },
+          "confidence": 0.0855,
+          "answer_confidence": 0.424,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "action_alignment": {
+          "type": "choice",
+          "choice": "expected",
+          "probabilities": {
+            "expected": 0.8802,
+            "ancillary": 0.0252,
+            "deviant": 0.0519,
+            "insufficient": 0.0426
+          },
+          "confidence": 0.6443,
+          "answer_confidence": 0.8802,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "taint_followed": {
+          "type": "noul",
+          "noul": 0.9717,
+          "confidence": 0.9717,
+          "answer_confidence": 0.9717,
+          "action": {
+            "act_probability": 1.0
+          }
+        }
+      }
+    },
+    {
+      "repeat": 0,
+      "case": "ungranted_sensitive_read",
+      "threads": 4,
+      "inference_mode": true,
+      "elapsed_ms": 5903.491400000348,
+      "forward_ms": 5898.253000001205,
+      "forward_calls": 1,
+      "usage": {
+        "input_tokens": 2859,
+        "output_tokens": 0,
+        "state_tokens": 859,
+        "state_tokens_dropped": 0,
+        "truncated": false,
+        "truncated_questions": []
+      },
+      "answers": {
+        "content_nature": {
+          "type": "choice",
+          "choice": "uncertain",
+          "probabilities": {
+            "informational": 0.2702,
+            "directive": 0.0932,
+            "example": 0.2126,
+            "uncertain": 0.424
+          },
+          "confidence": 0.0855,
+          "answer_confidence": 0.424,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "action_alignment": {
+          "type": "choice",
+          "choice": "expected",
+          "probabilities": {
+            "expected": 0.8802,
+            "ancillary": 0.0252,
+            "deviant": 0.0519,
+            "insufficient": 0.0426
+          },
+          "confidence": 0.6443,
+          "answer_confidence": 0.8802,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "taint_followed": {
+          "type": "noul",
+          "noul": 0.9717,
+          "confidence": 0.9717,
+          "answer_confidence": 0.9717,
+          "action": {
+            "act_probability": 1.0
+          }
+        }
+      }
+    },
+    {
+      "repeat": 0,
+      "case": "normal_read",
+      "threads": 1,
+      "inference_mode": false,
+      "elapsed_ms": 5192.865899998651,
+      "forward_ms": 5188.462899999649,
+      "forward_calls": 1,
+      "usage": {
+        "input_tokens": 1314,
+        "output_tokens": 0,
+        "state_tokens": 344,
+        "state_tokens_dropped": 0,
+        "truncated": false,
+        "truncated_questions": []
+      },
+      "answers": {
+        "content_nature": {
+          "type": "choice",
+          "choice": "informational",
+          "probabilities": {
+            "informational": 0.5581,
+            "directive": 0.0409,
+            "example": 0.2167,
+            "uncertain": 0.1843
+          },
+          "confidence": 0.207,
+          "answer_confidence": 0.5581,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "action_alignment": {
+          "type": "choice",
+          "choice": "expected",
+          "probabilities": {
+            "expected": 0.9116,
+            "ancillary": 0.0202,
+            "deviant": 0.0238,
+            "insufficient": 0.0444
+          },
+          "confidence": 0.7184,
+          "answer_confidence": 0.9116,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "taint_followed": {
+          "type": "noul",
+          "noul": 0.9797,
+          "confidence": 0.9797,
+          "answer_confidence": 0.9797,
+          "action": {
+            "act_probability": 1.0
+          }
+        }
+      }
+    },
+    {
+      "repeat": 0,
+      "case": "normal_write",
+      "threads": 1,
+      "inference_mode": false,
+      "elapsed_ms": 8689.373100000012,
+      "forward_ms": 8685.623599998507,
+      "forward_calls": 1,
+      "usage": {
+        "input_tokens": 2052,
+        "output_tokens": 0,
+        "state_tokens": 590,
+        "state_tokens_dropped": 0,
+        "truncated": false,
+        "truncated_questions": []
+      },
+      "answers": {
+        "content_nature": {
+          "type": "choice",
+          "choice": "informational",
+          "probabilities": {
+            "informational": 0.4461,
+            "directive": 0.0823,
+            "example": 0.2555,
+            "uncertain": 0.2161
+          },
+          "confidence": 0.1017,
+          "answer_confidence": 0.4461,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "action_alignment": {
+          "type": "choice",
+          "choice": "expected",
+          "probabilities": {
+            "expected": 0.8931,
+            "ancillary": 0.0229,
+            "deviant": 0.0444,
+            "insufficient": 0.0396
+          },
+          "confidence": 0.6728,
+          "answer_confidence": 0.8931,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "taint_followed": {
+          "type": "noul",
+          "noul": 0.968,
+          "confidence": 0.968,
+          "answer_confidence": 0.968,
+          "action": {
+            "act_probability": 1.0
+          }
+        }
+      }
+    },
+    {
+      "repeat": 0,
+      "case": "normal_read",
+      "threads": 4,
+      "inference_mode": true,
+      "elapsed_ms": 2604.3719000008423,
+      "forward_ms": 2600.9737999993376,
+      "forward_calls": 1,
+      "usage": {
+        "input_tokens": 1314,
+        "output_tokens": 0,
+        "state_tokens": 344,
+        "state_tokens_dropped": 0,
+        "truncated": false,
+        "truncated_questions": []
+      },
+      "answers": {
+        "content_nature": {
+          "type": "choice",
+          "choice": "informational",
+          "probabilities": {
+            "informational": 0.5581,
+            "directive": 0.0409,
+            "example": 0.2167,
+            "uncertain": 0.1843
+          },
+          "confidence": 0.207,
+          "answer_confidence": 0.5581,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "action_alignment": {
+          "type": "choice",
+          "choice": "expected",
+          "probabilities": {
+            "expected": 0.9116,
+            "ancillary": 0.0202,
+            "deviant": 0.0238,
+            "insufficient": 0.0444
+          },
+          "confidence": 0.7184,
+          "answer_confidence": 0.9116,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "taint_followed": {
+          "type": "noul",
+          "noul": 0.9797,
+          "confidence": 0.9797,
+          "answer_confidence": 0.9797,
+          "action": {
+            "act_probability": 1.0
+          }
+        }
+      }
+    },
+    {
+      "repeat": 1,
+      "case": "normal_read",
+      "threads": 1,
+      "inference_mode": false,
+      "elapsed_ms": 5117.385099998501,
+      "forward_ms": 5113.6311999998725,
+      "forward_calls": 1,
+      "usage": {
+        "input_tokens": 1314,
+        "output_tokens": 0,
+        "state_tokens": 344,
+        "state_tokens_dropped": 0,
+        "truncated": false,
+        "truncated_questions": []
+      },
+      "answers": {
+        "content_nature": {
+          "type": "choice",
+          "choice": "informational",
+          "probabilities": {
+            "informational": 0.5581,
+            "directive": 0.0409,
+            "example": 0.2167,
+            "uncertain": 0.1843
+          },
+          "confidence": 0.207,
+          "answer_confidence": 0.5581,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "action_alignment": {
+          "type": "choice",
+          "choice": "expected",
+          "probabilities": {
+            "expected": 0.9116,
+            "ancillary": 0.0202,
+            "deviant": 0.0238,
+            "insufficient": 0.0444
+          },
+          "confidence": 0.7184,
+          "answer_confidence": 0.9116,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "taint_followed": {
+          "type": "noul",
+          "noul": 0.9797,
+          "confidence": 0.9797,
+          "answer_confidence": 0.9797,
+          "action": {
+            "act_probability": 1.0
+          }
+        }
+      }
+    },
+    {
+      "repeat": 1,
+      "case": "ungranted_sensitive_read",
+      "threads": 4,
+      "inference_mode": true,
+      "elapsed_ms": 6163.435899999968,
+      "forward_ms": 6159.150299999965,
+      "forward_calls": 1,
+      "usage": {
+        "input_tokens": 2859,
+        "output_tokens": 0,
+        "state_tokens": 859,
+        "state_tokens_dropped": 0,
+        "truncated": false,
+        "truncated_questions": []
+      },
+      "answers": {
+        "content_nature": {
+          "type": "choice",
+          "choice": "uncertain",
+          "probabilities": {
+            "informational": 0.2702,
+            "directive": 0.0932,
+            "example": 0.2126,
+            "uncertain": 0.424
+          },
+          "confidence": 0.0855,
+          "answer_confidence": 0.424,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "action_alignment": {
+          "type": "choice",
+          "choice": "expected",
+          "probabilities": {
+            "expected": 0.8802,
+            "ancillary": 0.0252,
+            "deviant": 0.0519,
+            "insufficient": 0.0426
+          },
+          "confidence": 0.6443,
+          "answer_confidence": 0.8802,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "taint_followed": {
+          "type": "noul",
+          "noul": 0.9717,
+          "confidence": 0.9717,
+          "answer_confidence": 0.9717,
+          "action": {
+            "act_probability": 1.0
+          }
+        }
+      }
+    },
+    {
+      "repeat": 1,
+      "case": "ungranted_sensitive_read",
+      "threads": 4,
+      "inference_mode": false,
+      "elapsed_ms": 6192.090200000166,
+      "forward_ms": 6187.272600000142,
+      "forward_calls": 1,
+      "usage": {
+        "input_tokens": 2859,
+        "output_tokens": 0,
+        "state_tokens": 859,
+        "state_tokens_dropped": 0,
+        "truncated": false,
+        "truncated_questions": []
+      },
+      "answers": {
+        "content_nature": {
+          "type": "choice",
+          "choice": "uncertain",
+          "probabilities": {
+            "informational": 0.2702,
+            "directive": 0.0932,
+            "example": 0.2126,
+            "uncertain": 0.424
+          },
+          "confidence": 0.0855,
+          "answer_confidence": 0.424,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "action_alignment": {
+          "type": "choice",
+          "choice": "expected",
+          "probabilities": {
+            "expected": 0.8802,
+            "ancillary": 0.0252,
+            "deviant": 0.0519,
+            "insufficient": 0.0426
+          },
+          "confidence": 0.6443,
+          "answer_confidence": 0.8802,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "taint_followed": {
+          "type": "noul",
+          "noul": 0.9717,
+          "confidence": 0.9717,
+          "answer_confidence": 0.9717,
+          "action": {
+            "act_probability": 1.0
+          }
+        }
+      }
+    },
+    {
+      "repeat": 1,
+      "case": "normal_read",
+      "threads": 4,
+      "inference_mode": false,
+      "elapsed_ms": 2571.2070999998105,
+      "forward_ms": 2567.1340999997483,
+      "forward_calls": 1,
+      "usage": {
+        "input_tokens": 1314,
+        "output_tokens": 0,
+        "state_tokens": 344,
+        "state_tokens_dropped": 0,
+        "truncated": false,
+        "truncated_questions": []
+      },
+      "answers": {
+        "content_nature": {
+          "type": "choice",
+          "choice": "informational",
+          "probabilities": {
+            "informational": 0.5581,
+            "directive": 0.0409,
+            "example": 0.2167,
+            "uncertain": 0.1843
+          },
+          "confidence": 0.207,
+          "answer_confidence": 0.5581,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "action_alignment": {
+          "type": "choice",
+          "choice": "expected",
+          "probabilities": {
+            "expected": 0.9116,
+            "ancillary": 0.0202,
+            "deviant": 0.0238,
+            "insufficient": 0.0444
+          },
+          "confidence": 0.7184,
+          "answer_confidence": 0.9116,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "taint_followed": {
+          "type": "noul",
+          "noul": 0.9797,
+          "confidence": 0.9797,
+          "answer_confidence": 0.9797,
+          "action": {
+            "act_probability": 1.0
+          }
+        }
+      }
+    },
+    {
+      "repeat": 1,
+      "case": "ungranted_sensitive_read",
+      "threads": 1,
+      "inference_mode": false,
+      "elapsed_ms": 13446.665699999357,
+      "forward_ms": 13441.889700001411,
+      "forward_calls": 1,
+      "usage": {
+        "input_tokens": 2859,
+        "output_tokens": 0,
+        "state_tokens": 859,
+        "state_tokens_dropped": 0,
+        "truncated": false,
+        "truncated_questions": []
+      },
+      "answers": {
+        "content_nature": {
+          "type": "choice",
+          "choice": "uncertain",
+          "probabilities": {
+            "informational": 0.2702,
+            "directive": 0.0932,
+            "example": 0.2126,
+            "uncertain": 0.424
+          },
+          "confidence": 0.0855,
+          "answer_confidence": 0.424,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "action_alignment": {
+          "type": "choice",
+          "choice": "expected",
+          "probabilities": {
+            "expected": 0.8802,
+            "ancillary": 0.0252,
+            "deviant": 0.0519,
+            "insufficient": 0.0426
+          },
+          "confidence": 0.6443,
+          "answer_confidence": 0.8802,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "taint_followed": {
+          "type": "noul",
+          "noul": 0.9717,
+          "confidence": 0.9717,
+          "answer_confidence": 0.9717,
+          "action": {
+            "act_probability": 1.0
+          }
+        }
+      }
+    },
+    {
+      "repeat": 1,
+      "case": "normal_read",
+      "threads": 2,
+      "inference_mode": false,
+      "elapsed_ms": 3365.0307999996585,
+      "forward_ms": 3361.435700000584,
+      "forward_calls": 1,
+      "usage": {
+        "input_tokens": 1314,
+        "output_tokens": 0,
+        "state_tokens": 344,
+        "state_tokens_dropped": 0,
+        "truncated": false,
+        "truncated_questions": []
+      },
+      "answers": {
+        "content_nature": {
+          "type": "choice",
+          "choice": "informational",
+          "probabilities": {
+            "informational": 0.5581,
+            "directive": 0.0409,
+            "example": 0.2167,
+            "uncertain": 0.1843
+          },
+          "confidence": 0.207,
+          "answer_confidence": 0.5581,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "action_alignment": {
+          "type": "choice",
+          "choice": "expected",
+          "probabilities": {
+            "expected": 0.9116,
+            "ancillary": 0.0202,
+            "deviant": 0.0238,
+            "insufficient": 0.0444
+          },
+          "confidence": 0.7184,
+          "answer_confidence": 0.9116,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "taint_followed": {
+          "type": "noul",
+          "noul": 0.9797,
+          "confidence": 0.9797,
+          "answer_confidence": 0.9797,
+          "action": {
+            "act_probability": 1.0
+          }
+        }
+      }
+    },
+    {
+      "repeat": 1,
+      "case": "ungranted_sensitive_read",
+      "threads": 2,
+      "inference_mode": false,
+      "elapsed_ms": 8890.98550000017,
+      "forward_ms": 8887.145200000305,
+      "forward_calls": 1,
+      "usage": {
+        "input_tokens": 2859,
+        "output_tokens": 0,
+        "state_tokens": 859,
+        "state_tokens_dropped": 0,
+        "truncated": false,
+        "truncated_questions": []
+      },
+      "answers": {
+        "content_nature": {
+          "type": "choice",
+          "choice": "uncertain",
+          "probabilities": {
+            "informational": 0.2702,
+            "directive": 0.0932,
+            "example": 0.2126,
+            "uncertain": 0.424
+          },
+          "confidence": 0.0855,
+          "answer_confidence": 0.424,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "action_alignment": {
+          "type": "choice",
+          "choice": "expected",
+          "probabilities": {
+            "expected": 0.8802,
+            "ancillary": 0.0252,
+            "deviant": 0.0519,
+            "insufficient": 0.0426
+          },
+          "confidence": 0.6443,
+          "answer_confidence": 0.8802,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "taint_followed": {
+          "type": "noul",
+          "noul": 0.9717,
+          "confidence": 0.9717,
+          "answer_confidence": 0.9717,
+          "action": {
+            "act_probability": 1.0
+          }
+        }
+      }
+    },
+    {
+      "repeat": 1,
+      "case": "normal_write",
+      "threads": 4,
+      "inference_mode": false,
+      "elapsed_ms": 4335.867200001303,
+      "forward_ms": 4331.5223999998125,
+      "forward_calls": 1,
+      "usage": {
+        "input_tokens": 2052,
+        "output_tokens": 0,
+        "state_tokens": 590,
+        "state_tokens_dropped": 0,
+        "truncated": false,
+        "truncated_questions": []
+      },
+      "answers": {
+        "content_nature": {
+          "type": "choice",
+          "choice": "informational",
+          "probabilities": {
+            "informational": 0.4461,
+            "directive": 0.0823,
+            "example": 0.2555,
+            "uncertain": 0.2161
+          },
+          "confidence": 0.1017,
+          "answer_confidence": 0.4461,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "action_alignment": {
+          "type": "choice",
+          "choice": "expected",
+          "probabilities": {
+            "expected": 0.8931,
+            "ancillary": 0.0229,
+            "deviant": 0.0444,
+            "insufficient": 0.0396
+          },
+          "confidence": 0.6728,
+          "answer_confidence": 0.8931,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "taint_followed": {
+          "type": "noul",
+          "noul": 0.968,
+          "confidence": 0.968,
+          "answer_confidence": 0.968,
+          "action": {
+            "act_probability": 1.0
+          }
+        }
+      }
+    },
+    {
+      "repeat": 1,
+      "case": "normal_write",
+      "threads": 4,
+      "inference_mode": true,
+      "elapsed_ms": 4644.50940000097,
+      "forward_ms": 4637.906599999042,
+      "forward_calls": 1,
+      "usage": {
+        "input_tokens": 2052,
+        "output_tokens": 0,
+        "state_tokens": 590,
+        "state_tokens_dropped": 0,
+        "truncated": false,
+        "truncated_questions": []
+      },
+      "answers": {
+        "content_nature": {
+          "type": "choice",
+          "choice": "informational",
+          "probabilities": {
+            "informational": 0.4461,
+            "directive": 0.0823,
+            "example": 0.2555,
+            "uncertain": 0.2161
+          },
+          "confidence": 0.1017,
+          "answer_confidence": 0.4461,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "action_alignment": {
+          "type": "choice",
+          "choice": "expected",
+          "probabilities": {
+            "expected": 0.8931,
+            "ancillary": 0.0229,
+            "deviant": 0.0444,
+            "insufficient": 0.0396
+          },
+          "confidence": 0.6728,
+          "answer_confidence": 0.8931,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "taint_followed": {
+          "type": "noul",
+          "noul": 0.968,
+          "confidence": 0.968,
+          "answer_confidence": 0.968,
+          "action": {
+            "act_probability": 1.0
+          }
+        }
+      }
+    },
+    {
+      "repeat": 1,
+      "case": "normal_write",
+      "threads": 1,
+      "inference_mode": false,
+      "elapsed_ms": 9372.48340000042,
+      "forward_ms": 9366.642500001035,
+      "forward_calls": 1,
+      "usage": {
+        "input_tokens": 2052,
+        "output_tokens": 0,
+        "state_tokens": 590,
+        "state_tokens_dropped": 0,
+        "truncated": false,
+        "truncated_questions": []
+      },
+      "answers": {
+        "content_nature": {
+          "type": "choice",
+          "choice": "informational",
+          "probabilities": {
+            "informational": 0.4461,
+            "directive": 0.0823,
+            "example": 0.2555,
+            "uncertain": 0.2161
+          },
+          "confidence": 0.1017,
+          "answer_confidence": 0.4461,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "action_alignment": {
+          "type": "choice",
+          "choice": "expected",
+          "probabilities": {
+            "expected": 0.8931,
+            "ancillary": 0.0229,
+            "deviant": 0.0444,
+            "insufficient": 0.0396
+          },
+          "confidence": 0.6728,
+          "answer_confidence": 0.8931,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "taint_followed": {
+          "type": "noul",
+          "noul": 0.968,
+          "confidence": 0.968,
+          "answer_confidence": 0.968,
+          "action": {
+            "act_probability": 1.0
+          }
+        }
+      }
+    },
+    {
+      "repeat": 1,
+      "case": "normal_read",
+      "threads": 4,
+      "inference_mode": true,
+      "elapsed_ms": 2900.3561999998055,
+      "forward_ms": 2896.392900000137,
+      "forward_calls": 1,
+      "usage": {
+        "input_tokens": 1314,
+        "output_tokens": 0,
+        "state_tokens": 344,
+        "state_tokens_dropped": 0,
+        "truncated": false,
+        "truncated_questions": []
+      },
+      "answers": {
+        "content_nature": {
+          "type": "choice",
+          "choice": "informational",
+          "probabilities": {
+            "informational": 0.5581,
+            "directive": 0.0409,
+            "example": 0.2167,
+            "uncertain": 0.1843
+          },
+          "confidence": 0.207,
+          "answer_confidence": 0.5581,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "action_alignment": {
+          "type": "choice",
+          "choice": "expected",
+          "probabilities": {
+            "expected": 0.9116,
+            "ancillary": 0.0202,
+            "deviant": 0.0238,
+            "insufficient": 0.0444
+          },
+          "confidence": 0.7184,
+          "answer_confidence": 0.9116,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "taint_followed": {
+          "type": "noul",
+          "noul": 0.9797,
+          "confidence": 0.9797,
+          "answer_confidence": 0.9797,
+          "action": {
+            "act_probability": 1.0
+          }
+        }
+      }
+    },
+    {
+      "repeat": 1,
+      "case": "normal_write",
+      "threads": 2,
+      "inference_mode": false,
+      "elapsed_ms": 6572.0279999986815,
+      "forward_ms": 6566.191500000059,
+      "forward_calls": 1,
+      "usage": {
+        "input_tokens": 2052,
+        "output_tokens": 0,
+        "state_tokens": 590,
+        "state_tokens_dropped": 0,
+        "truncated": false,
+        "truncated_questions": []
+      },
+      "answers": {
+        "content_nature": {
+          "type": "choice",
+          "choice": "informational",
+          "probabilities": {
+            "informational": 0.4461,
+            "directive": 0.0823,
+            "example": 0.2555,
+            "uncertain": 0.2161
+          },
+          "confidence": 0.1017,
+          "answer_confidence": 0.4461,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "action_alignment": {
+          "type": "choice",
+          "choice": "expected",
+          "probabilities": {
+            "expected": 0.8931,
+            "ancillary": 0.0229,
+            "deviant": 0.0444,
+            "insufficient": 0.0396
+          },
+          "confidence": 0.6728,
+          "answer_confidence": 0.8931,
+          "action": {
+            "act_probability": 1.0
+          }
+        },
+        "taint_followed": {
+          "type": "noul",
+          "noul": 0.968,
+          "confidence": 0.968,
+          "answer_confidence": 0.968,
+          "action": {
+            "act_probability": 1.0
+          }
+        }
+      }
+    }
+  ],
+  "complete": true,
+  "summaries": [
+    {
+      "threads": 4,
+      "inference_mode": false,
+      "median_ms": 4296.014800001103,
+      "per_case_median_ms": {
+        "normal_read": 2509.9938499997734,
+        "normal_write": 4296.014800001103,
+        "ungranted_sensitive_read": 6081.948850000117
+      }
+    },
+    {
+      "threads": 2,
+      "inference_mode": false,
+      "median_ms": 6268.0929499993,
+      "per_case_median_ms": {
+        "normal_read": 3374.2179500004568,
+        "normal_write": 6268.0929499993,
+        "ungranted_sensitive_read": 8470.740599999772
+      }
+    },
+    {
+      "threads": 1,
+      "inference_mode": false,
+      "median_ms": 9030.928250000215,
+      "per_case_median_ms": {
+        "normal_read": 5155.125499998576,
+        "normal_write": 9030.928250000215,
+        "ungranted_sensitive_read": 13317.412200000035
+      }
+    },
+    {
+      "threads": 4,
+      "inference_mode": true,
+      "median_ms": 4379.297399999814,
+      "per_case_median_ms": {
+        "normal_read": 2752.364050000324,
+        "normal_write": 4379.297399999814,
+        "ungranted_sensitive_read": 6033.463650000158
+      }
+    }
+  ]
+}

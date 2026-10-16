@@ -1,5 +1,5 @@
-# Optional original-checkpoint prototype. This machine already has these packages.
-# The running legacy CoreGuard has not yet migrated to this backend.
+# Windows CPU environment for the default d2v2 official-checkpoint backend.
+# Compute GPU environment reuses its installed CUDA torch; see docs/07-compute-validation.md.
 laya==0.4.6
 torch==2.9.1
 transformers==4.57.3

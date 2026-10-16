@@ -5,7 +5,8 @@ import os
 import threading
 import time
 import hashlib
-import httpx
+import uuid
+from proxy_stream import forward
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from guard import Guard
@@ -83,20 +84,10 @@ def main():
                 if is_proxy:
                     data,dlp=guard.gateway_payload(data)
                     body=json.dumps(data,ensure_ascii=False).encode() if dlp['changed'] else raw
-                    append('gateway.jsonl',{'type':'proxy_request','path':proxy_path,'input_bytes':len(raw),
+                    request_id=str(uuid.uuid4())
+                    append('gateway.jsonl',{'type':'proxy_request','request_id':request_id,'path':proxy_path,'input_bytes':len(raw),
                         'input_sha256':hashlib.sha256(raw).hexdigest(),'output_sha256':hashlib.sha256(body).hexdigest(),**dlp})
-                    try:
-                        with httpx.Client(timeout=120,trust_env=False,follow_redirects=False) as client:
-                            with client.stream('POST',provider['base_url'].rstrip('/')+proxy_path,
-                                    headers={'Authorization':'Bearer '+provider['api_key'],'Content-Type':'application/json'},content=body) as upstream:
-                                self.send_response(upstream.status_code)
-                                self.send_header('Content-Type',upstream.headers.get('content-type','application/json'))
-                                self.send_header('Connection','close');self.end_headers();self.close_connection=True
-                                for chunk in upstream.iter_bytes():self.wfile.write(chunk);self.wfile.flush()
-                                append('gateway.jsonl',{'type':'proxy_response','status':upstream.status_code})
-                    except (httpx.HTTPError,BrokenPipeError,ConnectionResetError) as exc:
-                        append('gateway.jsonl',{'type':'proxy_error','error_type':type(exc).__name__})
-                        self.close_connection=True
+                    forward(self,provider,proxy_path,body,append,request_id)
                     return
                 if self.path == '/finalize':
                     return self.respond(200, guard.drain() if args.engine in ('d2core','d2v2') else {'pending_reviews': 0})

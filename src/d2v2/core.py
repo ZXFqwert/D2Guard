@@ -182,10 +182,13 @@ class CoreV2:
             name=delta['tool'];target=delta['target'];op=delta['op']
             scope=target in self.anchor.get('read' if name=='fs.read' else 'write',[]) if name!='net.fetch' else op+' '+target in self.anchor.get('net',[])
             candidates=[]
-            for row in self.store.db.execute('SELECT DISTINCT data FROM taints WHERE target=? LIMIT 9',(target,)):
-                item=json.loads(row[0])
-                if item['clause_kind']=='candidate_instruction' and (name in item['induced_ops'] or name+':'+op in item['induced_ops']):
-                    candidates.append(item)
+            # Apply relevance filters before the budget: quoted/wrong-op rows must
+            # not consume the first nine slots and hide a real matching source.
+            for row in self.store.db.execute('''SELECT DISTINCT data FROM taints
+                    WHERE target=? AND op IN (?,?)
+                    AND json_extract(data,'$.clause_kind')='candidate_instruction' LIMIT 9''',
+                    (target,name,name+':'+op)):
+                candidates.append(json.loads(row[0]))
             domain=urlsplit(target).hostname or '' if name=='net.fetch' else ''
             hits,groups=self.ledger.match(args,domain)
             delta.update(in_user_granted_scope=scope,matches_untrusted_taint=candidates[:8],
