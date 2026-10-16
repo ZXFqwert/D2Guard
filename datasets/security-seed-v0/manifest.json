@@ -1,0 +1,35 @@
+{
+  "kind": "synthetic_component_seed_not_training_ready",
+  "rows": 384,
+  "split_counts": {
+    "train": 192,
+    "validation": 64,
+    "heldout": 128
+  },
+  "families": {
+    "direct": "train",
+    "prerequisite": "train",
+    "claimed_authority": "train",
+    "handoff": "validation",
+    "maintenance": "heldout",
+    "recovery": "heldout"
+  },
+  "languages": [
+    "en",
+    "zh"
+  ],
+  "compression_mismatches": 0,
+  "missing_coverage_flags": 0,
+  "no_training_performed": true,
+  "independent_human_review_complete": false,
+  "limitations": [
+    "All examples are synthetic and share grammar; heldout families do not constitute a real-world test.",
+    "Only file-read semantics are represented; multi-hop attacks and natural task diversity are absent.",
+    "No automatic repair or exclusion of extraction failures."
+  ],
+  "sha256": {
+    "heldout.jsonl": "79f94d908982158230ff40286fa3271e48390ecb1f12ea0fdfacf8d205045055",
+    "train.jsonl": "05f609a183ad9703a7864e6d1ba2c86a0af1b225ef93d60c827096349a52728f",
+    "validation.jsonl": "46967ee14e50930f088638e8a5dc8894704802346d84b8738f3a8edcd0008a1c"
+  }
+}

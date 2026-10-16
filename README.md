@@ -6,15 +6,15 @@
 
 目前支持受限文件读写、真实本地 HTTP、一层 Pi 子 Agent，以及一个配置固定的只读 MCP 服务。通用远端 MCP/HTTP MCP、多层子 Agent、跨会话记忆、审批恢复、完整 OS 隔离、任意命令和前端仍未完成。可运行闭环不等于 D1 精度、性能或赛题整体验收通过。
 
-算力机独立环境已建立，官方原版 Laya 在 A100 上对三组固定安全输入的推理中位数为 25–29ms；Windows CPU 对应约 2.5–6.1 秒。当前更突出的未决项是语义判断质量：正常与异常输入的 taint_followed 均偏高，不能将高分直接解释为检出。部署、诊断与真实运行结果见 [算力机验证](docs/07-compute-validation.md)。
+当前快镜基线已改为官方英文原版 `convaiinnovations/laya`，固定 revision `7b928d828b7b0e022f929d9bd2e44165aa270148`；多语言结果仅保留参考。240 个相同事实/问题的对照显示部分能力改善，但历史干扰、问题方式与中文仍影响判断，不能宣称语义检测已达标。已生成 384 条待复核的中英文安全分量种子数据，尚未训练。详见 [版本对照与数据方案](docs/09-checkpoint-and-data.md)。
 
-最新已修复安全抽取中的操作—目标错配，并完成 36 组表示/协议对照与 11 组后续控制。真实矩阵仍为无防护泄露 56 字节、有防护执行前 ASK 且零外发；原版快镜语义区分能力尚未验收。46 项 Python 测试通过，详见 [安全语义诊断与修复](docs/08-security-semantics.md)。
+英文版真实 Pi 复测：正常任务完成无误拦，原攻击读取凭据前 ASK、外发 0 字节。当前真实运行使用算力机；Windows 英文模型尚未完整下载，配置为 remote_only，不会回退多语言版。49 项 Python 测试通过。
 
 ## 环境与启动
 
 需要 Python 3.11+、Node 22.19+ 和全局安装的 `@earendil-works/pi-coding-agent` 0.85.1。本机已具备，不需要重装。启动器核对 Pi 版本；升级前需要重新验证接口。
 
-本机已经具备核心和原版模型运行依赖。新机器分别参考 `requirements-core.txt` 与 `requirements-laya.txt`。运行 `python prepare_laya.py` 下载官方固定 revision 并校验权重摘要，文件和本地路径配置保存在忽略目录。模型不随 Git 提交；原版权重不会自动换成旧小分类器。官方加载器会修补 tokenizer 配置，因此运行时使用独立配置副本，保持已校验的原文件不变。
+本机已经具备核心和模型运行依赖，但当前英文权重只在算力机完整部署。新机器分别参考 `requirements-core.txt` 与 `requirements-laya.txt`。运行 `python prepare_laya.py --checkpoint english` 下载官方固定 revision 并校验权重摘要，文件和本地路径配置保存在忽略目录。模型不随 Git 提交；原版权重不会自动换成旧小分类器。官方加载器会修补 tokenizer 配置，因此运行时使用独立配置副本，保持已校验的原文件不变。
 
 在本目录使用 PowerShell：
 
