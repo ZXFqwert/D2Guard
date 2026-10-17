@@ -1,4 +1,4 @@
-"""Evidence-first D2 core. Only compressed facts cross the original Laya boundary."""
+"""Evidence-first core: deterministic facts and short model text views stay separate."""
 import json
 import queue
 import threading
@@ -10,11 +10,13 @@ from urllib.parse import urlsplit
 
 import httpx
 from original_laya import OriginalLaya
-from .compression import action, canonical, clauses, grant, sensitive, fast_view
+from .compression import action, canonical, clauses, grant, sensitive
 from .ledger import FingerprintLedger
 from .store import EvidenceStore, digest, encode
 from .policy import HardPolicies
 from .review import validate_assessment
+from .decision import decide as table_decide, required_questions
+from .views import build_view, InputBudgetExceeded
 
 
 class CoreV2:
@@ -31,12 +33,13 @@ class CoreV2:
         emit('decisions.jsonl',{'type':'core_started','engine':'d2v2','protection':enabled,
             'fast_model':getattr(self.fast,'metadata',{'backend':'test_injected'}),
             'compression':'bounded-rule-extractor-v2 operation-target relations; not universal semantic extraction',
-            'limits':{'hot_taints':8,'recent_steps':8,'fast_payload_bytes':12288,'fast_tokens':2048}})
+            'limits':{'hot_taints':8,'recent_steps':8,'view_tokens':320,'fast_tokens':512}})
 
     def state(self):
         return {'authority_anchor':self.anchor,'active_taints':list(self.taints),
             'secret_exposure':self.ledger.summary(),'recent_steps':self.store.recent(),
-            'coverage_incomplete':self.integrity_fault}
+            'coverage_incomplete':self.integrity_fault,
+            'contexts':{r[0]:self.store.context(r[0]) for r in self.store.db.execute('SELECT agent FROM contexts')}}
 
     def _sequence(self,event):
         if 'producer_seq' not in event:return
@@ -81,6 +84,14 @@ class CoreV2:
             else:raw=encode({k:v for k,v in event.items() if k not in {'event_id','producer_seq'}})
             ref,new=self._archive(event,kind,source,uri,raw)
             if not new:return
+            self.store.add_labels(agent)
+            if kind=='agent_start' and agent!='main':
+                parent=self.store.db.execute('SELECT agent FROM calls WHERE id=?',
+                    (event.get('parent_call_id'),)).fetchone()
+                if parent:
+                    self.store.inherit_context(agent,parent['agent'],ref['event_id'])
+                else:
+                    self.integrity_fault=True
             if event.get('parent_call_id'):
                 self.store.edge('call:'+event['parent_call_id'],'event:'+ref['event_id'],'CHILD_OBSERVATION',ref['event_id'])
             if kind in {'tool_result','tool_outcome'} and event.get('call_id'):
@@ -97,6 +108,7 @@ class CoreV2:
             elif kind in {'tool_result','mcp_description'}:
                 directives,incomplete=clauses(raw,ref)
                 ids=self.ledger.register(raw,ref,uri) if not event.get('is_error') else []
+                self.store.add_labels(agent,integrity=[ref['event_id']],confidentiality=ids)
                 for item in directives:
                     item['source_type']=source;item['source_uri']=uri
                     if hasattr(self.fast,'token_span'):
@@ -108,11 +120,10 @@ class CoreV2:
                         try:target=canonical(relation['target'])
                         except ValueError:incomplete=True;continue
                         op=relation['op']
-                        self.store.db.execute('INSERT OR IGNORE INTO taints VALUES(?,?,?,?,?)',
-                            (item['taint_id']+':'+digest(op+target)[:12],ref['event_id'],op,target,encode(item)))
+                        self.store.add_directive(op,target,item)
                     self.taints.append(item)
                 delta.update(event_kind='UNTRUSTED_OBSERVATION',directive_clauses=directives[:8],
-                    secrets_registered=ids[:8],coverage_incomplete=incomplete or len(directives)>8,
+                    secrets_registered=ids[:8],coverage_incomplete=incomplete,view_omitted_directives=max(0,len(directives)-8),
                     is_error=bool(event.get('is_error')))
                 # All clauses stay queryable on disk even if hot view omits them.
                 if incomplete:self.integrity_fault=True
@@ -182,14 +193,8 @@ class CoreV2:
             delta=action(tool,args);delta.update(call_id=cid,actor=agent,evidence_ref=ref)
             name=delta['tool'];target=delta['target'];op=delta['op']
             scope=target in self.anchor.get('read' if name=='fs.read' else 'write',[]) if name!='net.fetch' else op+' '+target in self.anchor.get('net',[])
-            candidates=[]
-            # Apply relevance filters before the budget: quoted/wrong-op rows must
-            # not consume the first nine slots and hide a real matching source.
-            for row in self.store.db.execute('''SELECT DISTINCT data FROM taints
-                    WHERE target=? AND op IN (?,?)
-                    AND json_extract(data,'$.clause_kind')='candidate_instruction' LIMIT 9''',
-                    (target,name,name+':'+op)):
-                candidates.append(json.loads(row[0]))
+            directive_op=name+':'+op if name=='net.fetch' else name
+            candidates=self.store.matching_directives(directive_op,target)
             domain=urlsplit(target).hostname or '' if name=='net.fetch' else ''
             hits,groups=self.ledger.match(args,domain)
             delta.update(in_user_granted_scope=scope,matches_untrusted_taint=candidates[:8],
@@ -199,57 +204,67 @@ class CoreV2:
                 self.store.edge('event:'+item['evidence_ref']['event_id'],'call:'+cid,'SUSPECTED_INDUCE',item['evidence_ref']['event_id'])
             if self.anchor.get('evidence_ref'):
                 self.store.edge('event:'+self.anchor['evidence_ref']['event_id'],'call:'+cid,'AUTHORITY_REFERENCE',self.anchor['evidence_ref']['event_id'])
-            policy=None;reason='';verdict='ALLOW';trace={'model_used':False,'reason':'L0_short_circuit'}
+            trace={'model_used':False,'reason':'L0_short_circuit'}
             hard_policy,hard_reason=self.hard.check(name,args,self.anchor.get('intent_mode')=='READONLY_REVIEW',hits)
-            if self.pending:
-                verdict='ASK';policy='POL-SESSION-HOLD';reason='会话已有未决 ASK，后续动作均保持暂停。'
-            elif hard_policy:
-                verdict='BLOCK';policy=hard_policy;reason=hard_reason
-            elif not delta['valid_target']:
-                policy='POL-PATH-INVALID';verdict='BLOCK';reason='目标路径无效或越出工作区。'
+            if not delta['valid_target']:
+                hard_policy,hard_reason='POL-PATH-INVALID','目标路径无效或越出工作区。'
             elif name=='fs.write' and (sensitive(target) or self.anchor.get('intent_mode')=='READONLY_REVIEW'):
-                policy='POL-FS-WRITE-SENSITIVE';verdict='BLOCK';reason='写入敏感资产或违反只读授权。'
-            elif hits and name in {'net.fetch','spawn_subagent','mcp.call','fs.write'}:
-                policy='POL-NET-SECRET-EXFIL' if name=='net.fetch' else 'POL-SUBAGENT-SECRET-LEAK' if name=='spawn_subagent' else 'POL-SECRET-DISCLOSURE'
-                verdict='BLOCK';reason='参数命中已登记的敏感凭据指纹，禁止跨边界披露。'
-            elif self.integrity_fault or self.anchor.get('coverage_incomplete') or delta['coverage_incomplete'] or len(candidates)>8:
-                policy='POL-INCOMPLETE-EVIDENCE';verdict='ASK';reason='事件链或安全提取不完整，不能可靠确认本次操作。'
+                hard_policy,hard_reason='POL-FS-WRITE-SENSITIVE','写入敏感资产或违反只读授权。'
+            elif hits and name=='fs.write':
+                hard_policy,hard_reason='POL-SECRET-DISCLOSURE','禁止将已登记机密写入业务产物。'
+            ctx=self.store.context(agent)
+            readonly_mcp=name=='mcp.call' and args=={'name':'project_facts'}
+            low_risk=(name=='fs.read' or readonly_mcp or
+                name=='net.fetch' and op=='GET' and not urlsplit(target).query and not args.get('body'))
+            sink=name in {'net.fetch','spawn_subagent'} or name=='mcp.call' and not readonly_mcp
+            facts={'hard_policy':hard_policy,'hard_reason':hard_reason,
+                'secret_hit':bool(hits),'untrusted_sink':sink,
+                'context_secret':bool(ctx['confidentiality']),'literal_scope':scope,
+                'sensitive':delta['sensitive_target'],'directive':bool(candidates),
+                'tainted':bool(ctx['integrity']),'low_risk':low_risk and not delta['sensitive_target'],
+                'high_risk':not low_risk or delta['sensitive_target']}
+            answers={}
+            if self.pending:
+                verdict,policy,risk,reason='ASK','POL-SESSION-HOLD','R2','会话已有未决 ASK，后续动作均保持暂停。'
+            elif not hard_policy and (self.integrity_fault or self.anchor.get('coverage_incomplete') or delta['coverage_incomplete']):
+                verdict,policy,risk,reason='ASK','POL-INCOMPLETE-EVIDENCE','R2','事件链或安全提取不完整，不能可靠确认本次操作。'
             else:
-                if len(encode({'previous_security_state':previous,'security_delta':delta}).encode())>12288:
-                    verdict='ASK';policy='POL-INPUT-BUDGET';reason='安全视图超出预算，已停止操作，未截断后放行。'
-                else:
-                    label=self.fast.classify_security(fast_view(previous),fast_view(delta));trace=dict(self.fast.last_trace)
-                    if not trace.get('model_used'):
-                        verdict='ASK';policy='POL-FAST-UNAVAILABLE';reason='原版快镜推理失败或输入截断，已挂起而非启发式冒充模型。'
-                    elif candidates and not scope and label.action_alignment.value=='deviant' and (delta['sensitive_target'] or name=='fs.write' or (name=='net.fetch' and op!='GET')):
-                        verdict='ASK' if name=='fs.read' else 'BLOCK';policy='POL-D1-D2-INDUCED-ACTION'
-                        reason='原版快镜判定偏离授权，且安全链关联到外部诱导目标；已在副作用前控制。'
-                    elif candidates and not scope and trace.get('answers',{}).get('taint_followed',{}).get('noul',0)>=.5 and (delta['sensitive_target'] or name=='fs.write' or (name=='net.fetch' and op!='GET')):
-                        verdict='ASK';policy='POL-D1-D2-SEMANTIC-CONFLICT'
-                        reason='快镜提示可能跟随不可信指令，但动作对齐输出未判为偏离；结合安全链中未获明确授权的高风险目标，已挂起等待用户决定。概率未校准，不作为放行依据。'
-                    elif delta['sensitive_target'] and not scope:
-                        verdict='ASK';policy='POL-SENSITIVE-READ-AUTH';reason='访问用户未明确授权的敏感资产。'
-                        if candidates:reason+=' 目标与低信任来源的诱导指令相符；这属于关联证据，不等于已证明因果。'
-                    elif scope and not hits and name in {'fs.read','fs.write','net.fetch'}:
-                        reason='结构化动作与真实用户授权目标一致，未命中敏感披露策略。'
-                    elif name=='net.fetch' and op=='GET' and not urlsplit(target).query and not delta['sensitive_target']:
-                        reason='允许无请求体的普通只读辅助访问；仍受实验网络边界约束。'
-                    elif name=='fs.read' and not delta['sensitive_target']:
-                        reason='允许工作区普通文件的只读辅助访问。'
-                    elif name=='mcp.call' and args == {'name':'project_facts'}:
-                        reason='允许配置明确限制为无参数只读查询的本地 MCP 工具。'
-                    elif name=='spawn_subagent' and not hits and label.action_alignment.value in {'expected','ancillary'}:
-                        reason='允许不含凭据的辅助子任务，子 Agent 继承主任务授权边界。'
-                    else:
-                        verdict='ASK';policy='POL-UNCONFIRMED-ACTION';reason='动作的授权或语义安全性未确认，需要用户决定。'
+                questions=required_questions(facts)
+                try:
+                    if questions:
+                        task=self.store.backtrack(self.anchor['evidence_ref'],max_chars=2**31)['excerpt']
+                        statement=self.store.db.execute("SELECT raw FROM events WHERE agent=? AND kind='assistant_turn' ORDER BY created DESC LIMIT 1",(agent,)).fetchone()
+                        view_state={'task_text':self.ledger.redact(task),
+                            'count_tokens':self.fast.count_tokens,
+                            'directive_sentences':[self.ledger.redact(self.store.backtrack(x['evidence_ref'],max_chars=2**31)['excerpt']) for x in candidates],
+                            'agent_statement':self.ledger.redact(json.loads(statement[0]).get('public_text','')) if statement else ''}
+                        # Include semantic task/arguments for non-file actions, never secret values.
+                        view_action={**delta,'target':self.ledger.redact(target)}
+                        if name=='spawn_subagent':view_action['target']=self.ledger.redact(args.get('task',''))
+                        if name=='mcp.call':view_action['target']=self.ledger.redact(encode(args))
+                        views={q:build_view(q,view_action,view_state) for q in questions}
+                        answers=self.fast.answer_questions(views)
+                        trace=dict(self.fast.last_trace)
+                        if not trace.get('model_used'):
+                            if trace.get('budget_exceeded'):raise InputBudgetExceeded('Model input exceeds total budget')
+                            raise RuntimeError('Fast model unavailable')
+                    verdict,policy,risk,reason=table_decide(facts,answers)
+                except InputBudgetExceeded:
+                    verdict,policy,risk,reason='ASK','POL-INPUT-BUDGET','R2','问题视图或完整模型输入超出预算，未截断后放行。'
+                    trace={**trace,'model_used':False,'budget_exceeded':True}
+                except (RuntimeError,AttributeError,ValueError,KeyError) as exc:
+                    verdict,policy,risk,reason='ASK','POL-FAST-UNAVAILABLE','R2','快镜或 tokenizer 不可用，已挂起。'
+                    trace={**trace,'error_type':type(exc).__name__}
             would=verdict
             if not self.enabled:verdict='ALLOW';reason='防护关闭；仅记录拟裁决，不改变 Agent 的工具操作。'
             result={'verdict':verdict,'policy':policy,'would_verdict':would,'reason':reason,'engine':'d2v2',
-                'fast':trace,'evidence':{'source_uri':candidates[0]['source_uri'] if candidates else '',
+                'rule_id':policy,'risk':risk,'fast':trace,'evidence':{'source_uri':candidates[0]['source_uri'] if candidates else '',
                     'evidence_refs':[self.anchor.get('evidence_ref'),*[x['evidence_ref'] for x in candidates[:3]],ref],
                     'security_delta':delta},'approval_status':'pending' if verdict=='ASK' else 'not_required',
                 'slow':{'triggered':False,'role':'advisory_only','synchronous_wait_ms':0}}
-            result['decision_basis']='D1_and_D2' if policy in {'POL-D1-D2-INDUCED-ACTION','POL-D1-D2-SEMANTIC-CONFLICT'} else 'deterministic_security_facts'
+            result['decision_basis']='calibrated_model_and_facts' if policy in {'DT-4c','DT-4d'} or policy=='DT-4b' and would=='ALLOW' else 'deterministic_security_facts'
+            result['decision_facts']=facts
+            result['model_answers']=answers
             if verdict in {'ASK','BLOCK'}:
                 pack=self._evidence_pack(result,previous)
                 try:self.reviews.put_nowait((cid,pack));result['slow']['triggered']=True
@@ -268,9 +283,16 @@ class CoreV2:
                 **result,'local_latency_ms':(time.perf_counter()-start)*1000})
             return result
 
+    def _protocol_refs(self,cid):
+        row=self.store.db.execute('SELECT proposal_ref FROM calls WHERE id=?',(cid,)).fetchone()
+        if not row or not row[0]:return []
+        ev=self.store.db.execute('SELECT id,sha,raw FROM events WHERE id=?',(row[0],)).fetchone()
+        return [{'event_id':ev['id'],'sha256':ev['sha'],'char_span':[0,len(ev['raw'])]}]
+
     def _hold(self,cid,policy,reason):
         result={'verdict':'ASK' if self.enabled else 'ALLOW','policy':policy,'reason':reason,
-            'engine':'d2v2','evidence':{},'fast':{'model_used':False},'approval_status':'pending'}
+            'rule_id':policy,'risk':'R2','would_verdict':'ASK',
+            'engine':'d2v2','evidence':{'evidence_refs':self._protocol_refs(cid)},'fast':{'model_used':False},'approval_status':'pending' if self.enabled else 'not_required'}
         if self.enabled:self.pending=result
         self.emit('decisions.jsonl',{'type':'protocol_hold','call_id':cid,**result})
         return result

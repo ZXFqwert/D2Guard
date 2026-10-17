@@ -1,8 +1,12 @@
-# D2Guard 新主线
+# 双镜 D²Guard 当前开发主线
+
+阶段 A 已通过四组真实矩阵及远端/本地核验（`matrix-20261017-093219`），现停在确认点，未开始阶段 B。
+
+当前方案见 [整体设计](docs/整体设计文档.md)；当前执行状态见 [阶段 A 报告](docs/14-stage-a-report.md)；资源与目录见 [项目地图](docs/00-project-map.md)。下方历史运行数字保留为先前版本记录，不作为阶段 A 验收。
 
 采用真实 Pi CLI 建立可重复的智能体攻防实验。模型自主提出工具调用，独立 HTTP 服务记录事件并决定是否阻断，判分器依据真实文件和接收回执计算结果。模型失败和攻击失败原样保存。
 
-当前围绕一条真实成功的攻击验证核心，暂停扩充场景和前端。默认 `--engine d2v2` 使用新蓝图实现：不可变原文证据库、安全分量提取、有界状态视图、官方原版 Laya、五条 YAML 硬策略、按引用取证的异步慢镜、本地流式 API 网关和真实 MCP stdio 桥。`--engine d2core` 与 `--engine m1` 保留用于复现旧结果。
+当前围绕一条真实成功的攻击验证核心，暂停扩充场景和前端。默认 `--engine d2v2` 使用新蓝图实现：不可变原文证据库、安全分量提取、持久安全账本与有界问题视图、官方原版 Laya、五条 YAML 硬策略、按引用取证的异步慢镜、本地流式 API 网关和真实 MCP stdio 桥。`--engine d2core` 与 `--engine m1` 保留用于复现旧结果。
 
 目前支持受限文件读写、真实本地 HTTP、一层 Pi 子 Agent，以及一个配置固定的只读 MCP 服务。通用远端 MCP/HTTP MCP、多层子 Agent、跨会话记忆、审批恢复、完整 OS 隔离、任意命令和前端仍未完成。可运行闭环不等于 D1 精度、性能或赛题整体验收通过。
 
@@ -56,7 +60,7 @@ python lab.py run --task 'Read README.md and write summary.md describing Aster T
 - `workspace/summary.md`：模型实际生成的业务产物。
 - `result.json`：任务检查、攻击后果、阻断及运行错误，指标分别报告。
 - `evidence_store.jsonl` / `state.sqlite3`：原文证据、哈希、位置引用和持久化风险索引；原文仅留在受控的忽略运行目录。
-- `security_chain.jsonl`：安全增量和有界状态视图，不含业务正文或完整工具参数。
+- `security_chain.jsonl`：安全增量和账本审计快照；完整账本不以 8 条视图上限截断。
 - `decisions.jsonl`：L0 与原版 Laya 各自输出、裁决依据、脱敏取证包及异步慢镜结果。
 - `gateway.jsonl`：模型请求/响应计数、内容哈希及 DLP 改动，不记录 API 密钥。
 - SQLite 的 `nodes` / `edges` / `steps`：真实来源、MCP 节点、工具调用与时序；候选关联和模型评估不标成已证明因果。

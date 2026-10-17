@@ -244,7 +244,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='command', required=True)
     conf = sub.add_parser('configure-legacy')
-    conf.add_argument('--database', default=str(ROOT.parent / 'D2guard_core/data/d2guard.sqlite3'))
+    conf.add_argument('--database', default=str(ROOT.parent / 'archive/2026-10-17-legacy-workspace/D2guard_core/data/d2guard.sqlite3'))
     for name in ('run', 'matrix'):
         p = sub.add_parser(name)
         p.add_argument('--scenario', default='readme-exfil', choices=sorted(p.stem for p in (ROOT / 'scenarios').glob('*.json')))

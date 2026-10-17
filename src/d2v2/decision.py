@@ -1,0 +1,60 @@
+"""Design §4.4, first matching row. No IO, model calls or mutable state.
+
+Model answers must explicitly carry calibrated=True and threshold_passed=True.
+Uncalibrated baseline probabilities (including NOUL) never grant authority.
+Protocol/session/incomplete-input guards are separate from the semantic table.
+"""
+
+
+def answer(answers, question):
+    value = answers.get(question, {})
+    if value.get('calibrated') is True and value.get('threshold_passed') is True:
+        return value.get('label', 'unclear')
+    return 'unclear'
+
+
+def required_questions(facts):
+    if (facts.get('hard_policy') or facts.get('secret_hit') and facts.get('untrusted_sink')
+            or facts.get('context_secret') and facts.get('untrusted_sink')
+            or facts.get('literal_scope')
+            or facts.get('sensitive') and facts.get('directive')):
+        return ()
+    if facts.get('sensitive') or facts.get('low_risk'):
+        return ('A1',)
+    if facts.get('high_risk') and facts.get('tainted'):
+        return ('A1', 'A2')
+    return ()
+
+
+def decide(facts, model_answers):
+    """Return (verdict, rule_id, risk, reason); identifiers map to table rows."""
+    if facts.get('hard_policy'):
+        return 'BLOCK', facts['hard_policy'], 'R3', facts.get('hard_reason') or '命中硬策略（§4.4 第 1 条）。'
+    if facts.get('secret_hit') and facts.get('untrusted_sink'):
+        return 'BLOCK', 'DT-2a', 'R3', '参数命中机密指纹，禁止向不可信边界披露。'
+    if facts.get('context_secret') and facts.get('untrusted_sink'):
+        return 'ASK', 'DT-2b', 'R2', '上下文含机密，外发内容可能经过编码或分片，需要用户确认。'
+    if facts.get('literal_scope'):
+        return 'ALLOW', 'DT-3', 'R0', '动作在用户字面授权内，未命中机密外流条件。'
+    if facts.get('sensitive') and facts.get('directive'):
+        return 'ASK', 'DT-4a', 'R2', '未授权敏感动作命中外部指令索引；这是关联证据，不是因果证明。'
+    a1, a2 = answer(model_answers, 'A1'), answer(model_answers, 'A2')
+    if facts.get('sensitive'):
+        if a1 == 'direct':
+            return 'ALLOW', 'DT-4b', 'R1', 'A1 经校准确认动作是任务直接需要。'
+        return 'ASK', 'DT-4b', 'R2', '未授权敏感动作缺少经校准的直接任务需要证据。'
+    if facts.get('high_risk') and facts.get('tainted'):
+        if a2 == 'external' or a1 == 'unrelated':
+            return 'ASK', 'DT-4c', 'R2', '经校准语义结果表明高风险动作偏离任务或由外部要求驱动。'
+        if a1 in {'direct', 'ancillary'} and a2 == 'user':
+            return 'ALLOW', 'DT-4c', 'R1', 'A1 与 A2 均经校准支持任务内动作。'
+    if facts.get('low_risk') and a1 != 'unclear':
+        if a1 == 'unrelated':
+            return 'ASK', 'DT-4d', 'R1', 'A1 经校准判定该低风险动作与任务无关。'
+        if a1 in {'direct', 'ancillary'}:
+            return 'ALLOW', 'DT-4d', 'R0', 'A1 经校准支持低风险任务动作。'
+    if facts.get('unknowns') and facts.get('high_risk'):
+        return 'ASK', 'DT-5', 'R2', '高风险动作涉及尚未解析的外部指令。'
+    if facts.get('low_risk'):
+        return 'ALLOW', 'DT-6', 'R0', '语义结果 unclear；允许低风险动作并记录不确定性。'
+    return 'ASK', 'DT-6', 'R2', '语义结果 unclear，不能确认高风险或未知动作。'

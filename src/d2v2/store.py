@@ -22,9 +22,15 @@ class EvidenceStore:
         PRAGMA journal_mode=WAL;
         CREATE TABLE IF NOT EXISTS events(id TEXT PRIMARY KEY, agent TEXT, kind TEXT,
             source TEXT, uri TEXT, raw TEXT, sha TEXT, metadata TEXT, created REAL);
+        CREATE INDEX IF NOT EXISTS latest_agent_event ON events(agent,kind,created DESC);
         CREATE TABLE IF NOT EXISTS deltas(event_id TEXT PRIMARY KEY, delta TEXT);
         CREATE TABLE IF NOT EXISTS taints(id TEXT PRIMARY KEY,event_id TEXT,op TEXT,target TEXT,data TEXT);
         CREATE INDEX IF NOT EXISTS taint_target ON taints(target,op);
+        CREATE TABLE IF NOT EXISTS directives(key TEXT,id TEXT,event_id TEXT,data TEXT,
+            PRIMARY KEY(key,id));
+        CREATE TABLE IF NOT EXISTS contexts(agent TEXT PRIMARY KEY,parent TEXT,spawned_at TEXT);
+        CREATE TABLE IF NOT EXISTS context_labels(agent TEXT,kind TEXT,label TEXT,
+            PRIMARY KEY(agent,kind,label));
         CREATE TABLE IF NOT EXISTS calls(id TEXT PRIMARY KEY,agent TEXT,args_hash TEXT,
             proposal_ref TEXT,decision TEXT,status TEXT);
         CREATE TABLE IF NOT EXISTS secret_chunks(secret_id TEXT, encoding TEXT, fp TEXT,
@@ -45,7 +51,47 @@ class EvidenceStore:
         CREATE TRIGGER IF NOT EXISTS immutable_events_delete BEFORE DELETE ON events
             BEGIN SELECT RAISE(ABORT,'evidence is immutable'); END;
         ''')
+        # Migrate historical indexes without dropping their audit representation.
+        self.db.execute('''INSERT OR IGNORE INTO directives
+            SELECT op || '|' || target,id,event_id,data FROM taints
+            WHERE json_extract(data,'$.clause_kind')='candidate_instruction' ''')
         self.db.commit()
+
+    def context(self, agent):
+        row = self.db.execute('SELECT parent,spawned_at FROM contexts WHERE agent=?',(agent,)).fetchone()
+        result = {'integrity': [], 'confidentiality': []}
+        for item in self.db.execute('SELECT kind,label FROM context_labels WHERE agent=? ORDER BY kind,label',(agent,)):
+            result[item['kind']].append(item['label'])
+        if row and row['parent']:
+            result.update(parent=row['parent'], spawned_at=row['spawned_at'])
+        return result
+
+    def add_labels(self, agent, integrity=(), confidentiality=()):
+        self.db.execute('INSERT OR IGNORE INTO contexts(agent) VALUES(?)',(agent,))
+        for kind, labels in (('integrity',integrity),('confidentiality',confidentiality)):
+            self.db.executemany('INSERT OR IGNORE INTO context_labels VALUES(?,?,?)',
+                               ((agent,kind,label) for label in labels))
+
+    def inherit_context(self, agent, parent, event_id):
+        old = self.db.execute('SELECT parent FROM contexts WHERE agent=?',(agent,)).fetchone()
+        if old and old['parent'] and old['parent'] != parent:
+            raise ValueError('Agent parent identity changed')
+        self.db.execute('INSERT INTO contexts VALUES(?,?,?) ON CONFLICT(agent) DO UPDATE SET '
+                        'parent=excluded.parent,spawned_at=COALESCE(contexts.spawned_at,excluded.spawned_at)',
+                        (agent,parent,event_id))
+        labels = self.context(parent)
+        self.add_labels(agent, labels['integrity'], labels['confidentiality'])
+
+    def add_directive(self, op, target, item):
+        item_id = item['taint_id'] + ':' + digest(op + target)[:12]
+        self.db.execute('INSERT OR IGNORE INTO directives VALUES(?,?,?,?)',
+                        (op+'|'+target,item_id,item['evidence_ref']['event_id'],encode(item)))
+        self.db.execute('INSERT OR IGNORE INTO taints VALUES(?,?,?,?,?)',
+                        (item_id,item['evidence_ref']['event_id'],op,target,encode(item)))
+
+    def matching_directives(self, op, target, limit=8):
+        return [json.loads(row[0]) for row in self.db.execute(
+            'SELECT data FROM directives WHERE key=? ORDER BY id LIMIT ?', (op+'|'+target,limit))]
 
     def put(self, event_id, agent, kind, source, uri, raw, metadata=None):
         sha = digest(raw)

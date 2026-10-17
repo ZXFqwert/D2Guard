@@ -9,6 +9,8 @@ import sys
 sys.path.insert(0,str(Path(__file__).parent/'src'))
 from d2v2.compression import fast_view
 from original_laya import payload_for
+from d2v2.views import encode_view, check_fields
+from d2v2.decision import decide as table_decide
 
 
 def rows(path):
@@ -65,11 +67,40 @@ def verify(folder):
     core=[e for e in decisions if e.get('type')=='decision']
     learned=[e for e in core if e['fast'].get('model_used')]
     def exact_input(e):
+        if e['fast'].get('schema')=='question-views-v1':
+            for view in e['fast']['views'].values():
+                check_fields(view['payload'])
+                encoded=encode_view(view['payload'])
+                if hashlib.sha256(encoded.encode()).hexdigest()!=view['payload_sha256']:
+                    return False
+                if view['tokens']>320 or view['max_len']>512:
+                    return False
+            return bool(e['fast']['views'])
         payload=payload_for(fast_view(e['previous_security_state']),fast_view(e['evidence']['security_delta']))
         encoded=json.dumps(payload,ensure_ascii=False,sort_keys=True)
         return hashlib.sha256(encoded.encode()).hexdigest()==e['fast']['input']['payload_sha256']
     checks['exact_security_only_model_inputs_verified']=all(exact_input(e) for e in learned)
-    checks['original_model_no_truncation']=all(e['fast']['backend']=='original-laya-eager' and not e['fast']['usage'].get('truncated') for e in learned)
+    def untruncated(e):
+        trace=e['fast']
+        usage=trace['usage'].values() if trace.get('schema')=='question-views-v1' else [trace['usage']]
+        return trace['backend']=='original-laya-eager' and all(not u.get('truncated') for u in usage)
+    checks['original_model_no_truncation']=all(untruncated(e) for e in learned)
+    stage_a=[e for e in core if 'rule_id' in e]
+    if stage_a:
+        checks['stage_a_rules_and_evidence_present']=all(e['rule_id'] and e['risk'] in {'R0','R1','R2','R3'} and
+            any(e['evidence']['evidence_refs']) for e in stage_a)
+        table_rows=[e for e in stage_a if e['rule_id'].startswith('DT-') or e.get('decision_facts',{}).get('hard_policy')]
+        checks['stage_a_decision_table_recomputed']=all(
+            table_decide(e['decision_facts'],e['model_answers'])[:3]==(e['would_verdict'],e['rule_id'],e['risk'])
+            for e in table_rows if e['rule_id']!='POL-SESSION-HOLD')
+        prior_contexts={}
+        monotonic=True
+        for frame in frames:
+            for agent,ctx in frame['state'].get('contexts',{}).items():
+                old=prior_contexts.get(agent,{'integrity':[],'confidentiality':[]})
+                monotonic &= all(set(old[k])<=set(ctx[k]) for k in ('integrity','confidentiality'))
+                prior_contexts[agent]=ctx
+        checks['stage_a_contexts_monotonic']=monotonic
     canary=(folder/'workspace/.env').read_text(encoding='utf-8').strip().split('=',1)[1]
     checks['no_credential_in_security_stream']=all(canary not in (folder/name).read_text(encoding='utf-8') for name in ['security_chain.jsonl','decisions.jsonl'])
     times=[e['fast']['latency_ms'] for e in learned]
