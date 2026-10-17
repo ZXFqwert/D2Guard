@@ -1,6 +1,7 @@
 """Evidence-first core: deterministic facts and short model text views stay separate."""
 import json
 import queue
+import re
 import threading
 import time
 import uuid
@@ -114,9 +115,11 @@ class CoreV2:
                 tool=event['tool'];args=event.get('args',{})
                 source='MEMORY' if tool in {'memory_read','memory_write'} else 'WEB' if tool=='net_fetch' else 'SUBAGENT' if tool=='spawn_subagent' else 'MCP_RET' if tool=='mcp_call' else 'LOCAL_FILE'
                 uri=args.get('path') or args.get('url') or 'agent://'+agent+'/result'
-                if tool in {'memory_read','memory_write'}:uri='memory://local/'+args['key']
+                if tool in {'memory_read','memory_write'}:uri='memory://local/'+str(args.get('key',''))
                 if tool=='mcp_call':uri='mcp://'+event.get('server_id','local-docs')+'/'+args.get('name','unknown')
                 if tool=='fs_read':source=self.file_sources.get(args.get('path'),source)
+                if event.get('is_error') and event.get('error_origin','host')=='host':
+                    source='HOST_TOOL_ERROR'
             elif kind=='mcp_description':source='MCP_DESC';uri='mcp://'+event['server_id']+'/'+event['tool_name']
             elif kind=='memory_recall':source='MEMORY';uri='memory://local/'+event['key']
             elif kind=='assistant_turn':
@@ -157,7 +160,9 @@ class CoreV2:
                 self.store.db.execute('INSERT INTO grants(event_id,data) VALUES(?,?)',(ref['event_id'],encode(self.anchor)))
                 delta.update(event_kind='USER_GRANT',authorization=self.anchor)
             elif kind in {'tool_result','mcp_description','memory_recall'}:
-                delta.update(self._ingest_content(raw,ref,source,uri,agent,event.get('is_error',False)))
+                if source=='HOST_TOOL_ERROR':
+                    delta.update(event_kind='HOST_TOOL_ERROR',is_error=True,directive_clauses=[],unknowns=[])
+                else:delta.update(self._ingest_content(raw,ref,source,uri,agent,event.get('is_error',False)))
             elif kind=='subagent_spawn':
                 self.store.inherit_context(event['child_agent_id'],agent,ref['event_id'])
             elif kind=='subagent_end':
@@ -185,6 +190,8 @@ class CoreV2:
                 if kind=='tool_started' and (not row or not row['decision'] or row['status']!='ALLOW' or row['agent']!=agent):
                     self.integrity_fault=True
                     raise ValueError('Missing, consumed or wrong-actor execution authorization')
+                if kind=='tool_started' and json.loads(row['decision']).get('execution_allowed') is False:
+                    raise ValueError('Tool arguments rejected; execution is not authorized')
                 if row and row[0]:
                     decision=json.loads(row[0])
                     if decision['verdict'] in {'BLOCK','ASK'}:status=decision['verdict']
@@ -198,7 +205,7 @@ class CoreV2:
 
     def _ingest_content(self,raw,ref,source,uri,agent,is_error=False):
         sid=self.store.register_source(source,uri,digest(raw),ref['event_id'])
-        ids=self.ledger.register(raw,ref,uri) if not is_error else []
+        ids=self.ledger.register(raw,ref,uri)
         self.store.add_labels(agent,integrity=[sid],confidentiality=ids)
         cached=self.store.db.execute('SELECT data FROM source_analysis WHERE source_id=?',(sid,)).fetchone()
         if cached:
@@ -243,6 +250,14 @@ class CoreV2:
 
     def _decision_inputs(self,tool,args,agent):
         delta=action(tool,args);name=delta['tool'];target=delta['target'];op=delta['op']
+        if name=='fs.read':
+            delta['sensitive_target']=self.hard.sensitive_read(args.get('path',''))
+            # External reads are sensitive semantic actions, even if the executor
+            # subsequently rejects an unsupported path. Do not mislabel them R3.
+            if not delta['valid_target']:
+                from .normalization import target_view
+                target=target_view(args.get('path','')).replace('\\','/')
+                delta.update(target=target,valid_target=True)
         candidates=self.store.matching_directives(name+':'+op if name=='net.fetch' else name,target)
         domain=(urlsplit(target).hostname or '') if name=='net.fetch' else ''
         hits,groups=self.ledger.match(args,domain)
@@ -259,7 +274,7 @@ class CoreV2:
         elif hits and name in {'fs.write','memory.write'}:
             hard={'rule_id':'POL-SECRET-DISCLOSURE','reason':'禁止将已登记机密写入业务或记忆产物。'}
         readonly_mcp=name=='mcp.call' and args=={'name':'project_facts'}
-        sink=is_egress_sink(name,args)
+        sink=is_egress_sink(name,args,self.anchor.get('net',[]))
         low=name in {'fs.read','memory.read'} or readonly_mcp or name=='net.fetch' and not sink
         unknowns=self.store.relevant_unknowns(agent)
         facts={'hard_policy':hard['rule_id'] if hard else None,'hard_reason':hard['reason'] if hard else None,
@@ -314,7 +329,10 @@ class CoreV2:
             trace={'model_used':False,'reason':'L0_short_circuit'}
             hard_policy=facts['hard_policy']
             answers={}
-            if hard_policy:
+            argument_error=name.startswith('memory.') and (not isinstance(args.get('key'),str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,64}',args['key']))
+            if argument_error:
+                verdict,policy,risk,reason='ALLOW','TOOL-ARGUMENT-INVALID','R0','记忆键名不合法；参数校验拒绝执行，不是安全策略拦截。'
+            elif hard_policy:
                 verdict,policy,risk,reason=table_decide(facts,{})
             elif self.pending:
                 verdict,policy,risk,reason='ASK','POL-SESSION-HOLD','R2','会话已有未决 ASK，后续动作均保持暂停。'
@@ -357,6 +375,8 @@ class CoreV2:
                 'slow':{'triggered':False,'role':'advisory_only','synchronous_wait_ms':0}}
             result['decision_basis']='calibrated_model_and_facts' if policy in {'DT-4c','DT-4d'} or policy=='DT-4b' and would=='ALLOW' else 'deterministic_security_facts'
             result['decision_facts']=facts
+            result['execution_allowed']=not argument_error and verdict=='ALLOW'
+            result['argument_error']='invalid_memory_key' if argument_error else None
             result['model_answers']=answers
             result['policy_matches']=policy_matches
             result=self._security(result)
@@ -398,7 +418,7 @@ class CoreV2:
                 raise ValueError('Current state forbids approval')
             self.approvals.consume(token,call_id,ah,agent)
             result.pop('approval_token',None)
-            result.update(verdict='ALLOW',approval_status='approved_once',approval_override=True,
+            result.update(verdict='ALLOW',execution_allowed=True,approval_status='approved_once',approval_override=True,
                           original_rule_id=result['rule_id'],policy_matches_at_approval=matches)
             self.store.db.execute("UPDATE calls SET decision=?,status='ALLOW' WHERE id=?",(encode(result),call_id))
             self.store.db.commit();self.pending=None

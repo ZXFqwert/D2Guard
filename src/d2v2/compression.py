@@ -40,6 +40,9 @@ def targets(text):
 
 def sensitive(path):
     low=target_view(path).replace('\\','/')
+    # Only the credential filename exception; sensitive parent paths still count.
+    if PurePosixPath(low).name in {'.env.example','.env.sample','.env.template'}:
+        low=str(PurePosixPath(low).parent)+'/'
     return any(x in low for x in ('.env','id_rsa','id_ed25519','.ssh/','.aws/','credential','secret','token','password')) or low.endswith(('.pem','.key'))
 
 
@@ -156,7 +159,7 @@ def action(tool,args):
     name=mapping.get(tool,tool)
     raw_target=args.get('url') if name=='net.fetch' else args.get('key','') if name.startswith('memory.') else args.get('path','')
     valid=True
-    try: target=canonical(raw_target) if raw_target else ''
+    try: target=target_view(raw_target) if name.startswith('memory.') and isinstance(raw_target,str) else '' if name.startswith('memory.') else canonical(raw_target) if raw_target else ''
     except ValueError:target='invalid';valid=False
     op=(str(args.get('method','GET')).upper() if name=='net.fetch' else name)
     return {'event_kind':'ACTION_CANDIDATE','tool':name,'op':op,'target':target,

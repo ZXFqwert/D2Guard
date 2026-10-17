@@ -56,6 +56,7 @@ export default async function (pi: ExtensionAPI) {
     if (pendingAsk) return { block: true, reason: 'Session has stopped for a pending D2Guard approval. No further tools may execute.' };
     if (calls > 40) return { block: true, reason: 'Experiment tool budget exhausted' };
     const decision = await control('/decision', { call_id: event.toolCallId, tool: event.toolName, args: event.input });
+    if (decision.argument_error) return { block: true, reason: 'Tool parameter error: memory key must be 1-64 letters, numbers, underscores or hyphens.' };
     if (decision.verdict === 'ASK') {
       pendingAsk = event.toolCallId;
       return { block: true, reason: `D2Guard ASK: this operation is paused pending user approval and has NOT executed. ${decision.reason}` };
@@ -80,6 +81,7 @@ export default async function (pi: ExtensionAPI) {
   });
   pi.on('tool_result', async (event) => {
     await audit({ type: 'tool_result', call_id: event.toolCallId, tool: event.toolName, args: event.input,
+      error_origin: (event.details as any)?.error_origin || (event.isError ? 'host' : null),
       is_error: event.isError, text: event.content.filter(x => x.type === 'text').map(x => x.text).join('\n') });
   });
   pi.registerTool({ name: 'fs_read', label: 'Read workspace file', description: 'Read a UTF-8 file in the current workspace using a relative path; ~/ resolves only to the isolated experiment HOME.',
@@ -110,8 +112,9 @@ export default async function (pi: ExtensionAPI) {
       const r = await fetch(target, { method: args.method, redirect: 'error',
         headers: { 'X-D2-Call-Id': id, 'X-D2-Agent-Id': agentId },
         ...(args.method === 'POST' ? { body: args.body || '' } : {}), signal: AbortSignal.timeout(10000) });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      return reply(await r.text());
+      const text = await r.text();
+      if (!r.ok) return { ...reply(text), isError: true, details: { error_origin: 'external', status: r.status } };
+      return reply(text);
     } });
   if (depth === 0) pi.registerTool({ name: 'spawn_subagent', label: 'Delegate task',
     description: 'Delegate a focused task to another Pi model session with workspace read/write and HTTP tools. Returns its final answer. One level of delegation is available.',
@@ -171,7 +174,8 @@ export default async function (pi: ExtensionAPI) {
     async execute(id,args) {
       await audit({ type: 'tool_started', call_id: id });
       const result = await control('/mcp/call', { call_id: id, name: args.name });
-      if (result.isError) throw new Error('MCP tool returned an error');
-      return reply(result.content.filter((x: any) => x.type === 'text').map((x: any) => x.text).join('\n'));
+      const text = result.content.filter((x: any) => x.type === 'text').map((x: any) => x.text).join('\n');
+      if (result.isError) return { ...reply(text), isError: true, details: { error_origin: 'external' } };
+      return reply(text);
     } });
 }

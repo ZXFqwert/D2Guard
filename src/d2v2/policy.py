@@ -1,6 +1,8 @@
 """Validated, non-evaluating state-predicate DSL for the five safety policies."""
 import fnmatch
 import re
+from html import unescape
+from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urlsplit
 import yaml
@@ -52,11 +54,55 @@ def predicate(expr,facts):
     raise ValueError('Unknown predicate operator')
 
 
-def is_egress_sink(name,args):
+def autoload_urls(content):
+    """Resource references that renderers load; ordinary hyperlinks are excluded."""
+    urls=[]
+    class Resources(HTMLParser):
+        def handle_starttag(self,tag,attrs):
+            attrs=dict(attrs)
+            keys={'img':('src','srcset'),'script':('src',),'iframe':('src',),
+                  'audio':('src',),'video':('src','poster'),'source':('src','srcset'),
+                  'embed':('src',),'object':('data',),'input':('src',)}.get(tag,())
+            if tag=='link' and set(attrs.get('rel','').lower().split()) & {'stylesheet','preload','prefetch','icon'}:keys=('href',)
+            for key in keys:
+                value=attrs.get(key,'') or ''
+                urls.extend(x.strip().split()[0] for x in value.split(',') if x.strip()) if key=='srcset' else urls.append(value)
+    parser=Resources(convert_charrefs=True)
+    parser.feed(content)
+    # Markdown inline and reference-style images; optional angle brackets/titles.
+    urls.extend(re.findall(r'!\[[^\]]*\]\(\s*<?([^\s)>]+)',content))
+    definitions={k.strip().casefold():v for k,v in re.findall(r'^\s*\[([^\]]+)\]:\s*<?([^\s>]+)',content,re.M)}
+    for alt,key in re.findall(r'!\[([^\]]*)\]\[([^\]]*)\]',content):
+        urls.append(definitions.get((key or alt).strip().casefold(),''))
+    for alt in re.findall(r'!\[([^\]]+)\](?![\[(])',content):urls.append(definitions.get(alt.strip().casefold(),''))
+    urls.extend(re.findall(r'url\(\s*[\'\"]?([^\s)\'\"]+)',content,re.I))
+    urls.extend(re.findall(r'@import\s+[\'\"]([^\'\"]+)',content,re.I))
+    return list(dict.fromkeys(unescape(u) for u in urls if urlsplit(unescape(u)).hostname and urlsplit(unescape(u)).scheme in {'','http','https'}))
+
+
+def artifact_egress_urls(args,net_grants=()):
+    # A renderer performs GET; a POST grant never authorizes an automatic GET.
+    from .compression import canonical
+    suffix=Path(args.get('path','')).suffix.casefold()
+    if suffix not in {'.md','.markdown','.mdx','.html','.htm','.xhtml','.svg','.css'}:return []
+    content=args.get('content','')
+    # Literal code in Markdown does not trigger a renderer fetch.
+    if suffix in {'.md','.markdown','.mdx'}:
+        content=re.sub(r'(?ms)^\s*(`{3,}|~{3,})[^\n]*\n.*?^\s*\1\s*$','',content)
+        content=re.sub(r'(`+).*?\1','',content,flags=re.S)
+        content=re.sub(r'(?m)^(?: {4}|\t).*$', '',content)
+    content=re.sub(r'<!--.*?-->','',content,flags=re.S)
+    grants={g[4:] for g in net_grants if g.startswith('GET ')}
+    return [u for u in autoload_urls(content)
+            if canonical('https:'+u if u.startswith('//') else u) not in grants]
+
+
+def is_egress_sink(name,args,net_grants=()):
     if name=='net.fetch':
         return str(args.get('method','GET')).upper()!='GET' or bool(urlsplit(args.get('url','')).query) or bool(args.get('body'))
     if name=='spawn_subagent':return True
     if name=='mcp.call':return args!={'name':'project_facts'}
+    if name=='fs.write':return bool(artifact_egress_urls(args,net_grants))
     return False
 
 
@@ -150,3 +196,14 @@ class HardPolicies:
         matches=self.evaluate(name,args,readonly,hits)
         hard=next((m for m in matches if m['risk']=='R3'),None)
         return (hard['rule_id'],hard['reason']) if hard else (None,None)
+
+    def sensitive_read(self,value):
+        """Detection only: the executor retains its separate workspace boundary."""
+        text=target_view(value).replace('\\','/')
+        root=normalized_path(str(self.workspace),self.workspace)
+        resolved=normalized_path(text,self.workspace)
+        outside=(text.startswith('~') or resolved!=root and not resolved.startswith(root.rstrip('/')+'/'))
+        patterns=self.rules['POL-FS-WRITE-SENSITIVE']['when']['target.path matches']
+        protected=any(fnmatch.fnmatchcase(resolved,p) or
+                      p.endswith('/*') and fnmatch.fnmatchcase(resolved,p[:-2]) for p in patterns)
+        return sensitive(text) or outside or protected
