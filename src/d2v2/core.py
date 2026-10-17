@@ -26,7 +26,7 @@ from .memory import MemoryStore
 
 
 class CoreV2:
-    def __init__(self, enabled, folder, provider, emit, fast=None, memory_root=None):
+    def __init__(self, enabled, folder, provider, emit, fast=None, memory_root=None, content_fast=None):
         self.enabled=enabled;self.folder=Path(folder);self._emit_raw=emit;self.provider=provider
         self.lock=threading.RLock();self.store=EvidenceStore(self.folder)
         self.ledger=FingerprintLedger(self.store)
@@ -34,6 +34,10 @@ class CoreV2:
         source_extensions={'.py','.js','.ts','.tsx','.jsx','.c','.cpp','.h','.java','.go','.rs','.sh','.ps1'}
         self.initial_sources={canonical(p.relative_to(self.folder/'workspace').as_posix()) for p in (self.folder/'workspace').rglob('*') if p.is_file() and p.suffix.lower() in source_extensions}
         self.fast=fast or OriginalLaya(Path(__file__).resolve().parents[2]/'.local/laya.json')
+        self.content_fast=content_fast
+        # No environment/configuration means no S1. Loaded models observe only
+        # until a separately reviewed acceptance explicitly enables additions.
+        self.content_add_risk=False
         self.anchor={'version':0,'read':[],'write':[],'net':[],'coverage_incomplete':True}
         self.taints=deque(maxlen=8);self.pending=None;self.integrity_fault=False
         self.approvals=Approvals(self.store)
@@ -47,6 +51,7 @@ class CoreV2:
         self.reviews=queue.Queue(maxsize=8)
         threading.Thread(target=self._slow_worker,daemon=True,name='d2v2-evidence-review').start()
         emit('decisions.jsonl',{'type':'core_started','engine':'d2v2','protection':enabled,
+            'content_model':getattr(self.content_fast,'metadata',None),
             'fast_model':getattr(self.fast,'metadata',{'backend':'test_injected'}),
             'compression':'bounded-rule-extractor-v2 operation-target relations; not universal semantic extraction',
             'limits':{'hot_taints':8,'recent_steps':8,'view_tokens':320,'fast_tokens':512}})
@@ -117,7 +122,8 @@ class CoreV2:
                 uri=args.get('path') or args.get('url') or 'agent://'+agent+'/result'
                 if tool in {'memory_read','memory_write'}:uri='memory://local/'+str(args.get('key',''))
                 if tool=='mcp_call':uri='mcp://'+event.get('server_id','local-docs')+'/'+args.get('name','unknown')
-                if tool=='fs_read':source=self.file_sources.get(args.get('path'),source)
+                if tool=='fs_read':
+                    source='MEMORY' if self.hard.memory_storage_path(args.get('path','')) else self.file_sources.get(args.get('path'),source)
                 if event.get('is_error') and event.get('error_origin','host')=='host':
                     source='HOST_TOOL_ERROR'
             elif kind=='mcp_description':source='MCP_DESC';uri='mcp://'+event['server_id']+'/'+event['tool_name']
@@ -162,7 +168,19 @@ class CoreV2:
             elif kind in {'tool_result','mcp_description','memory_recall'}:
                 if source=='HOST_TOOL_ERROR':
                     delta.update(event_kind='HOST_TOOL_ERROR',is_error=True,directive_clauses=[],unknowns=[])
-                else:delta.update(self._ingest_content(raw,ref,source,uri,agent,event.get('is_error',False)))
+                else:
+                    if kind=='tool_result' and event['tool']=='fs_read' and source=='MEMORY':
+                        key=digest(self.hard.memory_storage_path(event['args']['path']))
+                        try:entry=self.memory.read(key)
+                        except FileNotFoundError:entry=None
+                        if entry:self._merge_memory_labels(entry,agent)
+                    delta.update(self._ingest_content(raw,ref,source,uri,agent,event.get('is_error',False)))
+                    if kind=='tool_result' and event['tool']=='fs_write' and not event.get('is_error'):
+                        path=self.hard.memory_storage_path(event.get('args',{}).get('path',''))
+                        if path:
+                            call=self.store.db.execute('SELECT * FROM calls WHERE id=?',(event.get('call_id'),)).fetchone()
+                            if call and call['agent']==agent and call['status'] in {'execution_started','execution_completed'} and call['args_hash']==digest(encode({'tool':'fs_write','args':event['args']})):
+                                self.memory.write(digest(path),event['args']['content'],self._memory_metadata(agent))
             elif kind=='subagent_spawn':
                 self.store.inherit_context(event['child_agent_id'],agent,ref['event_id'])
             elif kind=='subagent_end':
@@ -213,6 +231,17 @@ class CoreV2:
         else:
             directives,incomplete=clauses(raw,ref)
             unknowns=unknown_clauses(raw,ref)
+            s1=None
+            if self.content_fast is not None:
+                try:
+                    s1=self.content_fast.classify(raw,source)
+                    if self.content_add_risk and s1.get('calibrated') and s1.get('threshold_passed') and s1['label']=='to_agent':
+                        if not any(r['stance']=='requested' for d in directives for r in d['action_relations']) or incomplete:
+                            unknowns.append({'evidence_ref':{**ref,'char_span':[0,len(raw)]},
+                                       'reason':'Calibrated S1 to_agent without complete extracted relation',
+                                       'signal':'model:D2Guard-Laya:S1','s1':s1})
+                except (RuntimeError,ValueError) as exc:
+                    s1={'model_used':False,'error_type':type(exc).__name__,'fallback':'rule:DIRECTIVE'}
             for item in directives:
                 item.update(source_type=source,source_uri=uri,source_id=sid)
                 item['evidence_ref']=evidence_span(ref,raw,item['evidence_ref']['char_span'],self.fast)
@@ -238,11 +267,12 @@ class CoreV2:
                 norm['tokenizer']='original-laya:'+self.fast.metadata.get('revision','unknown')
             self.store.db.execute('INSERT INTO normalized_evidence VALUES(?,?)',(ref['event_id'],encode(norm)))
             structural=len(raw)>65536 or any(x['extraction_overflow'] for x in directives)
-            extracted={'directives':directives,'unknowns':unknowns,'structural_gap':structural,'coverage_incomplete':incomplete}
+            extracted={'directives':directives,'unknowns':unknowns,'structural_gap':structural,'coverage_incomplete':incomplete,'s1':s1}
             self.store.db.execute('INSERT INTO source_analysis VALUES(?,?)',(sid,encode(extracted)))
         self.taints.extend(extracted['directives'])
         if extracted['structural_gap']:self.integrity_fault=True
         return {'event_kind':'UNTRUSTED_OBSERVATION','source_id':sid,'source_type':source,
+                's1':extracted.get('s1'),
                 'evidence_ref':ref,'directive_clauses':extracted['directives'][:8],
                 'unknowns':extracted['unknowns'][:8],'secrets_registered':ids[:8],
                 'coverage_incomplete':extracted['coverage_incomplete'],
@@ -425,6 +455,25 @@ class CoreV2:
             self.emit('decisions.jsonl',{'type':'approval_consumed','call_id':call_id,**result})
             return result
 
+    def _memory_metadata(self,agent):
+        ctx=self.store.context(agent)
+        provenance=[]
+        for source in self.store.source_records(ctx['integrity']):
+            event=self.store.db.execute('SELECT e.* FROM events e JOIN source_events s ON s.event_id=e.id WHERE s.source_id=? LIMIT 1',(source['id'],)).fetchone()
+            if event:provenance.append(dict(event))
+        metadata={'integrity':ctx['integrity'],'confidentiality':ctx['confidentiality'],
+                  'sources':self.store.source_records(ctx['integrity']),'provenance':provenance,
+                  'writer_session':self.approvals.session}
+        if len(encode(metadata).encode())>2097152:raise ValueError('Memory provenance exceeds 2 MiB; no labels dropped')
+        return metadata
+
+    def _merge_memory_labels(self,entry,agent):
+        for old in entry.get('provenance',[]):
+            imported='memory-import:'+digest(encode([entry['writer_session'],old['id']]))
+            ref,_=self.store.put(imported,agent,'MEMORY_PROVENANCE',old['source'],old['uri'],old['raw'],{'original_event_id':old['id'],'writer_session':entry['writer_session']})
+            self._ingest_content(old['raw'],ref,old['source'],old['uri'],agent)
+        self.store.add_labels(agent,entry.get('integrity',[]),entry.get('confidentiality',[]))
+
     def dispatch_memory(self,tool,args,call_id,agent='main'):
         """Consume a bound execution permit before touching host-owned memory."""
         with self.lock:
@@ -437,23 +486,10 @@ class CoreV2:
                 raise ValueError('Memory dispatch replay')
             self.store.db.commit()
             if tool=='memory_write':
-                ctx=self.store.context(agent)
-                provenance=[]
-                for source in self.store.source_records(ctx['integrity']):
-                    event=self.store.db.execute('SELECT e.* FROM events e JOIN source_events s ON s.event_id=e.id WHERE s.source_id=? LIMIT 1',(source['id'],)).fetchone()
-                    if event:provenance.append(dict(event))
-                metadata={'integrity':ctx['integrity'],'confidentiality':ctx['confidentiality'],
-                          'sources':self.store.source_records(ctx['integrity']),'provenance':provenance,
-                          'writer_session':self.approvals.session}
-                if len(encode(metadata).encode())>2097152:raise ValueError('Memory provenance exceeds 2 MiB; no labels dropped')
-                self.memory.write(args['key'],args['content'],metadata)
+                self.memory.write(args['key'],args['content'],self._memory_metadata(agent))
                 return {'text':'Saved memory '+args['key']}
             entry=self.memory.read(args['key'])
-            for old in entry.get('provenance',[]):
-                imported='memory-import:'+digest(encode([entry['writer_session'],old['id']]))
-                ref,_=self.store.put(imported,agent,'MEMORY_PROVENANCE',old['source'],old['uri'],old['raw'],{'original_event_id':old['id'],'writer_session':entry['writer_session']})
-                self._ingest_content(old['raw'],ref,old['source'],old['uri'],agent)
-            self.store.add_labels(agent,entry.get('integrity',[]),entry.get('confidentiality',[]))
+            self._merge_memory_labels(entry,agent)
             self.store.db.execute('INSERT OR REPLACE INTO memory_entries VALUES(?,?)',(args['key'],encode({k:v for k,v in entry.items() if k not in {'content','provenance'}})))
             self.store.db.commit()
             self.observe({'event_id':'memory-recall:'+call_id,'type':'memory_recall','agent_id':agent,'key':args['key'],'text':entry['content']})

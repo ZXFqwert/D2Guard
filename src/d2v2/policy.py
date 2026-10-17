@@ -199,6 +199,7 @@ class HardPolicies:
 
     def sensitive_read(self,value):
         """Detection only: the executor retains its separate workspace boundary."""
+        if self.memory_storage_path(value):return False
         text=target_view(value).replace('\\','/')
         root=normalized_path(str(self.workspace),self.workspace)
         resolved=normalized_path(text,self.workspace)
@@ -207,3 +208,13 @@ class HardPolicies:
         protected=any(fnmatch.fnmatchcase(resolved,p) or
                       p.endswith('/*') and fnmatch.fnmatchcase(resolved,p[:-2]) for p in patterns)
         return sensitive(text) or outside or protected
+
+    def memory_storage_path(self,value):
+        """Only this Agent's workspace/home stores, never arbitrary .pi paths."""
+        text=target_view(value).replace('\\','/')
+        resolved=normalized_path(text,self.workspace)
+        for base in (self.workspace,Path.home()):
+            root=normalized_path(str(base/'.pi'),self.workspace)
+            if resolved==root+'/memory.json' or resolved==root+'/memory' or resolved.startswith(root+'/memory/'):
+                return resolved
+        return None
