@@ -11,7 +11,7 @@ def read(path):
         if not line.strip():continue
         r=json.loads(line);key=(r['item_id'],r['variant'])
         if key in result:raise ValueError('Duplicate item/variant annotation')
-        if r.get('label') not in {None,'ALLOW','ASK','BLOCK','to_agent','task_data','unclear'}:raise ValueError('Unknown label')
+        if r.get('label') not in {None,'ALLOW','ASK','BLOCK','to_agent','task_data','unclear','for_reader','quoted','data'}:raise ValueError('Unknown label')
         result[key]=r
     return result
 
@@ -41,17 +41,17 @@ def compare(a,b,variant,other_variant=None):
             'disagreements_by_reason':dict(Counter(d['reason'] for d in diff))}
 
 
-def score(a,b,gold=None):
+def score(a,b,gold=None,state_raters=None):
     result={'evaluation_only':True,'gold_generated':False,'E0':{v:compare(a,b,v) for v in ('full','fragment')},'E1':None}
     if gold is not None:
-        result['E1']={name:compare(rater,gold,'state','gold') for name,rater in [('rater_a',a),('rater_b',b)]}
+        result['E1']={name:compare(rater,gold,'state','gold') for name,rater in (state_raters if state_raters is not None else {'rater_a':a,'rater_b':b}).items()}
         for value in result['E1'].values():value['meets_95_percent_observed']=None if value['agreement'] is None else value['agreement']>=.95
     return result
 
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('rater_a',type=Path);p.add_argument('rater_b',type=Path);p.add_argument('--gold',type=Path);p.add_argument('--output',type=Path)
-    a=p.parse_args();result=score(read(a.rater_a),read(a.rater_b),read(a.gold) if a.gold else None)
+    p=argparse.ArgumentParser();p.add_argument('rater_a',type=Path);p.add_argument('rater_b',type=Path);p.add_argument('--gold',type=Path);p.add_argument('--output',type=Path);p.add_argument('--state-raters',type=Path,nargs='+')
+    a=p.parse_args();result=score(read(a.rater_a),read(a.rater_b),read(a.gold) if a.gold else None,{str(p):read(p) for p in a.state_raters} if a.state_raters else None)
     text=json.dumps(result,ensure_ascii=False,indent=2)+'\n'
     if a.output:a.output.write_text(text,encoding='utf-8')
     print(text)

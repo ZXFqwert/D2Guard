@@ -10,7 +10,7 @@ from urllib.parse import urlsplit
 
 import httpx
 from original_laya import OriginalLaya
-from .compression import action, canonical, clauses, grant, sensitive, unknown_clauses
+from .compression import action, canonical, clauses, grant, sensitive, unknown_clauses, literal_scope, readonly_write_violation
 from .ledger import FingerprintLedger
 from .store import EvidenceStore, digest, encode
 from .policy import HardPolicies, is_egress_sink
@@ -26,10 +26,12 @@ from .memory import MemoryStore
 
 class CoreV2:
     def __init__(self, enabled, folder, provider, emit, fast=None, memory_root=None):
-        self.enabled=enabled;self.folder=Path(folder);self.emit=emit;self.provider=provider
+        self.enabled=enabled;self.folder=Path(folder);self._emit_raw=emit;self.provider=provider
         self.lock=threading.RLock();self.store=EvidenceStore(self.folder)
         self.ledger=FingerprintLedger(self.store)
         self.hard=HardPolicies(self.folder/'workspace')
+        source_extensions={'.py','.js','.ts','.tsx','.jsx','.c','.cpp','.h','.java','.go','.rs','.sh','.ps1'}
+        self.initial_sources={canonical(p.relative_to(self.folder/'workspace').as_posix()) for p in (self.folder/'workspace').rglob('*') if p.is_file() and p.suffix.lower() in source_extensions}
         self.fast=fast or OriginalLaya(Path(__file__).resolve().parents[2]/'.local/laya.json')
         self.anchor={'version':0,'read':[],'write':[],'net':[],'coverage_incomplete':True}
         self.taints=deque(maxlen=8);self.pending=None;self.integrity_fault=False
@@ -48,12 +50,32 @@ class CoreV2:
             'compression':'bounded-rule-extractor-v2 operation-target relations; not universal semantic extraction',
             'limits':{'hot_taints':8,'recent_steps':8,'view_tokens':320,'fast_tokens':512}})
 
+    def _security(self,value):
+        """Public summaries omit raw targets and mask registered values everywhere.
+
+        Original arguments and source URIs remain in immutable audit events. In
+        particular, a URL query can itself contain a credential; targets are not
+        inherently safe summary fields.
+        """
+        memo={}
+        def walk(item):
+            if isinstance(item,str):
+                if item not in memo:memo[item]=self.ledger.redact(item)
+                return memo[item]
+            if isinstance(item,list):return [walk(x) for x in item]
+            if isinstance(item,dict):return {k:walk(v) for k,v in item.items() if k!='raw_target'}
+            return item
+        return walk(value)
+
+    def emit(self,filename,item):
+        with self.lock:self._emit_raw(filename,self._security(item))
+
     def state(self):
-        return {'authority_anchor':self.anchor,'active_taints':list(self.taints),
+        return self._security({'authority_anchor':self.anchor,'active_taints':list(self.taints),
             'secret_exposure':self.ledger.summary(),'recent_steps':self.store.recent(),
             'coverage_incomplete':self.integrity_fault,
             'contexts':{r[0]:self.store.context(r[0]) for r in self.store.db.execute('SELECT agent FROM contexts')},
-            'unknown_count':self.store.db.execute('SELECT count(*) FROM unknowns').fetchone()[0]}
+            'unknown_count':self.store.db.execute('SELECT count(*) FROM unknowns').fetchone()[0]})
 
     def _sequence(self,event):
         if 'producer_seq' not in event:return
@@ -74,6 +96,7 @@ class CoreV2:
             kind,source,uri,raw,{'call_id':event.get('call_id'),'parent_call_id':event.get('parent_call_id')})
 
     def _commit(self,ref,delta):
+        delta=self._security(delta)
         self.store.save_delta(ref,delta)
         self.emit('security_chain.jsonl',{'event_id':ref['event_id'],'delta':delta,'state':self.state()})
 
@@ -220,12 +243,10 @@ class CoreV2:
 
     def _decision_inputs(self,tool,args,agent):
         delta=action(tool,args);name=delta['tool'];target=delta['target'];op=delta['op']
-        scope=(target in self.anchor.get('read',[]) if name=='fs.read' else
-               target in self.anchor.get('write',[]) if name=='fs.write' else
-               op+' '+target in self.anchor.get('net',[]) if name=='net.fetch' else False)
         candidates=self.store.matching_directives(name+':'+op if name=='net.fetch' else name,target)
         domain=(urlsplit(target).hostname or '') if name=='net.fetch' else ''
         hits,groups=self.ledger.match(args,domain)
+        scope=literal_scope(delta,args,self.anchor,hits)
         ctx=self.store.context(agent)
         matches=self.hard.evaluate(name,args,self.anchor.get('intent_mode')=='READONLY_REVIEW',hits,
             ctx,scope if name=='net.fetch' else False,[r[0] for r in self.store.db.execute('SELECT DISTINCT source FROM secrets')])
@@ -233,7 +254,7 @@ class CoreV2:
         soft=next((m for m in matches if m['risk']=='R2' and m['rule_id']!='POL-NET-SECRET-EXFIL'),None)
         if not delta['valid_target']:
             hard={'rule_id':'POL-PATH-INVALID','reason':'目标路径无效或越出工作区。'}
-        elif name=='fs.write' and (sensitive(target) or self.anchor.get('intent_mode')=='READONLY_REVIEW'):
+        elif name=='fs.write' and (sensitive(target) or readonly_write_violation(delta,self.anchor,self.initial_sources)):
             hard={'rule_id':'POL-FS-WRITE-SENSITIVE','reason':'写入敏感资产或违反只读授权。'}
         elif hits and name in {'fs.write','memory.write'}:
             hard={'rule_id':'POL-SECRET-DISCLOSURE','reason':'禁止将已登记机密写入业务或记忆产物。'}
@@ -338,6 +359,7 @@ class CoreV2:
             result['decision_facts']=facts
             result['model_answers']=answers
             result['policy_matches']=policy_matches
+            result=self._security(result)
             if verdict in {'ASK','BLOCK'}:
                 pack=self._evidence_pack(result,previous)
                 try:self.reviews.put_nowait((cid,pack));result['slow']['triggered']=True
@@ -352,7 +374,7 @@ class CoreV2:
             self.store.db.execute('INSERT INTO calls VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET decision=excluded.decision,status=excluded.status',
                 (cid,agent,ah,prior['proposal_ref'] if prior else None,encode(result),verdict))
             self.store.db.commit()
-            self.store.step({'actor':agent,'kind':'TOOL_PRE_EXEC','tool':name,'target':target[:160],
+            self.store.step({'actor':agent,'kind':'TOOL_PRE_EXEC','tool':name,'target':self.ledger.redact(target)[:160],
                 'verdict':verdict,'call_id':cid,'ref':ref['event_id']})
             self._commit(ref,delta)
             self.emit('decisions.jsonl',{'type':'decision','call_id':cid,'previous_security_state':previous,
@@ -443,6 +465,7 @@ class CoreV2:
             'security_delta':result['evidence']['security_delta'],'snippets':snippets,
             'missing_evidence':missing,'fast_assessment':result['fast'].get('answers',{}),
             'attribution_status':'candidate','secret_values_included':False}
+        pack=self._security(pack)
         self.emit('decisions.jsonl',{'type':'slow_evidence_pack','pack':pack})
         return pack
 

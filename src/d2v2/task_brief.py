@@ -23,7 +23,7 @@ def build_task_brief(raw, trusted, count_tokens):
         kept=[]
         for i,(a,b) in enumerate(spans):
             permissions=grant(trusted[a:b],{},1)
-            if i==0 or any(permissions[k] for k in ('read','write','net')):
+            if i==0 or any(permissions[k] for k in ('read','write','net','spawn')):
                 kept.append([a,b])
     # Use original complete sentence spans; quoted segments were masked upstream.
     brief='\n'.join(raw[a:b] for a,b in kept)

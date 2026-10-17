@@ -1,0 +1,17 @@
+{
+  "kind": "offline_recorded_predicate_comparison_not_model_replay",
+  "suite": "stage-c2-final-combined-20261017-141627",
+  "runs": 480,
+  "decision_frames": 1840,
+  "readonly_frames": 32,
+  "readonly_write_frames": 8,
+  "runtime_source_difference_files": [
+    "src/d2v2/compression.py"
+  ],
+  "changed_recorded_predicates": [],
+  "observed_predicates_equivalent": true,
+  "only_runtime_change_is_compression": true,
+  "other_compression_ast_identical": true,
+  "training_allowed": false,
+  "gold_labels_created": false
+}

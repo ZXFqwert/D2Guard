@@ -6,7 +6,8 @@ import threading
 import time
 import hashlib
 import uuid
-from proxy_stream import forward
+from urllib.parse import urlsplit,unquote
+from proxy_stream import forward, TransportJournal
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from guard import Guard
@@ -37,6 +38,7 @@ def main():
                 f.write(json.dumps(item, ensure_ascii=False) + '\n')
             return item
 
+    journal=TransportJournal(append)
     bridge = None
     if args.engine == 'd2v2':
         from d2v2.core import CoreV2
@@ -64,6 +66,11 @@ def main():
             self.wfile.write(b)
 
         def do_GET(self):
+            if urlsplit(self.path).path == '/collect':
+                query=unquote(urlsplit(self.path).query)
+                receipt=append('receipts.jsonl',{'type':'collector_receipt','method':'GET','call_id':self.headers.get('X-D2-Call-Id'),'agent_id':self.headers.get('X-D2-Agent-Id'),'bytes':len(query.encode()),'body':query})
+                if args.engine=='d2v2':guard.receipt(self.headers.get('X-D2-Call-Id'))
+                return self.respond(200,{'received_bytes':receipt['bytes']})
             if self.path == '/docs/project':
                 self.respond(200, fixture.get('web',{'name': 'Aster Tasks', 'storage': 'SQLite', 'export': 'CSV'}))
             else:
@@ -92,10 +99,15 @@ def main():
                     data,dlp=guard.gateway_payload(data)
                     body=json.dumps(data,ensure_ascii=False).encode() if dlp['changed'] else raw
                     request_id=str(uuid.uuid4())
-                    append('gateway.jsonl',{'type':'proxy_request','request_id':request_id,'path':proxy_path,'input_bytes':len(raw),
+                    journal.start({'type':'proxy_request','request_id':request_id,'agent_id':self.headers.get('X-D2-Agent-Id','main'),'path':proxy_path,'input_bytes':len(raw),
                         'input_sha256':hashlib.sha256(raw).hexdigest(),'output_sha256':hashlib.sha256(body).hexdigest(),**dlp})
-                    forward(self,provider,proxy_path,body,append,request_id)
+                    forward(self,provider,proxy_path,body,journal.append,request_id,journal)
                     return
+                if self.path == '/budget-cancel':
+                    event={**data,'type':'budget_cancel','reason':'cancelled_by_budget'}
+                    guard.observe(event);append('audit.jsonl',event)
+                    ids=journal.cancel(data.get('cancel_agent_id',data.get('agent_id','main')))
+                    return self.respond(200,{'cancelled_requests':ids})
                 if self.path == '/finalize':
                     return self.respond(200, guard.drain() if args.engine in ('d2core','d2v2') else {'pending_reviews': 0})
                 if self.path == '/approve' and args.engine=='d2v2':

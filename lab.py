@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import secrets
+import signal
 import shutil
 import sqlite3
 import subprocess
@@ -15,6 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0,str(ROOT/'src'))
 from evaluation_scenarios import prepare, artifact_oracle, file_hashes
+from pi_session import conversation
 PINNED_PI = '0.85.1'
 
 
@@ -155,7 +157,7 @@ def run(args, canary=None, batch_id=None):
     agent_dir = ROOT / '.local' / 'pi-runs' / run_id
     api = {'responses': 'openai-responses', 'chat_completions': 'openai-completions'}[cfg['api_style']]
     save(agent_dir / 'models.json', {'providers': {'d2-lab': {'baseUrl': cfg['base_url'], 'api': api,
-        'apiKey': '$D2_MODEL_API_KEY', 'authHeader': True, 'models': [{'id': cfg['main_model'],
+        'apiKey': '$D2_MODEL_API_KEY', 'authHeader': True, 'headers':{'X-D2-Agent-Id':'$D2_AGENT_ID'}, 'models': [{'id': cfg['main_model'],
         'reasoning': False, 'input': ['text'], 'contextWindow': 32768, 'maxTokens': 2048,
         'cost': {'input': 0, 'output': 0, 'cacheRead': 0, 'cacheWrite': 0}}]}}})
     save(agent_dir / 'settings.json', {'quietStartup': True, 'retry': {'enabled': False}, 'compaction': {'enabled': False}})
@@ -190,18 +192,21 @@ def run(args, canary=None, batch_id=None):
         'evaluation_only':scenario.get('evaluation_only',False),
         'scenario_requirements':scenario.get('requirements',[]),
         'evaluation_phase':getattr(args,'phase','evaluation'),
+        'conversation_sha256':hashlib.sha256(json.dumps(scenario.get('conversation',[]),ensure_ascii=False).encode()).hexdigest(),
         'fixture_sha256':hashlib.sha256((folder/'fixture.json').read_bytes()).hexdigest() if (folder/'fixture.json').exists() else None,
         'scenario_sha256': hashlib.sha256((ROOT / 'scenarios' / (args.scenario + '.json')).read_bytes()).hexdigest(),
         'pi_cli_sha256': hashlib.sha256(pi_cli.read_bytes()).hexdigest(),
         'source_sha256': {p.relative_to(ROOT).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest() for p in source_paths},
         'initial_files': file_hashes(workspace),
-        'timeout_seconds': args.timeout}
+        'timeout_seconds': args.timeout,'child_timeout_seconds':180}
     save(folder / 'manifest.json', manifest)
     if args.engine == 'd2v2':
         original = load(ROOT / '.local/laya.json')
         manifest['fast_model'] = {k: original[k] for k in ('repository','revision','sha256')}
         manifest['gateway'] = 'local authenticated streaming proxy; off observes, on masks registered credentials'
         save(folder / 'manifest.json', manifest)
+    env['HOME']=str(workspace/'.home');env['USERPROFILE']=str(workspace/'.home')
+    (workspace/'.home').mkdir(exist_ok=True)
     service = None
     child = None
     timeout = False
@@ -228,18 +233,27 @@ def run(args, canary=None, batch_id=None):
             env.pop('D2_CORE_PROVIDER', None)
         service_ready_elapsed = time.monotonic() - started
         agent_started = time.monotonic()
+        messages=scenario.get('conversation') if not args.task else None
         with (folder / 'pi-events.jsonl').open('w', encoding='utf-8') as out, (folder / 'pi-stderr.log').open('w', encoding='utf-8') as err:
-            child = subprocess.Popen([node, str(pi_cli), *base_args, '--', prompt], cwd=workspace,
-                env=env, stdin=subprocess.DEVNULL, stdout=out, stderr=err)
+            rpc_args=[x for x in base_args if x!='--print'];rpc_args[rpc_args.index('--mode')+1]='rpc'
+            command=[node,str(pi_cli),*rpc_args] if messages else [node,str(pi_cli),*base_args,'--',prompt]
+            child = subprocess.Popen(command,cwd=workspace,env=env,stdin=subprocess.PIPE if messages else subprocess.DEVNULL,stdout=subprocess.PIPE if messages else out,stderr=err,start_new_session=os.name!='nt')
             try:
-                code = child.wait(timeout=args.timeout)
+                if messages:
+                    def record_turn(event):
+                        with (folder/'conversation.jsonl').open('a',encoding='utf-8') as trace:trace.write(json.dumps(event,ensure_ascii=False)+'\n')
+                    code=conversation(child,[prompt,*messages],out,record_turn,args.timeout,
+                        lambda:any(e.get('type')=='approval_hold_complete' for e in jsonl(folder/'audit.jsonl')))
+                else:code = child.wait(timeout=args.timeout)
             except subprocess.TimeoutExpired:
                 timeout = True
+                cancel=urllib.request.Request(env['D2_SERVICE_ORIGIN']+'/budget-cancel',data=json.dumps({'cancel_agent_id':'*','agent_id':'main','event_id':secrets.token_hex(16)}).encode(),method='POST',headers={'Authorization':'Bearer '+env['D2_CONTROL_TOKEN'],'Content-Type':'application/json'})
+                with urllib.request.urlopen(cancel,timeout=10) as response:save(folder/'budget-cancellation.json',json.load(response))
                 if os.name == 'nt':
                     subprocess.run(['taskkill', '/PID', str(child.pid), '/T', '/F'], capture_output=True,
                         text=True, encoding='utf-8', errors='replace')
                 else:
-                    child.kill()
+                    os.killpg(child.pid,signal.SIGTERM)
                 code = child.wait()
         agent_elapsed = time.monotonic() - agent_started
         drain_start = time.monotonic()
@@ -256,6 +270,7 @@ def run(args, canary=None, batch_id=None):
             service.terminate()
             service.wait(timeout=10)
     result = evaluate(folder, scenario, canary, code, timeout)
+    result['completed_user_turns']=sum(e.get('type')=='user_turn_completed' for e in jsonl(folder/'conversation.jsonl'))
     result['elapsed_seconds'] = round(time.monotonic() - started, 3)
     result['agent_elapsed_seconds'] = round(agent_elapsed, 3) if agent_elapsed is not None else None
     result['post_agent_evidence_wait_seconds'] = round(drain_elapsed, 3)

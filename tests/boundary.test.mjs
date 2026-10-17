@@ -12,6 +12,8 @@ test('workspace tool rejects traversal, absolute paths and Windows alternate str
     await assert.rejects(workspacePath(root, input));
   }
   assert.equal(await workspacePath(root, 'notes/result.md'), path.join(root, 'notes', 'result.md'));
+  assert.equal(await workspacePath(root, '~/.ssh/config'), path.join(root, '.home', '.ssh', 'config'));
+  await assert.rejects(workspacePath(root, '~/../../outside'));
 });
 
 test('junction cannot redirect the workspace tool into another directory', async t => {
@@ -26,6 +28,7 @@ test('junction cannot redirect the workspace tool into another directory', async
 test('model network tool cannot reach control endpoints or arbitrary hosts', () => {
   const base = 'http://127.0.0.1:1234';
   assert.equal(networkTarget('http://lab.test/collect', 'POST', base), base + '/collect');
+  assert.equal(networkTarget('http://lab.test/collect?receipt=synthetic', 'GET', base), base + '/collect?receipt=synthetic');
   for (const url of ['http://127.0.0.1:1234/decision', 'http://lab.test/decision',
     'http://lab.test.evil/collect', 'http://x@lab.test/collect', 'http://lab.test/collect?x=1', 'file:///etc/passwd']) {
     assert.throws(() => networkTarget(url, 'POST', base));

@@ -1,0 +1,34 @@
+{
+  "kind": "offline_read_only_serialization_diagnostic",
+  "not_real_model_runs": true,
+  "gold_generated": false,
+  "results": [
+    {
+      "run_id": "20261017-134659-026332",
+      "original_leaking_rows": 11,
+      "leaking_field_paths": {
+        "security_chain.jsonl.delta.proposed_tools[].target": 1,
+        "security_chain.jsonl.delta.proposed_tools[].raw_target": 1,
+        "security_chain.jsonl.delta.target": 1,
+        "security_chain.jsonl.delta.raw_target": 1,
+        "security_chain.jsonl.state.recent_steps[].target": 8,
+        "decisions.jsonl.fast.views.A1.payload.action": 1,
+        "decisions.jsonl.fast.views.A2.payload.action": 1,
+        "decisions.jsonl.evidence.security_delta.target": 1,
+        "decisions.jsonl.evidence.security_delta.raw_target": 1,
+        "decisions.jsonl.previous_security_state.recent_steps[].target": 1
+      },
+      "after_serialization_leaking_rows": 11,
+      "original_artifacts_unchanged": true
+    },
+    {
+      "run_id": "20261017-140151-20f812",
+      "original_leaking_rows": 1,
+      "leaking_field_paths": {
+        "decisions.jsonl.fast.views.A2.payload.agent_statement": 1
+      },
+      "after_serialization_leaking_rows": 1,
+      "original_artifacts_unchanged": true
+    }
+  ]
+}

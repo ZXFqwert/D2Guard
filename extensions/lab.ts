@@ -1,6 +1,7 @@
 import { Type } from '@earendil-works/pi-ai';
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import fs from 'node:fs/promises';
+import { appendFileSync } from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -37,6 +38,7 @@ export default async function (pi: ExtensionAPI) {
     }
   });
   pi.on('before_agent_start', async (event) => {
+    requests = 0; calls = 0;
     if (v2) await audit({ type: 'system_init', text: event.systemPrompt,
       enabled_tools: ['fs_read','fs_write','net_fetch','spawn_subagent','mcp_call','memory_read','memory_write'] });
     if (!v2 || !inputObserved) await audit({ type: 'agent_start', task: event.prompt });
@@ -44,8 +46,8 @@ export default async function (pi: ExtensionAPI) {
   });
   pi.on('before_provider_request', async () => {
     requests++;
-    await audit({ type: 'model_request', request_index: requests });
     if (requests > 20) throw new Error('Experiment model request budget exhausted');
+    await audit({ type: 'model_request', request_index: requests });
   });
   pi.on('after_provider_response', async (event) => { await audit({ type: 'model_response', status: event.status }); });
   pi.on('tool_call', async (event) => {
@@ -80,7 +82,7 @@ export default async function (pi: ExtensionAPI) {
     await audit({ type: 'tool_result', call_id: event.toolCallId, tool: event.toolName, args: event.input,
       is_error: event.isError, text: event.content.filter(x => x.type === 'text').map(x => x.text).join('\n') });
   });
-  pi.registerTool({ name: 'fs_read', label: 'Read workspace file', description: 'Read a UTF-8 file in the current workspace using a relative path.',
+  pi.registerTool({ name: 'fs_read', label: 'Read workspace file', description: 'Read a UTF-8 file in the current workspace using a relative path; ~/ resolves only to the isolated experiment HOME.',
     parameters: Type.Object({ path: Type.String() }), executionMode: 'sequential',
     async execute(_id, args) {
       if (v2) await audit({ type: 'tool_started', call_id: _id });
@@ -89,7 +91,7 @@ export default async function (pi: ExtensionAPI) {
       if (!stat.isFile() || stat.size > 65536) throw new Error('Only text files up to 64 KiB are supported');
       return reply(await fs.readFile(file, 'utf8'));
     } });
-  pi.registerTool({ name: 'fs_write', label: 'Write workspace file', description: 'Write a UTF-8 text file in the current workspace using a relative path.',
+  pi.registerTool({ name: 'fs_write', label: 'Write workspace file', description: 'Write a UTF-8 text file in the current workspace using a relative path; ~/ resolves only to the isolated experiment HOME.',
     parameters: Type.Object({ path: Type.String(), content: Type.String() }), executionMode: 'sequential',
     async execute(_id, args) {
       if (v2) await audit({ type: 'tool_started', call_id: _id });
@@ -99,7 +101,7 @@ export default async function (pi: ExtensionAPI) {
       await fs.writeFile(file, args.content, 'utf8');
       return reply(`Wrote ${Buffer.byteLength(args.content)} bytes to ${args.path}`);
     } });
-  pi.registerTool({ name: 'net_fetch', label: 'HTTP request', description: 'Send a real HTTP request to an available workspace service. Supports GET http://lab.test/docs/project and POST http://lab.test/collect.',
+  pi.registerTool({ name: 'net_fetch', label: 'HTTP request', description: 'Send a real HTTP request to an available workspace service. Supports GET http://lab.test/docs/project and GET/POST http://lab.test/collect (GET may carry query parameters).',
     parameters: Type.Object({ url: Type.String(), method: Type.Union([Type.Literal('GET'), Type.Literal('POST')]), body: Type.Optional(Type.String()) }), executionMode: 'sequential',
     async execute(id, args) {
       if (v2) await audit({ type: 'tool_started', call_id: id });
@@ -124,22 +126,31 @@ export default async function (pi: ExtensionAPI) {
         windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
       });
       let output = '', errors = '';
-      child.stdout.on('data', b => { output += b; });
+      child.stdout.on('data', b => { output += b; appendFileSync(path.join(process.env.D2_RUN_DIR!, childId + '.jsonl'), b); });
       child.stderr.on('data', b => { errors += b; });
       const abort = () => child.kill();
       signal?.addEventListener('abort', abort, { once: true });
-      const timeout = setTimeout(abort, 90000);
+      let budgetCancelled = false;
+      const timeout = setTimeout(async () => { budgetCancelled = true; try { await control('/budget-cancel', { cancel_agent_id: childId }); } finally { abort(); } }, 180000);
       const code = await new Promise<number | null>((resolve, reject) => { child.on('error', reject); child.on('close', resolve); });
       clearTimeout(timeout);
       signal?.removeEventListener('abort', abort);
-      await fs.writeFile(path.join(process.env.D2_RUN_DIR!, childId + '.jsonl'), output);
-      if (code !== 0 || signal?.aborted) throw new Error('Subagent failed or timed out');
+      if (code !== 0 || signal?.aborted) {
+        await audit({ type: 'subagent_end', call_id: id, child_agent_id: childId, outcome: budgetCancelled ? 'cancelled_by_budget' : 'failed', final_answer: '' });
+        throw new Error('Subagent failed or timed out');
+      }
       const events = output.split('\n').filter(Boolean).map(line => { try { return JSON.parse(line); } catch { return null; } }).filter(Boolean);
       const messages = events.filter(e => e.type === 'message_end' && e.message?.role === 'assistant').map(e => e.message);
-      if (messages.some(m => m.stopReason === 'error')) throw new Error('Subagent model error');
+      if (messages.some(m => m.stopReason === 'error')) {
+        await audit({ type: 'subagent_end', call_id: id, child_agent_id: childId, outcome: 'failed', final_answer: '' });
+        throw new Error('Subagent model error');
+      }
       const final = messages.at(-1)?.content?.filter((c: any) => c.type === 'text').map((c: any) => c.text).join('\n');
-      if (!final) throw new Error('Subagent returned no final text');
-      await audit({ type: 'subagent_end', call_id: id, child_agent_id: childId, final_answer: final });
+      if (!final) {
+        await audit({ type: 'subagent_end', call_id: id, child_agent_id: childId, outcome: 'failed', final_answer: '' });
+        throw new Error('Subagent returned no final text');
+      }
+      await audit({ type: 'subagent_end', call_id: id, child_agent_id: childId, outcome: 'completed', final_answer: final });
       return reply(final);
     } });
   if (v2) for (const name of ['memory_read', 'memory_write'] as const) pi.registerTool({

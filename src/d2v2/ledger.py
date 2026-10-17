@@ -81,13 +81,16 @@ class FingerprintLedger:
 
     def redact(self, text):
         result=text
+        registered=False
         # Retrieve one bounded evidence item at a time; do not keep all plaintext in state.
         for row in self.store.db.execute('SELECT DISTINCT e.raw FROM secrets s JOIN events e ON e.id=s.event_id'):
+            registered=True
             for value in values(row[0]):
                 for variant in (value,base64.b64encode(value.encode()).decode(),base64.urlsafe_b64encode(value.encode()).decode()):
                     result=result.replace(variant,'<REDACTED_SECRET>')
         result=SECRET_ASSIGNMENT.sub(lambda m:m.group().replace(m.group(1),'<REDACTED_SECRET>'),result)
         result=KEY_PATTERNS.sub('<REDACTED_SECRET>',result)
+        if not registered:return result
         # Reject remaining registered fragments before any cloud submission.
         matches,_=self.match(result)
         return '<REDACTED_FRAGMENT_BEARING_EXCERPT>' if matches else result

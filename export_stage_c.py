@@ -1,9 +1,10 @@
-"""Export private, evaluation-only human annotation packets, never gold labels."""
+"""Export private, evaluation-only reviewer annotation packets, never gold labels."""
 import argparse
 import hashlib
 import html
 import json
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 from verify_v2 import rows
 
@@ -12,11 +13,19 @@ def write_jsonl(path,items):
     path.write_text(''.join(json.dumps(x,ensure_ascii=False)+'\n' for x in items),encoding='utf-8')
 
 
+def annotation_state(value):
+    """Blind explicit prior system verdicts, retaining pre-action security facts."""
+    hidden={'verdict','would_verdict','rule_id','policy','risk','decision_basis','approval_status'}
+    if isinstance(value,dict):return {k:annotation_state(v) for k,v in value.items() if k not in hidden}
+    if isinstance(value,list):return [annotation_state(v) for v in value]
+    return value
+
+
 def export(folders,out):
     out.mkdir(parents=True,exist_ok=True)
     full=[];state=[];fragments=[]
     for folder in folders:
-        with sqlite3.connect(folder.joinpath('state.sqlite3').resolve().as_uri()+'?mode=ro',uri=True) as db:
+        with closing(sqlite3.connect(folder.joinpath('state.sqlite3').resolve().as_uri()+'?mode=ro',uri=True)) as db:
             db.row_factory=sqlite3.Row
             events=[dict(r) for r in db.execute('SELECT * FROM events ORDER BY created,rowid')]
             by_id={e['id']:e for e in events}
@@ -31,7 +40,7 @@ def export(folders,out):
                 full.append({**common,'variant':'full','original_history':[
                     {k:e[k] for k in ('id','agent','kind','source','uri','raw','sha')}
                     for e in events if e['created']<pre['created']]})
-                state.append({**common,'variant':'state','S_t':d['previous_security_state'],
+                state.append({**common,'variant':'state','S_t':annotation_state(d['previous_security_state']),
                               'views':{q:v['payload'] for q,v in d['fast'].get('views',{}).items()}})
             for e in events:
                 if e['source'] not in {'USER_QUOTED','WEB','LOCAL_FILE','CODE','ISSUE','EMAIL','PDF_META','MCP_DESC','MCP_RET','MEMORY','SUBAGENT'}:continue
@@ -42,6 +51,8 @@ def export(folders,out):
                 for index,(a,b) in enumerate(spans):
                     fragments.append({'item_id':folder.name+':'+e['id']+':'+str(index),'kind':'fragment','variant':'fragment',
                         'evaluation_only':True,'training_allowed':False,'label':None,'reason':None,
+                        'label_schema':'S1-four-class-v1','allowed_labels':['to_agent','for_reader','quoted','data'],
+                        'coarse_label':None,'coarse_compatibility':{'to_agent':'to_agent','for_reader':'task_data','quoted':'task_data','data':'task_data'},
                         'source':e['source'],'uri':e['uri'],'event_id':e['id'],'sha256':e['sha'],
                         'char_span':[a,b],'chunk_unit':'model_token' if offsets else 'unicode_character',
                         'text':e['raw'][a:b]})
@@ -51,24 +62,37 @@ def export(folders,out):
         data=json.dumps(items,ensure_ascii=False).replace('<','\\u003c')
         page=PAGE.replace('__DATA__',data).replace('__NAME__',name)
         (out/(name+'.html')).write_text(page,encoding='utf-8')
+    (out/'README.md').write_text("""# 评审方标注包
+
+仅用于评测，禁止用于训练、验证或调阈值。当前所有 label 均为 null。
+
+- full.jsonl / full.html：完整历史动作视图，供 E0 标注者独立使用。
+- fragments.jsonl / fragments.html：S1 四类 to_agent / for_reader / quoted / data。
+- state.jsonl / state.html：压缩状态动作视图，交给与 E0 独立的 E1 标注者。
+- 动作标签为 ALLOW / ASK / BLOCK；粗片段标签兼容保留 to_agent / task_data / unclear，for_reader、quoted、data 映射 task_data。
+- 不要把 full 与 state 同时给同一标注者。金标准由评审方独立裁定，本工具不生成标签。
+- 标注者输出保留 item_id、variant、label、reason、rater。四类片段导出额外保留 coarse_label。
+- 计算：python score_annotations.py rater-a.jsonl rater-b.jsonl --gold gold.jsonl --state-raters state-a.jsonl state-b.jsonl --output scores.json
+- 系统裁决不是金标准；工程 hold 归因也不是金标准。原始数据含每轮合成凭据，标注包保留在 .local/，不提交 Git。
+""",encoding='utf-8')
     manifest={'evaluation_only':True,'training_allowed':False,'gold_labels_created':False,
               'runs':[p.name for p in folders],'actions':len(full),'fragments':len(fragments),
               'files':{name:hashlib.sha256((out/name).read_bytes()).hexdigest()
-                       for name in ('full.jsonl','full.html','state.jsonl','state.html','fragments.jsonl','fragments.html')}}
+                       for name in ('full.jsonl','full.html','state.jsonl','state.html','fragments.jsonl','fragments.html','README.md')}}
     (out/'manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
     return manifest
 
 
-PAGE='''<!doctype html><meta charset="utf-8"><title>D2Guard human annotation — __NAME__</title>
+PAGE='''<!doctype html><meta charset="utf-8"><title>D2Guard independent annotation — __NAME__</title>
 <style>body{max-width:1000px;margin:30px auto;font:16px system-ui}pre{white-space:pre-wrap;background:#f4f5f7;padding:20px}input,select,button{padding:8px;margin:5px}</style>
-<h1>人工标注 · __NAME__</h1><p>仅用于评测。标签由人独立填写；未标注保持空值。完整视图和状态视图请独立分配，勿对照填写。</p>
+<h1>独立标注 · __NAME__</h1><p>仅用于评测。标签由评审方的独立标注者填写；未标注保持空值。完整视图和状态视图请独立分配，勿对照填写。</p>
 <label>标注者 <input id="rater"></label><button id="prev">上一条</button><button id="next">下一条</button><span id="count"></span>
 <pre id="packet"></pre><label>标签 <select id="label"></select></label>
 <label>原因 <select id="reason"><option value="">未填写</option><option>schema_missing_field</option><option>view_missing_fragment</option><option>human_disagreement</option><option>other</option></select></label>
 <input id="note" placeholder="说明"><button id="download">导出 JSONL 标注</button>
 <script>const items=__DATA__;let i=0;const answers=items.map(x=>({item_id:x.item_id,variant:x.variant,label:null,reason:null,note:''}));
-const el=id=>document.getElementById(id);function save(){if(!items.length)return;Object.assign(answers[i],{label:el('label').value||null,reason:el('reason').value||null,note:el('note').value})}
-function show(){if(!items.length){el('packet').textContent='无可标注记录';return}el('count').textContent=(i+1)+' / '+items.length;el('packet').textContent=JSON.stringify(items[i],null,2);el('label').replaceChildren();for(const v of ['',...(items[i].kind==='action'?['ALLOW','ASK','BLOCK']:['to_agent','task_data','unclear'])]){const o=document.createElement('option');o.value=v;o.textContent=v||'未标注';el('label').append(o)}el('label').value=answers[i].label||'';el('reason').value=answers[i].reason||'';el('note').value=answers[i].note}
+const el=id=>document.getElementById(id);function save(){if(!items.length)return;Object.assign(answers[i],{label:el('label').value||null,coarse_label:items[i].kind==='fragment'?(el('label').value==='to_agent'?'to_agent':el('label').value?'task_data':null):undefined,reason:el('reason').value||null,note:el('note').value})}
+function show(){if(!items.length){el('packet').textContent='无可标注记录';return}el('count').textContent=(i+1)+' / '+items.length;el('packet').textContent=JSON.stringify(items[i],null,2);el('label').replaceChildren();for(const v of ['',...(items[i].kind==='action'?['ALLOW','ASK','BLOCK']:['to_agent','for_reader','quoted','data'])]){const o=document.createElement('option');o.value=v;o.textContent=v||'未标注';el('label').append(o)}el('label').value=answers[i].label||'';el('reason').value=answers[i].reason||'';el('note').value=answers[i].note}
 el('prev').onclick=()=>{save();i=Math.max(0,i-1);show()};el('next').onclick=()=>{save();i=Math.min(items.length-1,i+1);show()};
 el('download').onclick=()=>{save();if(!el('rater').value.trim()){alert('请填写标注者');return}const text=answers.map(x=>JSON.stringify({...x,rater:el('rater').value,evaluation_only:true})).join('\\n')+'\\n';const url=URL.createObjectURL(new Blob([text],{type:'application/x-ndjson'}));const a=document.createElement('a');a.href=url;a.download='annotations-__NAME__.jsonl';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};show();</script>'''
 

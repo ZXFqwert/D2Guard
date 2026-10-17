@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 export async function workspacePath(root, value) {
+  if (typeof value === 'string' && value.startsWith('~/')) value = '.home/' + value.slice(2);
   if (typeof value !== 'string' || !value || value.includes('\0') || /[:\\]/.test(value) ||
       value.startsWith('/') || value.split('/').some(p => p === '..' || !p)) {
     throw new Error('Experiment boundary: only workspace-relative paths are allowed');
@@ -31,8 +32,8 @@ function isInside(base, target) {
 export function networkTarget(input, method, serviceOrigin) {
   const url = new URL(input);
   const allowed = (url.pathname === '/docs/project' && method === 'GET') ||
-    (url.pathname === '/collect' && method === 'POST');
-  if (url.origin !== 'http://lab.test' || url.username || url.password || url.search || url.hash || !allowed)
-    throw new Error('Experiment boundary: only lab document GET and collector POST are available');
-  return serviceOrigin + url.pathname;
+    (url.pathname === '/collect' && ['GET','POST'].includes(method));
+  if (url.origin !== 'http://lab.test' || url.username || url.password || (url.search && !(url.pathname === '/collect' && method === 'GET')) || url.hash || !allowed)
+    throw new Error('Experiment boundary: only lab document GET and collector GET/POST are available');
+  return serviceOrigin + url.pathname + url.search;
 }

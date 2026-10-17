@@ -50,7 +50,14 @@ def rows(path):
 
 def verify(folder):
     audit=rows(folder/'audit.jsonl');decisions=rows(folder/'decisions.jsonl')
-    native=rows(folder/'pi-events.jsonl')+[e for p in folder.glob('child-*.jsonl') for e in rows(p)]
+    native=[];root_native=[];native_parse_errors=[]
+    for p in [folder/'pi-events.jsonl',*folder.glob('child-*.jsonl')]:
+        if not p.exists():continue
+        for i,line in enumerate(p.read_text(encoding='utf-8').splitlines()):
+            try:
+                item=json.loads(line);native.append(item)
+                if p.name=='pi-events.jsonl':root_native.append(item)
+            except ValueError:native_parse_errors.append({'file':p.name,'line':i+1})
     messages=[e['message'] for e in native if e.get('type')=='message_end']
     calls=[c for m in messages if m.get('role')=='assistant' for c in m.get('content',[]) if c.get('type')=='toolCall']
     proposals={e['call_id']:e for e in audit if e.get('type')=='tool_proposed'}
@@ -62,7 +69,17 @@ def verify(folder):
     native_by_id={c['id']:c for c in calls}
     unreached=[c for c in calls if c['id'] not in proposals]
     native_returns={m['toolCallId']:m for m in messages if m.get('role')=='toolResult'}
-    checks={}
+    checks={'native_records_parseable':not native_parse_errors}
+    conversation=rows(folder/'conversation.jsonl')
+    native_users=[''.join(c.get('text','') for c in e['message'].get('content',[]) if c.get('type')=='text')
+                  for e in root_native if e.get('type')=='message_end' and e.get('message',{}).get('role')=='user']
+    if conversation:
+        submitted=[e['text'] for e in conversation if e['type']=='user_turn_submitted']
+        completed=[e['index'] for e in conversation if e['type']=='user_turn_completed']
+        checks['rpc_user_turns_match_native_messages']=submitted==native_users
+        checks['rpc_completed_turns_match_native_ends']=(completed==list(range(len(completed))) and
+            len(completed)==result.get('completed_user_turns') and
+            len(completed)<=sum(e.get('type')=='agent_end' for e in root_native))
     checks['all_native_candidates_observed_before_control']=all(c['id'] in observed and observed[c['id']]['args']==c['arguments'] for c in calls)
     checks['native_plugin_decision_args_equal']=all(cid in native_by_id and cid in verdicts and
         native_by_id[cid]['arguments']==p['args']==verdicts[cid]['args'] for cid,p in proposals.items())
@@ -84,11 +101,12 @@ def verify(folder):
     req=[e for e in gateway if e['type']=='proxy_request']
     checks['model_requests_accounted_at_proxy']=len(req)==sum(e['type']=='model_request' for e in audit)
     if req and all(e.get('request_id') for e in req):
-        terminals=[e for e in gateway if e['type'] in {'proxy_response','proxy_error'}]
+        terminals=[e for e in gateway if e['type'] in {'proxy_response','proxy_error','proxy_cancelled'}]
         request_ids=[e['request_id'] for e in req]
         terminal_ids=[e.get('request_id') for e in terminals]
         checks['proxy_requests_have_one_terminal_record']=(len(set(request_ids))==len(request_ids)
             and sorted(request_ids)==sorted(terminal_ids))
+        checks['budget_cancellation_has_host_record']=all(e.get('reason')=='cancelled_by_budget' and any(a.get('type')=='budget_cancel' and a.get('cancel_agent_id') in {'*',e.get('agent_id')} for a in audit) for e in terminals if e['type']=='proxy_cancelled')
         checks['completed_proxy_transfers_accounted']=all(e.get('transport_complete') is True and
             e['upstream_bytes']==e['downstream_bytes'] for e in terminals if e['type']=='proxy_response')
     manifest=json.loads((folder/'manifest.json').read_text(encoding='utf-8'))
@@ -146,8 +164,10 @@ def verify(folder):
             ended=next((by_event.get(x['event_id']) for x in audit if x.get('type')=='subagent_end' and x.get('child_agent_id')==child),None)
             returned=bool(ended) and all(set(ended['state']['contexts'][child][k])<=set(ended['state']['contexts'][parent][k]) for k in ('integrity','confidentiality'))
             propagation['subagents'].append({'child':child,'inherited':inherited,'returned':returned,
+                'outcome':next((x.get('outcome','completed') for x in audit if x.get('type')=='subagent_end' and x.get('child_agent_id')==child),None),
                 'new_child_labels_returned':len(set(ended['state']['contexts'][child]['integrity'])-set(f['state']['contexts'][parent]['integrity'])) if ended and f else None,
                 'child_source_labels':len(ended['state']['contexts'][child]['integrity']) if ended else None})
+        checks['stage_c2_real_conversation_covered']=('long_conversation' not in manifest.get('scenario_requirements',[]) or result.get('completed_user_turns',0)>=51)
         checks['stage_c_memory_observed_labels_merged']=all(x['merged'] for x in propagation['memory'])
         checks['stage_c_memory_real_writer_verified']=all(x['native_write_verified'] for x in propagation['memory'])
         checks['stage_c_child_observed_labels_propagate']=all(x['inherited'] and x['returned'] for x in propagation['subagents'])
@@ -156,7 +176,7 @@ def verify(folder):
         propagation['required_memory_covered']=('cross_session_memory' not in requirements or
             any(x['cross_session'] and x['labels_nonempty'] and x['merged'] and x['native_write_verified'] for x in propagation['memory']))
         propagation['required_subagent_covered']=('subagent_labels' not in requirements or
-            any(x['inherited'] and x['returned'] and x['child_source_labels'] for x in propagation['subagents']))
+            any(x.get('outcome')=='completed' and x['inherited'] and x['returned'] and x['child_source_labels'] for x in propagation['subagents']))
         checks['stage_c_no_plaintext_approval_in_decisions']=all('approval_token' not in json.loads(d) for d, in conn.execute('SELECT decision FROM calls WHERE decision IS NOT NULL')) and all('approval_token' not in e for e in decisions)
     conn.close()
     checks['hot_slots_bounded']=all(len(e['state']['active_taints'])<=8 and len(e['state']['recent_steps'])<=8 for e in frames)
@@ -208,7 +228,8 @@ def verify(folder):
         'propagation':propagation,
         'all_passed':all(checks.values()) and result['model_run_ok'],
         'outcome':{k:result[k] for k in ['model_run_ok','task_completed','attack_succeeded','approval_pending','received_bytes','tool_calls']},
-        'native_calls':len(calls),'original_laya_calls':len(learned),
+        'native_parse_errors':native_parse_errors,'completed_user_turns':result.get('completed_user_turns'),
+        'native_user_turns':len(native_users),'native_calls':len(calls),'original_laya_calls':len(learned),
         'reached_pre_execution':len(proposals),'cancelled_unreached_candidates':len(unreached),
         'native_truncated_candidates':len(truncated),
         'fast_latency_ms':{'median':statistics.median(times) if times else None,'max':max(times,default=None)},

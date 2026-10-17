@@ -8,6 +8,7 @@ import bashlex
 from d2core.execution import analyze_command, command_name, git_subcommand, exec_violation
 from d2core.policy_engine import normalized_path
 from .compression import sensitive
+from .normalization import target_view
 
 PREDICATES={
     'args.contains_secret_fingerprint','args.references_secret_asset',
@@ -87,7 +88,7 @@ class HardPolicies:
         method=str(args.get('method','GET')).upper()
         sink=is_egress_sink(name,args)
         domain=(urlsplit(args.get('url','')).hostname or '').lower()
-        paths=[normalized_path(args.get('path',''),self.workspace)] if name=='fs.write' else []
+        paths=[normalized_path(target_view(args.get('path','')),self.workspace)] if name=='fs.write' else []
         effect='file_write' if name=='fs.write' else 'vcs_publish' if name in {'git.commit','git.push'} else ''
         flags={x:False for x in PREDICATES}
         if name=='exec':
@@ -104,10 +105,10 @@ class HardPolicies:
             if any(git_subcommand(argv) in {'push','commit'} for argv in analysis.commands):effect='vcs_publish'
             for argv in analysis.commands:
                 if argv and command_name(argv[0]) in {'touch','cp','mv','mkdir','install','ln','sed','rm','tee','set-content','out-file'}:
-                    paths.extend(normalized_path(word,self.workspace) for word in argv[1:] if not word.startswith('-'))
+                    paths.extend(normalized_path(target_view(word),self.workspace) for word in argv[1:] if not word.startswith('-'))
             def visit(node):
                 if node.kind=='redirect' and getattr(node,'output',None) and hasattr(node.output,'word'):
-                    paths.append(normalized_path(node.output.word,self.workspace))
+                    paths.append(normalized_path(target_view(node.output.word),self.workspace))
                 for value in vars(node).values():
                     if isinstance(value,bashlex.ast.node):visit(value)
                     elif isinstance(value,list):

@@ -1,0 +1,56 @@
+{
+  "evaluation_only": true,
+  "training_allowed": false,
+  "archives": [
+    {
+      "path": ".local/stage-c2-superseded-evidence.tar.gz",
+      "bytes": 129691261,
+      "sha256": "4b606a35181135f3acb577c21da771657d5bb34778554bddaae266ee027b4e74"
+    },
+    {
+      "path": ".local/stage-c2-final-chunk-001.tar.gz",
+      "bytes": 37322811,
+      "sha256": "6368deafc3d3659d6f47951c7bef0bfbc13fe12fc01ef1c464cfdc39fb7325a5"
+    },
+    {
+      "path": ".local/stage-c2-final-chunk-002.tar.gz",
+      "bytes": 22843374,
+      "sha256": "617d36a4c28bd1926f16a4acd73bf1e23576eb4b647180ca77585e2562bc4db7"
+    },
+    {
+      "path": ".local/stage-c2-final-chunk-003.tar.gz",
+      "bytes": 25871312,
+      "sha256": "a2e4b9203d4d09848ea8714ea6101994590d78cf2bb7545aafa5576f0f6381a1"
+    },
+    {
+      "path": ".local/stage-c2-final-chunk-004.tar.gz",
+      "bytes": 16949523,
+      "sha256": "a1c7d736db568af802b6d4926f23862d5c888e4e71d859689f7c1412fc4a7543"
+    },
+    {
+      "path": ".local/stage-c2-final-chunk-005.tar.gz",
+      "bytes": 14742719,
+      "sha256": "db1a92b4da52aae235a2c8353322ec73298d8a687b7e02b337465abc3f8ddb00"
+    },
+    {
+      "path": ".local/stage-c2-final-chunk-006.tar.gz",
+      "bytes": 5571494,
+      "sha256": "6e6c415ac265a6c98da326c629e8da3431c9bfe9babab260c84996f9ee5fe1db"
+    },
+    {
+      "path": ".local/stage-c2-reviewed-reports-and-runs.tar.gz",
+      "bytes": 2145094,
+      "sha256": "498e87336043f12d41a3d450fa8f4c1455918e88b6b0d9ff27a61d98f7e3798c"
+    },
+    {
+      "path": ".local/stage-c2-final-metadata-and-overlap.tar.gz",
+      "bytes": 6980735,
+      "sha256": "5928ca3564fcd614bdb947d401abf8d1dcbcd8eb40a5791ce2244c50773a740d"
+    },
+    {
+      "path": ".local/stage-c2-exports.tar.gz",
+      "bytes": 7562720,
+      "sha256": "2680177f5448798d122a15f06463eb29b114e747529741f879239914a2f989b9"
+    }
+  ]
+}

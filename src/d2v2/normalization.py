@@ -9,7 +9,7 @@ import unicodedata
 from dataclasses import dataclass
 from urllib.parse import unquote
 
-from d2core.extractor import normalize as legacy_normalize, _sub, B64
+from d2core.extractor import normalize as legacy_normalize, _sub, B64, HOMOGLYPHS
 
 GREEK = str.maketrans({'Α':'A','Β':'B','Ε':'E','Ζ':'Z','Η':'H','Ι':'I','Κ':'K',
                      'Μ':'M','Ν':'N','Ο':'O','Ρ':'P','Τ':'T','Υ':'Y','Χ':'X',
@@ -73,3 +73,9 @@ def evidence_span(ref, raw, char_span, fast):
         result['token_span']=fast.token_span(raw,char_span)
         result['tokenizer']='original-laya:'+getattr(fast,'metadata',{}).get('revision','unknown')
     return result
+
+
+def target_view(raw):
+    """One detection key; never feed the result to the executor."""
+    text=unicodedata.normalize('NFKC',raw).translate(HOMOGLYPHS).translate(GREEK)
+    return ''.join(c for c in text if unicodedata.category(c)!='Cf').casefold()

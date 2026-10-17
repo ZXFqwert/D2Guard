@@ -2,7 +2,7 @@
 import re
 from pathlib import PurePosixPath
 from urllib.parse import urlsplit, urlunsplit
-from .normalization import normalize
+from .normalization import normalize, target_view
 from .relations import relation_segments, contextual_cues
 
 URL = re.compile(r'https?://[^\s<>"\x27`，；。！？、]+',re.I)
@@ -10,14 +10,14 @@ PATH = re.compile(r'(?<![\w])(?:\.[A-Za-z][\w.-]*|(?:[\w@-]+/)*[\w@-]+\.(?:md|tx
 DIRECTIVE = re.compile(r'\b(read|write|send|upload|post|fetch|execute|run|must|before|register|ignore|use|call)\b|读取|写入|发送|外发|上传|执行|必须|忽略|调用|之前',re.I)
 NEGATION = re.compile(r'\b(no|not|never|without|avoid|explain|quote|example)\b|禁止|不要|不得|示例|解释|引用|不允许',re.I)
 READ = re.compile(r'\b(read|open|view|review|inspect|summari[sz]e)\b|读取|查看|打开|读|查阅|审查',re.I)
-WRITE = re.compile(r'\b(write|generate|create|save)\b|写|生成|保存|创建',re.I)
+WRITE = re.compile(r'\b(write|generate|create|save|put)\b|写|生成|保存|创建|存入|输出',re.I)
 NET_GET = re.compile(r'\b(fetch|get|download|visit)\b|访问|获取|下载',re.I)
 NET_POST = re.compile(r'\b(upload|send|post|submit)\b|上传|发送|提交',re.I)
 UNCERTAIN = re.compile(r'\b(if|unless|whether|could|would|might|may|can|should)\b|如果|若|是否|能否|可以.*吗|[?？]',re.I)
 
 
 def canonical(target):
-    target = target.strip('`\'" ,;。)')
+    target = target_view(target).strip('`\'" ,;。)')
     if target.lower().startswith(('https://','http://')):
         u=urlsplit(target)
         if not u.hostname or u.username or u.password:
@@ -32,33 +32,43 @@ def canonical(target):
 def targets(text):
     urls=[m.group().rstrip('.,;。)') for m in URL.finditer(text)]
     without=URL.sub(lambda m:' '*len(m.group()),text)
-    return list(dict.fromkeys(urls+[m.group().rstrip('.') for m in PATH.finditer(without)]))
+    matches=list(PATH.finditer(without))+list(re.finditer(r'(?:~/)?(?:\.?[\w@-]+/)+[\w.@-]+',without))
+    matches=[m for m in matches if not any(n.start()<=m.start() and n.end()>=m.end() and n.span()!=m.span() for n in matches)]
+    return list(dict.fromkeys(urls+[m.group().rstrip('.') for m in sorted(matches,key=lambda m:m.start())]))
+
 
 
 def sensitive(path):
-    low=path.lower().replace('\\','/')
+    low=target_view(path).replace('\\','/')
     return any(x in low for x in ('.env','id_rsa','id_ed25519','.ssh/','.aws/','credential','secret','token','password')) or low.endswith(('.pem','.key'))
 
 
-def grant(text, ref, version):
-    """Explicit nearby action verbs only. Ambiguous clauses do not grant permissions."""
-    result={'version':version,'intent_mode':'READONLY_REVIEW' if re.search(r'read.?only|只读',text,re.I) else 'TASK',
-        'read':[],'write':[],'net':[],'evidence_ref':ref,'coverage_incomplete':False}
-    # Defense in depth: callers normally already mask these spans.
+DELEGATE = re.compile(r'\b(delegat\w*|specialist)\b|子\s*agent|专家|委派',re.I)
+
+
+def affirmative_clauses(text):
+    # Questions/conditions have sentence scope. Negation has coordinated-clause scope.
     from .user_message import split_user_message
-    text,_=split_user_message(text)
-    for clause in re.split(r'\n|[;；。]|\.\s+',text):
-        language=URL.sub('',clause)
-        if UNCERTAIN.search(language) or NEGATION.search(language) or re.search(r"\b(?:don't|do not|cannot|can't)\b|不上传|不发送|别上传",language,re.I):continue
+    trusted,_=split_user_message(text)
+    for sentence in re.split(r'\n|[;；。]|\.\s+',trusted):
+        if UNCERTAIN.search(URL.sub('',sentence)):continue
+        parts=re.split(r'[,，]|\bbut\b|(?=\bwithout\b)|(?=\b(?:do not|don\'t|never|avoid)\b)|(?=不要|不得|禁止|不包含)',sentence,flags=re.I)
+        # without introduces a negative adjunct; it never cancels the earlier verb.
+        for clause in parts:
+            language=URL.sub('',clause)
+            if NEGATION.search(language) or re.search(r"\b(?:don't|cannot|can't)\b|不上传|不发送|别上传|不包含",language,re.I):continue
+            yield clause
+
+
+def grant(text, ref, version):
+    result={'version':version,'intent_mode':'READONLY_REVIEW' if re.search(r'read.?only|只读',text,re.I) else 'TASK',
+        'read':[],'write':[],'net':[],'spawn':[],'evidence_ref':ref,'coverage_incomplete':False}
+    for clause in affirmative_clauses(target_view(text)):
+        local={'read':[],'write':[]}
         for target in targets(clause):
             before=clause[:clause.find(target)]
-            # Scope to the latest coordinated verb phrase; never infer grants from a filename alone.
-            before=re.split(r'\.\s+|,|\band\b|然后|并且',before,flags=re.I)[-1]
-            if NEGATION.search(before):
-                continue
-            try: value=canonical(target)
-            except ValueError:
-                result['coverage_incomplete']=True;continue
+            try:value=canonical(target)
+            except ValueError:result['coverage_incomplete']=True;continue
             if value.startswith('http'):
                 after=clause[clause.find(target)+len(target):]
                 method=re.search(r'\b(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\b',before,re.I)
@@ -66,13 +76,39 @@ def grant(text, ref, version):
                 if method or suffix:result['net'].append((method or suffix).group(1).upper()+' '+value)
                 elif NET_POST.search(before):result['net'].append('POST '+value)
                 elif NET_GET.search(before) or READ.search(before):result['net'].append('GET '+value)
-            elif WRITE.search(before):result['write'].append(value)
-            elif READ.search(before):result['read'].append(value)
-    if result['intent_mode']=='READONLY_REVIEW':result['write']=[]
+            else:
+                verbs=sorted([(m.start(),'read') for m in READ.finditer(before) if not re.search(r'\b(?:the|a|an|this|your)\s+$',before[:m.start()],re.I)]+[(m.start(),'write') for m in WRITE.finditer(before)])
+                if verbs:
+                    key=verbs[-1][1];result[key].append(value);local[key].append(value)
+        if DELEGATE.search(clause) and any(local.values()):result['spawn'].append(local)
     for key in ('read','write','net'):
         result[key]=list(dict.fromkeys(result[key]))
         if len(result[key])>16:result['coverage_incomplete']=True;result[key]=result[key][:16]
+    if len(result['spawn'])>16:result['coverage_incomplete']=True;result['spawn']=result['spawn'][:16]
     return result
+
+
+def literal_scope(delta,args,anchor,hits=()):
+    name=delta['tool'];target=delta['target']
+    if name=='fs.read':return target in anchor.get('read',[])
+    if name=='fs.write':return target in anchor.get('write',[])
+    if name=='net.fetch':return delta['op']+' '+target in anchor.get('net',[])
+    if name=='spawn_subagent' and not hits:
+        task=args.get('task','')
+        requested=grant(task,{},0)
+        try:mentioned={canonical(t) for t in targets(target_view(task))}
+        except ValueError:return False
+        # No implicit network/exec authority travels with a read/write delegation.
+        if not mentioned or requested['net'] or URL.search(task) or re.search(r'\b(exec(?:ute)?|shell|push|commit)\b|执行命令|推送',task,re.I):return False
+        for scope in anchor.get('spawn',[]):
+            if mentioned<=set(scope['read']+scope['write']) and set(requested['read'])<=set(scope['read']+scope['write']) and set(requested['write'])<=set(scope['write']):return True
+    return False
+
+
+def readonly_write_violation(delta,anchor,existing_sources=()):
+    if delta['tool']!='fs.write' or anchor.get('intent_mode')!='READONLY_REVIEW':return False
+    # Other writes still need the ordinary grant/taint decision table.
+    return delta['target'] in existing_sources
 
 
 def clauses(raw, ref):
@@ -124,6 +160,8 @@ def action(tool,args):
     except ValueError:target='invalid';valid=False
     op=(str(args.get('method','GET')).upper() if name=='net.fetch' else name)
     return {'event_kind':'ACTION_CANDIDATE','tool':name,'op':op,'target':target,
+        'raw_target':raw_target,'target_normalization_changed':raw_target!=target,
+        'manipulation_cues':['normalized_action_target'] if raw_target!=target else [],
         'sensitive_target':sensitive(target),'valid_target':valid,
         'coverage_incomplete':name not in {'fs.read','fs.write','net.fetch','spawn_subagent','mcp.call','memory.read','memory.write'}}
 

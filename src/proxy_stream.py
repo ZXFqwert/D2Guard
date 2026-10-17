@@ -2,11 +2,46 @@
 import hashlib
 import time
 import uuid
+import threading
 
 import httpx
 
 
-def forward(handler, provider, path, body, append, request_id=None):
+class TransportJournal:
+    """Exactly one transport terminal, including host-confirmed budget cancellation."""
+    def __init__(self,append):
+        self.emit=append;self.lock=threading.RLock();self.active={};self.finished=set()
+
+    def start(self,item):
+        with self.lock:
+            self.active[item['request_id']]={'agent_id':item['agent_id'],'started':time.perf_counter(),
+                'upstream_bytes':0,'downstream_bytes':0,'chunks':0}
+            return self.emit('gateway.jsonl',item)
+
+    def progress(self,rid,received,sent,chunks):
+        with self.lock:
+            if rid in self.active:self.active[rid].update(upstream_bytes=received,downstream_bytes=sent,chunks=chunks)
+
+    def append(self,filename,item):
+        with self.lock:
+            rid=item['request_id']
+            if rid in self.finished:return None
+            current=self.active.pop(rid,{})
+            self.finished.add(rid)
+            return self.emit(filename,{**item,'agent_id':current.get('agent_id','unknown')})
+
+    def cancel(self,agent,reason='cancelled_by_budget'):
+        with self.lock:
+            ids=[rid for rid,value in self.active.items() if agent=='*' or value['agent_id']==agent]
+            for rid in ids:
+                current=self.active[rid]
+                self.append('gateway.jsonl',{'type':'proxy_cancelled','request_id':rid,'reason':reason,
+                    'transport_complete':False,'elapsed_ms':(time.perf_counter()-current['started'])*1000,
+                    **{k:current[k] for k in ('upstream_bytes','downstream_bytes','chunks')}})
+            return ids
+
+
+def forward(handler, provider, path, body, append, request_id=None, journal=None):
     request_id = request_id or str(uuid.uuid4())
     start = time.perf_counter()
     stage = 'connect_upstream'
@@ -35,12 +70,14 @@ def forward(handler, provider, path, body, append, request_id=None):
                     except StopIteration:
                         break
                     received += len(chunk)
+                    if journal:journal.progress(request_id,received,sent,chunks)
                     response_hash.update(chunk)
                     stage = 'write_downstream'
                     handler.wfile.write(chunk)
                     handler.wfile.flush()
                     sent += len(chunk)
                     chunks += 1
+                    if journal:journal.progress(request_id,received,sent,chunks)
                 append('gateway.jsonl', {'type':'proxy_response','request_id':request_id,
                     'status':status, 'upstream_bytes':received, 'downstream_bytes':sent,
                     'chunks':chunks, 'response_sha256':response_hash.hexdigest(),
