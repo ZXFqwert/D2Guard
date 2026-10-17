@@ -1,0 +1,61 @@
+version: 2
+trust:
+  domains: []
+commands:
+  download_commands: [curl, wget, invoke-webrequest, iwr, invoke-restmethod, irm]
+  execution_commands: [sh, bash, zsh, dash, cmd, powershell, pwsh, python, python3, perl, ruby, node, iex, invoke-expression]
+rules:
+  - id: POL-FS-WRITE-SENSITIVE
+    match: {tool: [fs.write, exec], effect: file_write}
+    when:
+      target.path matches:
+        - '*/.ssh/*'
+        - '*/.ssh'
+        - '*/.aws/*'
+        - '*/.aws'
+        - '/etc/cron*'
+        - '/etc/init.d/*'
+        - '/etc/rc*.d/*'
+        - '/etc/systemd/system/*'
+        - '/usr/lib/systemd/system/*'
+        - '*/.config/autostart/*'
+        - '*/.config/systemd/user/*'
+        - '*/start menu/programs/startup/*'
+        - '*/windows/system32/tasks/*'
+        - '*/library/launchagents/*'
+        - '/library/launchdaemons/*'
+        - '*/.vscode/settings.json'
+        - '*/.claude/*'
+        - '*/.codex/*'
+        - '*/.pi/*'
+    risk: {base: R3}
+    verdict: {R3: BLOCK}
+    explain: 禁止写入凭证、持久化启动或 Agent 配置路径。
+  - id: POL-NET-SECRET-EXFIL
+    match: {tool: [net.fetch, mcp.call]}
+    when:
+      any:
+        - all: [action.fingerprint_egress, args.contains_secret_fingerprint]
+        - all: [action.egress_sink, ctx.confidentiality.nonempty, target.domain not in trust.domains, not authority.net_granted]
+    risk: {base: R2, escalate: [{if: args.contains_secret_fingerprint, to: R3}]}
+    verdict: {R3: BLOCK, R2: ASK}
+    explain: 外发参数命中机密指纹，或持有机密的上下文试图向未授权目标外发。
+  - id: POL-GIT-REVIEW-NO-PUSH
+    match: {tool: [git.push, git.commit, exec], effect: vcs_publish}
+    when: {authority.mode: READONLY_REVIEW}
+    risk: {base: R3}
+    verdict: {R3: BLOCK}
+    explain: 只读审查禁止提交或推送代码。
+  - id: POL-EXEC-RESTRICT
+    match: {tool: [exec]}
+    when:
+      any: [cmd.ast.pipe_to_interpreter, cmd.ast.decode_then_exec, cmd.ast.remote_download_exec, cmd.reads_sensitive_env, cmd.ast.unverifiable]
+    risk: {base: R3}
+    verdict: {R3: BLOCK}
+    explain: 命令包含受禁止的执行链、敏感环境访问或不可审计的 AST。
+  - id: POL-SUBAGENT-SECRET-LEAK
+    match: {tool: [spawn_subagent]}
+    when: {any: [args.contains_secret_fingerprint, args.references_secret_asset]}
+    risk: {base: R3, downgrade: [{if: not args.contains_secret_fingerprint, to: R2}]}
+    verdict: {R3: BLOCK, R2: ASK}
+    explain: 子任务携带机密或引用敏感资产，需要在派发前控制。

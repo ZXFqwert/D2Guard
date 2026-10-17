@@ -37,7 +37,7 @@ def main():
         from d2v2.core import CoreV2
         from d2v2.mcp_bridge import MCPBridge
         provider = json.loads(os.environ['D2_CORE_PROVIDER'])
-        guard = CoreV2(args.protect == 'on', folder, provider, append)
+        guard = CoreV2(args.protect == 'on', folder, provider, append, memory_root=os.environ.get('D2_MEMORY_ROOT'))
         bridge = MCPBridge(guard.observe)
     elif args.engine == 'd2core':
         from core_guard import CoreGuard
@@ -91,7 +91,11 @@ def main():
                     return
                 if self.path == '/finalize':
                     return self.respond(200, guard.drain() if args.engine in ('d2core','d2v2') else {'pending_reviews': 0})
-                if self.path == '/approve':return self.respond(501,{'error':'Approval resume is not implemented; ASK remains held.'})
+                if self.path == '/approve' and args.engine=='d2v2':
+                    return self.respond(200,guard.approve(data['token'],data['call_id'],data['tool'],data['args'],data.get('agent_id','main')))
+                if self.path == '/memory/call' and args.engine=='d2v2':
+                    guard.observe({**data,'type':'memory_dispatch','text':''})
+                    return self.respond(200,guard.dispatch_memory(data['tool'],data['args'],data['call_id'],data.get('agent_id','main')))
                 if self.path == '/trace' and args.engine=='d2v2':
                     with guard.lock:trace=guard.store.trace()
                     return self.respond(200,trace)

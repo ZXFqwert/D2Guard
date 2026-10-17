@@ -153,13 +153,19 @@ def run(args, canary=None, batch_id=None):
         'D2_WORKSPACE': str(workspace), 'D2_RUN_DIR': str(folder), 'D2_AGENT_ID': 'main', 'D2_DEPTH': '0',
         'PI_CODING_AGENT_DIR': str(agent_dir), 'PI_TELEMETRY': '0', 'PI_OFFLINE': '1',
         'D2_PI_CLI': str(pi_cli), 'D2_PI_BASE_ARGS': json.dumps(base_args)}
-    service_env = {**env, 'D2_CORE_PROVIDER': json.dumps(cfg)}
+    memory_root = Path(args.memory_root).resolve() if args.memory_root else folder / '.local/memory'
+    memory_root.mkdir(parents=True, exist_ok=True)
+    # The host path and private provenance are never passed to the Agent.
+    env.pop('D2_MEMORY_ROOT', None)
+    service_env = {**env, 'D2_CORE_PROVIDER': json.dumps(cfg), 'D2_MEMORY_ROOT': str(memory_root)}
     source_paths = [ROOT / 'lab.py', *sorted((ROOT / 'src').glob('*.py')), *sorted((ROOT / 'src').glob('*.mjs')), ROOT / 'extensions' / 'lab.ts']
     source_paths += sorted(p for p in (ROOT / 'src/d2core').rglob('*') if p.is_file() and p.suffix in ('.py', '.json', '.yaml'))
-    source_paths += sorted((ROOT / 'src/d2v2').glob('*.py'))
+    source_paths += sorted(p for p in (ROOT / 'src/d2v2').iterdir() if p.suffix in ('.py','.yaml'))
     manifest = {'run_id': run_id, 'batch_id': batch_id, 'scenario': args.scenario, 'scenario_version': scenario['version'],
         'environment': args.environment, 'protection': args.protect, 'pi_version': version,
         'guard_engine': args.engine,
+        'memory_namespace': 'explicit_shared' if args.memory_root else 'isolated_run',
+        'memory_initial_sha256': {p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(memory_root.glob('*.json'))},
         'model': cfg['main_model'], 'api_style': cfg['api_style'], 'base_url': cfg['base_url'],
         'scope': 'confined file and loopback HTTP tools; no arbitrary shell; not an OS sandbox',
         'cost_accounting': 'unknown: custom provider prices are not configured; zero price fields do not imply free use',
@@ -250,6 +256,7 @@ def main():
         p.add_argument('--scenario', default='readme-exfil', choices=sorted(p.stem for p in (ROOT / 'scenarios').glob('*.json')))
         p.add_argument('--timeout', type=int, default=180)
         p.add_argument('--engine', choices=['m1', 'd2core','d2v2'], default='d2v2')
+        p.add_argument('--memory-root', help='Host-owned shared memory directory; default is isolated per run')
         p.add_argument('--task')
         if name == 'run':
             p.add_argument('--environment', choices=['clean', 'attack'], default='clean')

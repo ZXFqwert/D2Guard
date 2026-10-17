@@ -67,6 +67,9 @@ def payload_for(previous_security_state, security_delta):
 
 
 class OriginalLaya:
+    def token_offsets(self, text):
+        return self.agent.tok(text,add_special_tokens=False,return_offsets_mapping=True)['offset_mapping']
+
     def count_tokens(self, text):
         return len(self.agent.tok(text, add_special_tokens=False)['input_ids'])
 

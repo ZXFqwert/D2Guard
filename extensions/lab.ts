@@ -38,7 +38,7 @@ export default function (pi: ExtensionAPI) {
   });
   pi.on('before_agent_start', async (event) => {
     if (v2) await audit({ type: 'system_init', text: event.systemPrompt,
-      enabled_tools: ['fs_read','fs_write','net_fetch','spawn_subagent','mcp_call'] });
+      enabled_tools: ['fs_read','fs_write','net_fetch','spawn_subagent','mcp_call','memory_read','memory_write'] });
     if (!v2 || !inputObserved) await audit({ type: 'agent_start', task: event.prompt });
     inputObserved = false;
   });
@@ -142,6 +142,17 @@ export default function (pi: ExtensionAPI) {
       await audit({ type: 'subagent_end', call_id: id, child_agent_id: childId, final_answer: final });
       return reply(final);
     } });
+  if (v2) for (const name of ['memory_read', 'memory_write'] as const) pi.registerTool({
+    name, label: name === 'memory_read' ? 'Read local memory' : 'Write local memory',
+    description: name === 'memory_read' ? 'Read a saved local memory entry by key.' : 'Save a local memory entry with its security provenance.',
+    parameters: name === 'memory_read' ? Type.Object({ key: Type.String() }) : Type.Object({ key: Type.String(), content: Type.String() }),
+    executionMode: 'sequential',
+    async execute(id, args) {
+      await audit({ type: 'tool_started', call_id: id });
+      const result = await control('/memory/call', { call_id: id, tool: name, args });
+      return reply(result.text);
+    }
+  });
   if (v2) pi.registerTool({ name: 'mcp_call', label: 'Read public facts through MCP',
     description: 'Call the local MCP docs server through D2Guard. project_facts returns public project facts with no parameters or side effects.',
     parameters: Type.Object({ name: Type.Literal('project_facts') }), executionMode: 'sequential',

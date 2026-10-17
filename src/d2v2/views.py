@@ -31,7 +31,11 @@ def build_view(q, action, state):
     bounds presentation only; the decision queries the full persistent index.
     """
     description = f"{action['tool']} {action.get('op', '')} {action.get('target', '')}".strip()
-    view = {'task': state['task_text'], 'action': description}
+    if state.get('task_brief_overflow'):
+        raise InputBudgetExceeded('Mandatory task sentences exceed 150 model tokens')
+    if state['count_tokens'](state['task_brief'])>150:
+        raise InputBudgetExceeded('Task brief exceeds 150 model tokens')
+    view = {'task': state['task_brief'], 'action': description}
     if q == 'A2':
         view.update(external_sentences=state.get('directive_sentences', [])[:8],
                     agent_statement=state.get('agent_statement', ''))

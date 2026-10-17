@@ -2,7 +2,7 @@
 import re
 from pathlib import PurePosixPath
 from urllib.parse import urlsplit, urlunsplit
-from d2core.extractor import normalize
+from .normalization import normalize
 from .relations import relation_segments, contextual_cues
 
 URL = re.compile(r'https?://[^\s<>"\x27`]+',re.I)
@@ -54,7 +54,9 @@ def grant(text, ref, version):
                 result['coverage_incomplete']=True;continue
             if value.startswith('http'):
                 if READ.search(before) or re.search(r'\bGET\b',before):result['net'].append('GET '+value)
-                elif re.search(r'\bPOST\b',before):result['net'].append('POST '+value)
+                else:
+                    method=re.search(r'\b(POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\b',before,re.I)
+                    if method:result['net'].append(method.group().upper()+' '+value)
             elif WRITE.search(before):result['write'].append(value)
             elif READ.search(before):result['read'].append(value)
     if result['intent_mode']=='READONLY_REVIEW':result['write']=[]
@@ -81,22 +83,40 @@ def clauses(raw, ref):
             'requested_data_flows':flows[:12],'contextual_cues':cues,
             'evidence_ref':{**ref,'char_span':[a,b]},
             'span_unit':'unicode_codepoints','attribution':'candidate',
+            'extraction_overflow':len(mentioned)>12 or len(relations)>12 or len(flows)>12,
             'coverage_incomplete':gap or len(mentioned)>12 or len(relations)>12 or len(flows)>12})
     # A capped target list is a coverage gap even when the source is short.
     return found, len(raw)>65536 or any(item['coverage_incomplete'] for item in found)
 
 
+def unknown_clauses(raw, ref):
+    """Until S1 is trained, DIRECTIVE is an explicitly identified rule signal."""
+    text,mapping=normalize(raw)
+    found=[]
+    for match in re.finditer(r'[^\n;。]+',text):
+        clause=match.group()
+        if not DIRECTIVE.search(clause):continue
+        relations,_,gap=relation_segments(clause,targets)
+        if (not relations or gap) and not NEGATION.search(clause):
+            spans=mapping.char_to_raw[match.start():match.end()]
+            found.append({'evidence_ref':{**ref,'char_span':[min(s[0] for s in spans),max(s[1] for s in spans)]},
+                          'reason':'DIRECTIVE rule signal without complete operation/target relation',
+                          'signal':'rule:DIRECTIVE','s1':None})
+    return found
+
+
 def action(tool,args):
-    mapping={'fs_read':'fs.read','fs_write':'fs.write','net_fetch':'net.fetch','spawn_subagent':'spawn_subagent','mcp_call':'mcp.call'}
+    mapping={'fs_read':'fs.read','fs_write':'fs.write','net_fetch':'net.fetch','spawn_subagent':'spawn_subagent','mcp_call':'mcp.call',
+             'memory_read':'memory.read','memory_write':'memory.write'}
     name=mapping.get(tool,tool)
-    raw_target=args.get('url') if name=='net.fetch' else args.get('path','')
+    raw_target=args.get('url') if name=='net.fetch' else args.get('key','') if name.startswith('memory.') else args.get('path','')
     valid=True
     try: target=canonical(raw_target) if raw_target else ''
     except ValueError:target='invalid';valid=False
     op=(str(args.get('method','GET')).upper() if name=='net.fetch' else name)
     return {'event_kind':'ACTION_CANDIDATE','tool':name,'op':op,'target':target,
         'sensitive_target':sensitive(target),'valid_target':valid,
-        'coverage_incomplete':name not in {'fs.read','fs.write','net.fetch','spawn_subagent','mcp.call'}}
+        'coverage_incomplete':name not in {'fs.read','fs.write','net.fetch','spawn_subagent','mcp.call','memory.read','memory.write'}}
 
 
 def fast_view(value):

@@ -10,17 +10,22 @@ from urllib.parse import urlsplit
 
 import httpx
 from original_laya import OriginalLaya
-from .compression import action, canonical, clauses, grant, sensitive
+from .compression import action, canonical, clauses, grant, sensitive, unknown_clauses
 from .ledger import FingerprintLedger
 from .store import EvidenceStore, digest, encode
-from .policy import HardPolicies
+from .policy import HardPolicies, is_egress_sink
 from .review import validate_assessment
 from .decision import decide as table_decide, required_questions
 from .views import build_view, InputBudgetExceeded
+from .user_message import split_user_message
+from .task_brief import build_task_brief
+from .normalization import normalize, evidence_span
+from .approval import Approvals
+from .memory import MemoryStore
 
 
 class CoreV2:
-    def __init__(self, enabled, folder, provider, emit, fast=None):
+    def __init__(self, enabled, folder, provider, emit, fast=None, memory_root=None):
         self.enabled=enabled;self.folder=Path(folder);self.emit=emit;self.provider=provider
         self.lock=threading.RLock();self.store=EvidenceStore(self.folder)
         self.ledger=FingerprintLedger(self.store)
@@ -28,6 +33,12 @@ class CoreV2:
         self.fast=fast or OriginalLaya(Path(__file__).resolve().parents[2]/'.local/laya.json')
         self.anchor={'version':0,'read':[],'write':[],'net':[],'coverage_incomplete':True}
         self.taints=deque(maxlen=8);self.pending=None;self.integrity_fault=False
+        self.approvals=Approvals(self.store)
+        self.memory=MemoryStore(memory_root or self.folder/'.local/memory')
+        old=self.store.db.execute('SELECT data FROM grants ORDER BY version DESC LIMIT 1').fetchone()
+        if old:self.anchor=json.loads(old[0])
+        old=self.store.db.execute("SELECT decision FROM calls WHERE status='ASK' ORDER BY rowid LIMIT 1").fetchone()
+        if old:self.pending=json.loads(old[0])
         self.reviews=queue.Queue(maxsize=8)
         threading.Thread(target=self._slow_worker,daemon=True,name='d2v2-evidence-review').start()
         emit('decisions.jsonl',{'type':'core_started','engine':'d2v2','protection':enabled,
@@ -39,7 +50,8 @@ class CoreV2:
         return {'authority_anchor':self.anchor,'active_taints':list(self.taints),
             'secret_exposure':self.ledger.summary(),'recent_steps':self.store.recent(),
             'coverage_incomplete':self.integrity_fault,
-            'contexts':{r[0]:self.store.context(r[0]) for r in self.store.db.execute('SELECT agent FROM contexts')}}
+            'contexts':{r[0]:self.store.context(r[0]) for r in self.store.db.execute('SELECT agent FROM contexts')},
+            'unknown_count':self.store.db.execute('SELECT count(*) FROM unknowns').fetchone()[0]}
 
     def _sequence(self,event):
         if 'producer_seq' not in event:return
@@ -75,17 +87,19 @@ class CoreV2:
             elif kind=='system_init':source='HOST_CONFIGURATION';uri='system://pi'
             elif kind=='tool_result':
                 tool=event['tool'];args=event.get('args',{})
-                source='WEB' if tool=='net_fetch' else 'SUBAGENT' if tool=='spawn_subagent' else 'MCP_RET' if tool=='mcp_call' else 'LOCAL_FILE'
+                source='MEMORY' if tool in {'memory_read','memory_write'} else 'WEB' if tool=='net_fetch' else 'SUBAGENT' if tool=='spawn_subagent' else 'MCP_RET' if tool=='mcp_call' else 'LOCAL_FILE'
                 uri=args.get('path') or args.get('url') or 'agent://'+agent+'/result'
+                if tool in {'memory_read','memory_write'}:uri='memory://local/'+args['key']
                 if tool=='mcp_call':uri='mcp://'+event.get('server_id','local-docs')+'/'+args.get('name','unknown')
             elif kind=='mcp_description':source='MCP_DESC';uri='mcp://'+event['server_id']+'/'+event['tool_name']
+            elif kind=='memory_recall':source='MEMORY';uri='memory://local/'+event['key']
             elif kind=='assistant_turn':
                 raw=encode({'public_text':event.get('text',''),'proposals':event.get('proposals',[])})
             else:raw=encode({k:v for k,v in event.items() if k not in {'event_id','producer_seq'}})
             ref,new=self._archive(event,kind,source,uri,raw)
             if not new:return
             self.store.add_labels(agent)
-            if kind=='agent_start' and agent!='main':
+            if kind in {'agent_start','user_input'} and agent!='main':
                 parent=self.store.db.execute('SELECT agent FROM calls WHERE id=?',
                     (event.get('parent_call_id'),)).fetchone()
                 if parent:
@@ -102,31 +116,27 @@ class CoreV2:
                 self.store.edge(server,'event:'+ref['event_id'],'MCP_OBSERVATION',ref['event_id'])
             delta.update(source_type=source,evidence_ref=ref)
             if kind in {'agent_start','user_input'} and agent=='main':
-                self.anchor=grant(raw,ref,self.anchor['version']+1)
+                trusted,quoted=split_user_message(raw)
+                self.anchor=grant(trusted,ref,self.anchor['version']+1)
+                brief=build_task_brief(raw,trusted,self.fast.count_tokens)
+                self.anchor.update(brief)
+                # Full original remains private evidence; exported state is redacted.
+                self.anchor['task_brief']=self.ledger.redact(self.anchor['task_brief'])
+                for index,(a,b) in enumerate(quoted):
+                    quoted_ref,_=self.store.put(ref['event_id']+':quoted:'+str(index),agent,
+                        'CONTENT_IN','USER_QUOTED','user://quoted',raw[a:b],
+                        {'parent_ref':ref,'parent_char_span':[a,b]})
+                    qdelta=self._ingest_content(raw[a:b],quoted_ref,'USER_QUOTED','user://quoted',agent)
+                    self._commit(quoted_ref,qdelta)
                 self.store.db.execute('INSERT INTO grants(event_id,data) VALUES(?,?)',(ref['event_id'],encode(self.anchor)))
                 delta.update(event_kind='USER_GRANT',authorization=self.anchor)
-            elif kind in {'tool_result','mcp_description'}:
-                directives,incomplete=clauses(raw,ref)
-                ids=self.ledger.register(raw,ref,uri) if not event.get('is_error') else []
-                self.store.add_labels(agent,integrity=[ref['event_id']],confidentiality=ids)
-                for item in directives:
-                    item['source_type']=source;item['source_uri']=uri
-                    if hasattr(self.fast,'token_span'):
-                        token_span=self.fast.token_span(raw,item['evidence_ref']['char_span'])
-                        item['evidence_ref'].update(token_span=token_span,tokenizer='original-laya:'+getattr(self.fast,'metadata',{}).get('revision','unknown'))
-                    item['taint_id']='T-'+digest(encode(item))[:16]
-                    for relation in item['action_relations']:
-                        if relation['stance']!='requested':continue
-                        try:target=canonical(relation['target'])
-                        except ValueError:incomplete=True;continue
-                        op=relation['op']
-                        self.store.add_directive(op,target,item)
-                    self.taints.append(item)
-                delta.update(event_kind='UNTRUSTED_OBSERVATION',directive_clauses=directives[:8],
-                    secrets_registered=ids[:8],coverage_incomplete=incomplete,view_omitted_directives=max(0,len(directives)-8),
-                    is_error=bool(event.get('is_error')))
-                # All clauses stay queryable on disk even if hot view omits them.
-                if incomplete:self.integrity_fault=True
+            elif kind in {'tool_result','mcp_description','memory_recall'}:
+                delta.update(self._ingest_content(raw,ref,source,uri,agent,event.get('is_error',False)))
+            elif kind=='subagent_spawn':
+                self.store.inherit_context(event['child_agent_id'],agent,ref['event_id'])
+            elif kind=='subagent_end':
+                child=self.store.context(event['child_agent_id'])
+                self.store.add_labels(agent,child['integrity'],child['confidentiality'])
             elif kind=='assistant_turn':
                 proposals=[]
                 for p in event.get('proposals',[]):
@@ -151,7 +161,7 @@ class CoreV2:
                     raise ValueError('Missing, consumed or wrong-actor execution authorization')
                 if row and row[0]:
                     decision=json.loads(row[0])
-                    if decision['verdict'] in {'BLOCK','ASK'}:status='not_executed'
+                    if decision['verdict'] in {'BLOCK','ASK'}:status=decision['verdict']
                     self.store.db.execute('UPDATE calls SET status=? WHERE id=?',(status,event['call_id']))
                     if status=='execution_started':self._account_call(event['call_id'],status)
                 delta['execution_status']=status
@@ -159,6 +169,85 @@ class CoreV2:
             self.store.step({'actor':agent,'kind':delta['event_kind'],'ref':ref['event_id'],
                 'status':delta.get('execution_status','observed')})
             self._commit(ref,delta)
+
+    def _ingest_content(self,raw,ref,source,uri,agent,is_error=False):
+        sid=self.store.register_source(source,uri,digest(raw),ref['event_id'])
+        ids=self.ledger.register(raw,ref,uri) if not is_error else []
+        self.store.add_labels(agent,integrity=[sid],confidentiality=ids)
+        cached=self.store.db.execute('SELECT data FROM source_analysis WHERE source_id=?',(sid,)).fetchone()
+        if cached:
+            extracted=json.loads(cached[0])
+        else:
+            directives,incomplete=clauses(raw,ref)
+            unknowns=unknown_clauses(raw,ref)
+            for item in directives:
+                item.update(source_type=source,source_uri=uri,source_id=sid)
+                item['evidence_ref']=evidence_span(ref,raw,item['evidence_ref']['char_span'],self.fast)
+                item['taint_id']='T-'+digest(encode([sid,item['evidence_ref']['char_span']]))[:16]
+                for relation in item['action_relations']:
+                    if relation['stance']!='requested':continue
+                    try:target=canonical(relation['target'])
+                    except ValueError:incomplete=True;continue
+                    self.store.add_directive(relation['op'],target,item)
+            for item in unknowns:
+                item['evidence_ref']=evidence_span(ref,raw,item['evidence_ref']['char_span'],self.fast)
+                self.store.add_unknown(sid,item)
+            detection,mapping=normalize(raw,casefold=True)
+            norm={'text':detection,'char_to_raw':mapping.char_to_raw,'raw_token_offsets':None,
+                  'detection_token_offsets':None,'token_to_raw':None,'tokenizer':None}
+            if hasattr(self.fast,'token_offsets'):
+                norm['raw_token_offsets']=self.fast.token_offsets(raw)
+                norm['detection_token_offsets']=self.fast.token_offsets(detection)
+                norm['token_to_raw']=[]
+                for a,b in norm['detection_token_offsets']:
+                    spans=mapping.char_to_raw[a:b]
+                    norm['token_to_raw'].append([min(x[0] for x in spans),max(x[1] for x in spans)] if spans else [0,0])
+                norm['tokenizer']='original-laya:'+self.fast.metadata.get('revision','unknown')
+            self.store.db.execute('INSERT INTO normalized_evidence VALUES(?,?)',(ref['event_id'],encode(norm)))
+            structural=len(raw)>65536 or any(x['extraction_overflow'] for x in directives)
+            extracted={'directives':directives,'unknowns':unknowns,'structural_gap':structural,'coverage_incomplete':incomplete}
+            self.store.db.execute('INSERT INTO source_analysis VALUES(?,?)',(sid,encode(extracted)))
+        self.taints.extend(extracted['directives'])
+        if extracted['structural_gap']:self.integrity_fault=True
+        return {'event_kind':'UNTRUSTED_OBSERVATION','source_id':sid,'source_type':source,
+                'evidence_ref':ref,'directive_clauses':extracted['directives'][:8],
+                'unknowns':extracted['unknowns'][:8],'secrets_registered':ids[:8],
+                'coverage_incomplete':extracted['coverage_incomplete'],
+                'view_omitted_directives':max(0,len(extracted['directives'])-8),'is_error':bool(is_error)}
+
+    def _decision_inputs(self,tool,args,agent):
+        delta=action(tool,args);name=delta['tool'];target=delta['target'];op=delta['op']
+        scope=(target in self.anchor.get('read',[]) if name=='fs.read' else
+               target in self.anchor.get('write',[]) if name=='fs.write' else
+               op+' '+target in self.anchor.get('net',[]) if name=='net.fetch' else False)
+        candidates=self.store.matching_directives(name+':'+op if name=='net.fetch' else name,target)
+        domain=(urlsplit(target).hostname or '') if name=='net.fetch' else ''
+        hits,groups=self.ledger.match(args,domain)
+        ctx=self.store.context(agent)
+        matches=self.hard.evaluate(name,args,self.anchor.get('intent_mode')=='READONLY_REVIEW',hits,
+            ctx,scope if name=='net.fetch' else False,[r[0] for r in self.store.db.execute('SELECT DISTINCT source FROM secrets')])
+        hard=next((m for m in matches if m['risk']=='R3'),None)
+        soft=next((m for m in matches if m['risk']=='R2' and m['rule_id']!='POL-NET-SECRET-EXFIL'),None)
+        if not delta['valid_target']:
+            hard={'rule_id':'POL-PATH-INVALID','reason':'目标路径无效或越出工作区。'}
+        elif name=='fs.write' and (sensitive(target) or self.anchor.get('intent_mode')=='READONLY_REVIEW'):
+            hard={'rule_id':'POL-FS-WRITE-SENSITIVE','reason':'写入敏感资产或违反只读授权。'}
+        elif hits and name in {'fs.write','memory.write'}:
+            hard={'rule_id':'POL-SECRET-DISCLOSURE','reason':'禁止将已登记机密写入业务或记忆产物。'}
+        readonly_mcp=name=='mcp.call' and args=={'name':'project_facts'}
+        sink=is_egress_sink(name,args)
+        low=name in {'fs.read','memory.read'} or readonly_mcp or name=='net.fetch' and not sink
+        unknowns=self.store.relevant_unknowns(agent)
+        facts={'hard_policy':hard['rule_id'] if hard else None,'hard_reason':hard['reason'] if hard else None,
+            'soft_policy':soft['rule_id'] if soft else None,'soft_reason':soft['reason'] if soft else None,
+            'secret_hit':bool(hits),'untrusted_sink':sink,'network_granted':name=='net.fetch' and scope,
+            'context_secret':bool(ctx['confidentiality']),'literal_scope':scope,
+            'sensitive':delta['sensitive_target'],'directive':bool(candidates),'tainted':bool(ctx['integrity']),
+            'low_risk':low and not delta['sensitive_target'],'high_risk':not low or delta['sensitive_target'],
+            'unknowns':bool(unknowns)}
+        delta.update(in_user_granted_scope=scope,matches_untrusted_taint=candidates,
+                     secret_exposure=hits[:8],carries_secret=bool(hits),unknowns=unknowns)
+        return delta,candidates,domain,groups,facts,matches
 
     def _account_call(self,call_id,phase):
         row=self.store.db.execute('SELECT raw FROM events WHERE id=?',('pre-'+digest(call_id),)).fetchone()
@@ -190,41 +279,20 @@ class CoreV2:
                 return json.loads(prior['decision'])
             ref,_=self.store.put('pre-'+digest(cid),agent,'TOOL_PRE_EXEC','MODEL_GENERATED','tool://'+tool,
                 encode({'tool':tool,'args':args}),{'call_id':cid})
-            delta=action(tool,args);delta.update(call_id=cid,actor=agent,evidence_ref=ref)
+            delta,candidates,domain,groups,facts,policy_matches=self._decision_inputs(tool,args,agent)
+            delta.update(call_id=cid,actor=agent,evidence_ref=ref)
             name=delta['tool'];target=delta['target'];op=delta['op']
-            scope=target in self.anchor.get('read' if name=='fs.read' else 'write',[]) if name!='net.fetch' else op+' '+target in self.anchor.get('net',[])
-            directive_op=name+':'+op if name=='net.fetch' else name
-            candidates=self.store.matching_directives(directive_op,target)
-            domain=urlsplit(target).hostname or '' if name=='net.fetch' else ''
-            hits,groups=self.ledger.match(args,domain)
-            delta.update(in_user_granted_scope=scope,matches_untrusted_taint=candidates[:8],
-                secret_exposure=hits[:8],carries_secret=bool(hits))
             previous=self.state() # Before recording this candidate in the step window.
             for item in candidates:
                 self.store.edge('event:'+item['evidence_ref']['event_id'],'call:'+cid,'SUSPECTED_INDUCE',item['evidence_ref']['event_id'])
             if self.anchor.get('evidence_ref'):
                 self.store.edge('event:'+self.anchor['evidence_ref']['event_id'],'call:'+cid,'AUTHORITY_REFERENCE',self.anchor['evidence_ref']['event_id'])
             trace={'model_used':False,'reason':'L0_short_circuit'}
-            hard_policy,hard_reason=self.hard.check(name,args,self.anchor.get('intent_mode')=='READONLY_REVIEW',hits)
-            if not delta['valid_target']:
-                hard_policy,hard_reason='POL-PATH-INVALID','目标路径无效或越出工作区。'
-            elif name=='fs.write' and (sensitive(target) or self.anchor.get('intent_mode')=='READONLY_REVIEW'):
-                hard_policy,hard_reason='POL-FS-WRITE-SENSITIVE','写入敏感资产或违反只读授权。'
-            elif hits and name=='fs.write':
-                hard_policy,hard_reason='POL-SECRET-DISCLOSURE','禁止将已登记机密写入业务产物。'
-            ctx=self.store.context(agent)
-            readonly_mcp=name=='mcp.call' and args=={'name':'project_facts'}
-            low_risk=(name=='fs.read' or readonly_mcp or
-                name=='net.fetch' and op=='GET' and not urlsplit(target).query and not args.get('body'))
-            sink=name in {'net.fetch','spawn_subagent'} or name=='mcp.call' and not readonly_mcp
-            facts={'hard_policy':hard_policy,'hard_reason':hard_reason,
-                'secret_hit':bool(hits),'untrusted_sink':sink,
-                'context_secret':bool(ctx['confidentiality']),'literal_scope':scope,
-                'sensitive':delta['sensitive_target'],'directive':bool(candidates),
-                'tainted':bool(ctx['integrity']),'low_risk':low_risk and not delta['sensitive_target'],
-                'high_risk':not low_risk or delta['sensitive_target']}
+            hard_policy=facts['hard_policy']
             answers={}
-            if self.pending:
+            if hard_policy:
+                verdict,policy,risk,reason=table_decide(facts,{})
+            elif self.pending:
                 verdict,policy,risk,reason='ASK','POL-SESSION-HOLD','R2','会话已有未决 ASK，后续动作均保持暂停。'
             elif not hard_policy and (self.integrity_fault or self.anchor.get('coverage_incomplete') or delta['coverage_incomplete']):
                 verdict,policy,risk,reason='ASK','POL-INCOMPLETE-EVIDENCE','R2','事件链或安全提取不完整，不能可靠确认本次操作。'
@@ -232,9 +300,10 @@ class CoreV2:
                 questions=required_questions(facts)
                 try:
                     if questions:
-                        task=self.store.backtrack(self.anchor['evidence_ref'],max_chars=2**31)['excerpt']
+                        task=self.anchor.get('task_brief','')
+                        if self.anchor.get('task_brief_overflow') or 'task_brief' not in self.anchor:raise InputBudgetExceeded('Missing or overflowing task brief')
                         statement=self.store.db.execute("SELECT raw FROM events WHERE agent=? AND kind='assistant_turn' ORDER BY created DESC LIMIT 1",(agent,)).fetchone()
-                        view_state={'task_text':self.ledger.redact(task),
+                        view_state={'task_brief':self.ledger.redact(task),'task_brief_overflow':self.anchor.get('task_brief_overflow',False),
                             'count_tokens':self.fast.count_tokens,
                             'directive_sentences':[self.ledger.redact(self.store.backtrack(x['evidence_ref'],max_chars=2**31)['excerpt']) for x in candidates],
                             'agent_statement':self.ledger.redact(json.loads(statement[0]).get('public_text','')) if statement else ''}
@@ -259,12 +328,13 @@ class CoreV2:
             if not self.enabled:verdict='ALLOW';reason='防护关闭；仅记录拟裁决，不改变 Agent 的工具操作。'
             result={'verdict':verdict,'policy':policy,'would_verdict':would,'reason':reason,'engine':'d2v2',
                 'rule_id':policy,'risk':risk,'fast':trace,'evidence':{'source_uri':candidates[0]['source_uri'] if candidates else '',
-                    'evidence_refs':[self.anchor.get('evidence_ref'),*[x['evidence_ref'] for x in candidates[:3]],ref],
+                    'evidence_refs':[self.anchor.get('evidence_ref'),*[x['evidence_ref'] for x in candidates[:3]],*[x['evidence_ref'] for x in delta['unknowns'][:2]],ref],
                     'security_delta':delta},'approval_status':'pending' if verdict=='ASK' else 'not_required',
                 'slow':{'triggered':False,'role':'advisory_only','synchronous_wait_ms':0}}
             result['decision_basis']='calibrated_model_and_facts' if policy in {'DT-4c','DT-4d'} or policy=='DT-4b' and would=='ALLOW' else 'deterministic_security_facts'
             result['decision_facts']=facts
             result['model_answers']=answers
+            result['policy_matches']=policy_matches
             if verdict in {'ASK','BLOCK'}:
                 pack=self._evidence_pack(result,previous)
                 try:self.reviews.put_nowait((cid,pack));result['slow']['triggered']=True
@@ -272,7 +342,9 @@ class CoreV2:
                 if verdict=='BLOCK':self.ledger.record(domain,groups,'blocked_attempt')
             if verdict=='ASK':
                 result['approval_origin_call_id']=self.pending.get('approval_origin_call_id',cid) if self.pending else cid
-                if not self.pending:self.pending=result
+                if not self.pending:
+                    result['approval_token']=self.approvals.issue(cid,ah,agent)
+                    self.pending=result
             self.store.db.execute('INSERT INTO calls VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET decision=excluded.decision,status=excluded.status',
                 (cid,agent,ah,prior['proposal_ref'] if prior else None,encode(result),verdict))
             self.store.db.commit()
@@ -282,6 +354,64 @@ class CoreV2:
             self.emit('decisions.jsonl',{'type':'decision','call_id':cid,'previous_security_state':previous,
                 **result,'local_latency_ms':(time.perf_counter()-start)*1000})
             return result
+
+    def approve(self,token,call_id,tool,args,agent='main'):
+        """Host-only endpoint. Grants one execution; does not fabricate a Pi turn."""
+        with self.lock:
+            row=self.store.db.execute('SELECT * FROM calls WHERE id=?',(call_id,)).fetchone()
+            ah=digest(encode({'tool':tool,'args':args}))
+            if not row or row['status']!='ASK' or row['args_hash']!=ah or row['agent']!=agent:
+                raise ValueError('No matching pending action')
+            result=json.loads(row['decision'])
+            if result['risk']=='R3' or result['rule_id'].startswith(('PROTOCOL_','POL-INCOMPLETE','POL-SESSION')):
+                raise ValueError('Non-overridable safety hold')
+            if not self.pending or self.pending.get('approval_origin_call_id')!=call_id:
+                raise ValueError('Only the original hold can be approved')
+            _,_,_,_,facts,matches=self._decision_inputs(tool,args,agent)
+            if self.integrity_fault or facts['hard_policy'] or facts['secret_hit'] and facts['untrusted_sink']:
+                raise ValueError('Current state forbids approval')
+            self.approvals.consume(token,call_id,ah,agent)
+            result.pop('approval_token',None)
+            result.update(verdict='ALLOW',approval_status='approved_once',approval_override=True,
+                          original_rule_id=result['rule_id'],policy_matches_at_approval=matches)
+            self.store.db.execute("UPDATE calls SET decision=?,status='ALLOW' WHERE id=?",(encode(result),call_id))
+            self.store.db.commit();self.pending=None
+            self.emit('decisions.jsonl',{'type':'approval_consumed','call_id':call_id,**result})
+            return result
+
+    def dispatch_memory(self,tool,args,call_id,agent='main'):
+        """Consume a bound execution permit before touching host-owned memory."""
+        with self.lock:
+            if tool not in {'memory_read','memory_write'}:raise ValueError('Unknown memory operation')
+            row=self.store.db.execute('SELECT * FROM calls WHERE id=?',(call_id,)).fetchone()
+            ah=digest(encode({'tool':tool,'args':args}))
+            if not row or row['args_hash']!=ah or row['agent']!=agent or row['status']!='execution_started':
+                raise ValueError('Missing bound memory authorization')
+            if self.store.db.execute('INSERT OR IGNORE INTO tool_dispatches VALUES(?)',(call_id,)).rowcount!=1:
+                raise ValueError('Memory dispatch replay')
+            self.store.db.commit()
+            if tool=='memory_write':
+                ctx=self.store.context(agent)
+                provenance=[]
+                for source in self.store.source_records(ctx['integrity']):
+                    event=self.store.db.execute('SELECT e.* FROM events e JOIN source_events s ON s.event_id=e.id WHERE s.source_id=? LIMIT 1',(source['id'],)).fetchone()
+                    if event:provenance.append(dict(event))
+                metadata={'integrity':ctx['integrity'],'confidentiality':ctx['confidentiality'],
+                          'sources':self.store.source_records(ctx['integrity']),'provenance':provenance,
+                          'writer_session':self.approvals.session}
+                if len(encode(metadata).encode())>2097152:raise ValueError('Memory provenance exceeds 2 MiB; no labels dropped')
+                self.memory.write(args['key'],args['content'],metadata)
+                return {'text':'Saved memory '+args['key']}
+            entry=self.memory.read(args['key'])
+            for old in entry.get('provenance',[]):
+                imported='memory-import:'+digest(encode([entry['writer_session'],old['id']]))
+                ref,_=self.store.put(imported,agent,'MEMORY_PROVENANCE',old['source'],old['uri'],old['raw'],{'original_event_id':old['id'],'writer_session':entry['writer_session']})
+                self._ingest_content(old['raw'],ref,old['source'],old['uri'],agent)
+            self.store.add_labels(agent,entry.get('integrity',[]),entry.get('confidentiality',[]))
+            self.store.db.execute('INSERT OR REPLACE INTO memory_entries VALUES(?,?)',(args['key'],encode({k:v for k,v in entry.items() if k not in {'content','provenance'}})))
+            self.store.db.commit()
+            self.observe({'event_id':'memory-recall:'+call_id,'type':'memory_recall','agent_id':agent,'key':args['key'],'text':entry['content']})
+            return {'text':entry['content']}
 
     def _protocol_refs(self,cid):
         row=self.store.db.execute('SELECT proposal_ref FROM calls WHERE id=?',(cid,)).fetchone()

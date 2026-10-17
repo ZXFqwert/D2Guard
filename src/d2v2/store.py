@@ -2,6 +2,8 @@ import hashlib
 import json
 import sqlite3
 import time
+import posixpath
+from urllib.parse import urlsplit, urlunsplit
 
 
 def encode(value):
@@ -10,6 +12,15 @@ def encode(value):
 
 def digest(value):
     return hashlib.sha256(value.encode()).hexdigest()
+
+
+def source_identity(source_type, uri, sha):
+    if '://' in uri:
+        u=urlsplit(uri)
+        uri=urlunsplit((u.scheme.lower(),u.netloc.lower(),posixpath.normpath(u.path) if u.path else '/',u.query,''))
+    else:
+        uri=posixpath.normpath(uri.replace('\\','/'))
+    return 'SRC-'+digest(encode([source_type,uri,sha])),uri
 
 
 class EvidenceStore:
@@ -31,6 +42,18 @@ class EvidenceStore:
         CREATE TABLE IF NOT EXISTS contexts(agent TEXT PRIMARY KEY,parent TEXT,spawned_at TEXT);
         CREATE TABLE IF NOT EXISTS context_labels(agent TEXT,kind TEXT,label TEXT,
             PRIMARY KEY(agent,kind,label));
+        CREATE TABLE IF NOT EXISTS sources(id TEXT PRIMARY KEY,type TEXT,uri TEXT,sha TEXT);
+        CREATE TABLE IF NOT EXISTS source_events(source_id TEXT,event_id TEXT,
+            PRIMARY KEY(source_id,event_id));
+        CREATE TABLE IF NOT EXISTS label_aliases(old_label TEXT PRIMARY KEY,source_id TEXT);
+        CREATE TABLE IF NOT EXISTS unknowns(id TEXT PRIMARY KEY,source_id TEXT,data TEXT);
+        CREATE INDEX IF NOT EXISTS unknown_source ON unknowns(source_id);
+        CREATE TABLE IF NOT EXISTS normalized_evidence(event_id TEXT PRIMARY KEY,data TEXT);
+        CREATE TABLE IF NOT EXISTS source_analysis(source_id TEXT PRIMARY KEY,data TEXT);
+        CREATE TABLE IF NOT EXISTS tool_dispatches(call_id TEXT PRIMARY KEY);
+        CREATE TABLE IF NOT EXISTS memory_entries(id TEXT PRIMARY KEY,data TEXT);
+        CREATE TABLE IF NOT EXISTS approval_nonces(nonce TEXT PRIMARY KEY,used INTEGER NOT NULL);
+        CREATE TABLE IF NOT EXISTS session_meta(key TEXT PRIMARY KEY,value TEXT);
         CREATE TABLE IF NOT EXISTS calls(id TEXT PRIMARY KEY,agent TEXT,args_hash TEXT,
             proposal_ref TEXT,decision TEXT,status TEXT);
         CREATE TABLE IF NOT EXISTS secret_chunks(secret_id TEXT, encoding TEXT, fp TEXT,
@@ -55,13 +78,45 @@ class EvidenceStore:
         self.db.execute('''INSERT OR IGNORE INTO directives
             SELECT op || '|' || target,id,event_id,data FROM taints
             WHERE json_extract(data,'$.clause_kind')='candidate_instruction' ''')
+        # Append mappings for old event-ID labels. Never delete their audit rows.
+        for row in self.db.execute('''SELECT DISTINCT e.* FROM events e JOIN context_labels c
+                ON c.label=e.id WHERE c.kind='integrity' ''').fetchall():
+            sid=self.register_source(row['source'],row['uri'],row['sha'],row['id'])
+            self.db.execute('INSERT OR IGNORE INTO label_aliases VALUES(?,?)',(row['id'],sid))
+            self.db.execute("INSERT OR IGNORE INTO context_labels SELECT agent,kind,? FROM context_labels WHERE kind='integrity' AND label=?",(sid,row['id']))
         self.db.commit()
+
+    def register_source(self, source_type, uri, sha, event_id):
+        sid,normalized=source_identity(source_type,uri,sha)
+        self.db.execute('INSERT OR IGNORE INTO sources VALUES(?,?,?,?)',(sid,source_type,normalized,sha))
+        self.db.execute('INSERT OR IGNORE INTO source_events VALUES(?,?)',(sid,event_id))
+        self.node(sid,'SOURCE_ID',normalized)
+        self.edge(sid,'event:'+event_id,'SOURCE_OBSERVED',event_id)
+        return sid
+
+    def source_records(self, ids):
+        result=[]
+        for sid in ids:
+            row=self.db.execute('SELECT * FROM sources WHERE id=?',(sid,)).fetchone()
+            if row:result.append(dict(row))
+        return result
+
+    def add_unknown(self, source_id, item):
+        value={**item,'src':source_id}
+        uid='UNK-'+digest(encode([source_id,item['evidence_ref']['char_span'],item['reason']]))
+        self.db.execute('INSERT OR IGNORE INTO unknowns VALUES(?,?,?)',(uid,source_id,encode(value)))
+
+    def relevant_unknowns(self, agent, limit=8):
+        return [json.loads(row[0]) for row in self.db.execute('''SELECT DISTINCT u.data FROM unknowns u
+            JOIN context_labels c ON c.label=u.source_id WHERE c.agent=? AND c.kind='integrity' LIMIT ?''',(agent,limit))]
 
     def context(self, agent):
         row = self.db.execute('SELECT parent,spawned_at FROM contexts WHERE agent=?',(agent,)).fetchone()
         result = {'integrity': [], 'confidentiality': []}
         for item in self.db.execute('SELECT kind,label FROM context_labels WHERE agent=? ORDER BY kind,label',(agent,)):
-            result[item['kind']].append(item['label'])
+            alias=self.db.execute('SELECT source_id FROM label_aliases WHERE old_label=?',(item['label'],)).fetchone() if item['kind']=='integrity' else None
+            label=alias[0] if alias else item['label']
+            if label not in result[item['kind']]:result[item['kind']].append(label)
         if row and row['parent']:
             result.update(parent=row['parent'], spawned_at=row['spawned_at'])
         return result
@@ -83,7 +138,7 @@ class EvidenceStore:
         self.add_labels(agent, labels['integrity'], labels['confidentiality'])
 
     def add_directive(self, op, target, item):
-        item_id = item['taint_id'] + ':' + digest(op + target)[:12]
+        item_id = digest(encode([item.get('source_id',item['taint_id']),item['evidence_ref']['char_span'],op,target]))
         self.db.execute('INSERT OR IGNORE INTO directives VALUES(?,?,?,?)',
                         (op+'|'+target,item_id,item['evidence_ref']['event_id'],encode(item)))
         self.db.execute('INSERT OR IGNORE INTO taints VALUES(?,?,?,?,?)',
@@ -134,6 +189,8 @@ class EvidenceStore:
             raise ValueError('Evidence span out of bounds')
         return {'event_id':row['id'],'sha256':row['sha'],'source_type':row['source'],
             'source_uri':row['uri'],'char_span':[a,min(b,a+max_chars)],
+            'token_span':ref.get('token_span') if b-a<=max_chars else None,
+            'tokenizer':ref.get('tokenizer') if b-a<=max_chars else None,
             'excerpt':row['raw'][a:min(b,a+max_chars)],'truncated':b-a>max_chars}
 
     def save_delta(self, ref, delta):

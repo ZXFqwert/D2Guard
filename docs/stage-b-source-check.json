@@ -1,0 +1,233 @@
+{
+  "batch": "matrix-20261017-102542",
+  "source_files": 37,
+  "byte_identical_count": 36,
+  "all_normalized_lf_identical": true,
+  "checks": [
+    {
+      "path": "lab.py",
+      "manifest_sha256": "4475363694ffbd88c4ae7f27b19941b4b11bc0790c46ff5b1cdea023d010852c",
+      "local_sha256": "4475363694ffbd88c4ae7f27b19941b4b11bc0790c46ff5b1cdea023d010852c",
+      "byte_identical": true
+    },
+    {
+      "path": "src/core_guard.py",
+      "manifest_sha256": "f01c844a3f81f5e65a8bfe037eff4b3ebca0a2c4586e2ac5698feb5d696f089a",
+      "local_sha256": "f01c844a3f81f5e65a8bfe037eff4b3ebca0a2c4586e2ac5698feb5d696f089a",
+      "byte_identical": true
+    },
+    {
+      "path": "src/guard.py",
+      "manifest_sha256": "d82ed22b7031125e32eb793671b471c5882f66d05a098146163a45e723cd51e9",
+      "local_sha256": "d82ed22b7031125e32eb793671b471c5882f66d05a098146163a45e723cd51e9",
+      "byte_identical": true
+    },
+    {
+      "path": "src/original_laya.py",
+      "manifest_sha256": "9851dc411c90804e06ae8c9b350d22fc7a44c4f8faa54124340cc8c6818683db",
+      "local_sha256": "9851dc411c90804e06ae8c9b350d22fc7a44c4f8faa54124340cc8c6818683db",
+      "byte_identical": true
+    },
+    {
+      "path": "src/proxy_stream.py",
+      "manifest_sha256": "6b8a6ff31f48b59fad298f19138fd0dc8b57ac33fcae0313ca4da748c152e00d",
+      "local_sha256": "6b8a6ff31f48b59fad298f19138fd0dc8b57ac33fcae0313ca4da748c152e00d",
+      "byte_identical": true
+    },
+    {
+      "path": "src/services.py",
+      "manifest_sha256": "9b94d84657aa80da044630f051ba10702b97ca69fe663dddc532ae2e34b7b348",
+      "local_sha256": "9b94d84657aa80da044630f051ba10702b97ca69fe663dddc532ae2e34b7b348",
+      "byte_identical": true
+    },
+    {
+      "path": "src/boundary.mjs",
+      "manifest_sha256": "f8ce1840b20ea73afb613e673980e3db9313c8440c5ee9e2705475a68eebeba2",
+      "local_sha256": "f8ce1840b20ea73afb613e673980e3db9313c8440c5ee9e2705475a68eebeba2",
+      "byte_identical": true
+    },
+    {
+      "path": "extensions/lab.ts",
+      "manifest_sha256": "22e52ad8bde29c9d09f13975826e823be6427da04c1adb8f7b77c1e39546619e",
+      "local_sha256": "22e52ad8bde29c9d09f13975826e823be6427da04c1adb8f7b77c1e39546619e",
+      "byte_identical": true
+    },
+    {
+      "path": "src/d2core/D2guard_contract.json",
+      "manifest_sha256": "820397e278f90926ca4ceeb9168a598451c1efc5c69460584f2bac9a48aed576",
+      "local_sha256": "820397e278f90926ca4ceeb9168a598451c1efc5c69460584f2bac9a48aed576",
+      "byte_identical": true
+    },
+    {
+      "path": "src/d2core/__init__.py",
+      "manifest_sha256": "698a70386779a1d98a683df33a75924cf1ba477fb01b602f9188e011f99c5a4c",
+      "local_sha256": "bfc25bde4fc4f3c0981d14de15e0aff99bf41d112f6967d01f6a334124bbdb95",
+      "byte_identical": false,
+      "normalized_lf_identical": true,
+      "difference": "Single docstring file trailing CRLF versus LF; no executable statements"
+    },
+    {
+      "path": "src/d2core/config.py",
+      "manifest_sha256": "1d27be6a195cff6dfa2f370f7002d67e23f4469f459d15e656c03bf8cfe0334b",
+      "local_sha256": "1d27be6a195cff6dfa2f370f7002d67e23f4469f459d15e656c03bf8cfe0334b",
+      "byte_identical": true
+    },
+    {
+      "path": "src/d2core/execution.py",
+      "manifest_sha256": "c8537760a91dfed83ac6377198ccb75cad61db68ae4150183a1e328a0325c7bf",
+      "local_sha256": "c8537760a91dfed83ac6377198ccb75cad61db68ae4150183a1e328a0325c7bf",
+      "byte_identical": true
+    },
+    {
+      "path": "src/d2core/extractor.py",
+      "manifest_sha256": "3c1853fa9c443c587ee37d0261a4ce3d43c4c3b68bbcb55ce1c8309ad262c00f",
+      "local_sha256": "3c1853fa9c443c587ee37d0261a4ce3d43c4c3b68bbcb55ce1c8309ad262c00f",
+      "byte_identical": true
+    },
+    {
+      "path": "src/d2core/mirrors.py",
+      "manifest_sha256": "ad4c0f7a792e3e50fdcf4a107e083e75fd25db39d9eee429b0ab3086f8cb0b97",
+      "local_sha256": "ad4c0f7a792e3e50fdcf4a107e083e75fd25db39d9eee429b0ab3086f8cb0b97",
+      "byte_identical": true
+    },
+    {
+      "path": "src/d2core/models.py",
+      "manifest_sha256": "0715a658840ed4e7f2636667b816b595f287635722a46b5631df0a6812949bd0",
+      "local_sha256": "0715a658840ed4e7f2636667b816b595f287635722a46b5631df0a6812949bd0",
+      "byte_identical": true
+    },
+    {
+      "path": "src/d2core/policies.yaml",
+      "manifest_sha256": "d3d33ad17c5cbd5edca7bd347516a22fdae22002cd589bec353bc7888cee90fa",
+      "local_sha256": "d3d33ad17c5cbd5edca7bd347516a22fdae22002cd589bec353bc7888cee90fa",
+      "byte_identical": true
+    },
+    {
+      "path": "src/d2core/policy_engine.py",
+      "manifest_sha256": "8de4e50a7f832b3bd7f403d3424eee38ff41ec8eca483c1d9531f9125891f108",
+      "local_sha256": "8de4e50a7f832b3bd7f403d3424eee38ff41ec8eca483c1d9531f9125891f108",
+      "byte_identical": true
+    },
+    {
+      "path": "src/d2core/state_machine.py",
+      "manifest_sha256": "a80d2ccb74e1fb279c73c33b485e0680771cdfc3e8804e7bba71c0b0afe2c01e",
+      "local_sha256": "a80d2ccb74e1fb279c73c33b485e0680771cdfc3e8804e7bba71c0b0afe2c01e",
+      "byte_identical": true
+    },
+    {
+      "path": "src/d2core/weights/laya_d2_distilled.json",
+      "manifest_sha256": "15e14e9dfcacad95d84aafa7d995fe3c642e2470e4b9a96a465b38354a5e1ef0",
+      "local_sha256": "15e14e9dfcacad95d84aafa7d995fe3c642e2470e4b9a96a465b38354a5e1ef0",
+      "byte_identical": true
+    },
+    {
+      "path": "src/d2v2/__init__.py",
+      "manifest_sha256": "cd6999265348f5f3f175bf0ce072cd50e9449bb4d344253240794e022f992199",
+      "local_sha256": "cd6999265348f5f3f175bf0ce072cd50e9449bb4d344253240794e022f992199",
+      "byte_identical": true
+    },
+    {
+      "path": "src/d2v2/approval.py",
+      "manifest_sha256": "7668a399a41c53ab9a6d763b4e9b5c5cdba8d1d9fa500be923289ba38704bb9f",
+      "local_sha256": "7668a399a41c53ab9a6d763b4e9b5c5cdba8d1d9fa500be923289ba38704bb9f",
+      "byte_identical": true
+    },
+    {
+      "path": "src/d2v2/compression.py",
+      "manifest_sha256": "90fca40fb3c6a63f66d048482b9c6cd7b6e5263f5f5cd124244fba9b2888732b",
+      "local_sha256": "90fca40fb3c6a63f66d048482b9c6cd7b6e5263f5f5cd124244fba9b2888732b",
+      "byte_identical": true
+    },
+    {
+      "path": "src/d2v2/core.py",
+      "manifest_sha256": "8415b304171596f13f2eb6b3c8728500f79aa2139e034e8d420377fe7653cb8e",
+      "local_sha256": "8415b304171596f13f2eb6b3c8728500f79aa2139e034e8d420377fe7653cb8e",
+      "byte_identical": true
+    },
+    {
+      "path": "src/d2v2/decision.py",
+      "manifest_sha256": "489cfbdafc2bbe66aeb130c53280b33673d5d314b662469f4a3f795766daa5b4",
+      "local_sha256": "489cfbdafc2bbe66aeb130c53280b33673d5d314b662469f4a3f795766daa5b4",
+      "byte_identical": true
+    },
+    {
+      "path": "src/d2v2/ledger.py",
+      "manifest_sha256": "cc033db7e28d38da86f524e107ebf5703b1d35c170238e4fb5d6e3b2be81a548",
+      "local_sha256": "cc033db7e28d38da86f524e107ebf5703b1d35c170238e4fb5d6e3b2be81a548",
+      "byte_identical": true
+    },
+    {
+      "path": "src/d2v2/mcp_bridge.py",
+      "manifest_sha256": "53575d1e7f17d4d24ed51f589cd9a7b8bfad9f39973372207a3befecc68f9606",
+      "local_sha256": "53575d1e7f17d4d24ed51f589cd9a7b8bfad9f39973372207a3befecc68f9606",
+      "byte_identical": true
+    },
+    {
+      "path": "src/d2v2/mcp_fixture.py",
+      "manifest_sha256": "3c6cdd8b0caec8516eb4c26f7d56ab0fefe8efd42d9cb8d7e979516b6fbccd60",
+      "local_sha256": "3c6cdd8b0caec8516eb4c26f7d56ab0fefe8efd42d9cb8d7e979516b6fbccd60",
+      "byte_identical": true
+    },
+    {
+      "path": "src/d2v2/memory.py",
+      "manifest_sha256": "34842c78dc3f785b0d065711f48d673239354305a65034191c109e8ccac730a5",
+      "local_sha256": "34842c78dc3f785b0d065711f48d673239354305a65034191c109e8ccac730a5",
+      "byte_identical": true
+    },
+    {
+      "path": "src/d2v2/normalization.py",
+      "manifest_sha256": "6d0cd29d28f7e9253070c665f312d11f47777e5d527fd7e8968661e2b2328c7c",
+      "local_sha256": "6d0cd29d28f7e9253070c665f312d11f47777e5d527fd7e8968661e2b2328c7c",
+      "byte_identical": true
+    },
+    {
+      "path": "src/d2v2/policies.yaml",
+      "manifest_sha256": "dfe80c7c6a35ae3870bcd19c1d502d9ebaea963d6f3d064c3b654c3643d91c57",
+      "local_sha256": "dfe80c7c6a35ae3870bcd19c1d502d9ebaea963d6f3d064c3b654c3643d91c57",
+      "byte_identical": true
+    },
+    {
+      "path": "src/d2v2/policy.py",
+      "manifest_sha256": "6891145f28fcd4aa616d3db8e7abaa0ab92467c7306a057b338221e10cf9d286",
+      "local_sha256": "6891145f28fcd4aa616d3db8e7abaa0ab92467c7306a057b338221e10cf9d286",
+      "byte_identical": true
+    },
+    {
+      "path": "src/d2v2/relations.py",
+      "manifest_sha256": "39b4c903ba13f3c58dab18c06e0a55004cc00afb9c146a821a7f13e7deb57a86",
+      "local_sha256": "39b4c903ba13f3c58dab18c06e0a55004cc00afb9c146a821a7f13e7deb57a86",
+      "byte_identical": true
+    },
+    {
+      "path": "src/d2v2/review.py",
+      "manifest_sha256": "da49559ec5a9513910d1f2b646504d5cc3b3c916d6e34942e5ce621592385696",
+      "local_sha256": "da49559ec5a9513910d1f2b646504d5cc3b3c916d6e34942e5ce621592385696",
+      "byte_identical": true
+    },
+    {
+      "path": "src/d2v2/store.py",
+      "manifest_sha256": "71b2966327740c2fe42800b996459133d207aba42b7fa6e2d2a47514f092f18b",
+      "local_sha256": "71b2966327740c2fe42800b996459133d207aba42b7fa6e2d2a47514f092f18b",
+      "byte_identical": true
+    },
+    {
+      "path": "src/d2v2/task_brief.py",
+      "manifest_sha256": "e81a7d57c51398c8679bcdd16732f8333d677757e17e35344bf23132530f8f55",
+      "local_sha256": "e81a7d57c51398c8679bcdd16732f8333d677757e17e35344bf23132530f8f55",
+      "byte_identical": true
+    },
+    {
+      "path": "src/d2v2/user_message.py",
+      "manifest_sha256": "cdeb2d2f1e3c7e891d056f5d6505015c2f505678eb9321368ee390552a13a057",
+      "local_sha256": "cdeb2d2f1e3c7e891d056f5d6505015c2f505678eb9321368ee390552a13a057",
+      "byte_identical": true
+    },
+    {
+      "path": "src/d2v2/views.py",
+      "manifest_sha256": "6c48087cdda22cdf4929fccec8d91f0cafada705b017e9b370811f552a814d94",
+      "local_sha256": "6c48087cdda22cdf4929fccec8d91f0cafada705b017e9b370811f552a814d94",
+      "byte_identical": true
+    }
+  ],
+  "note": "Original manifests retained. Remote legacy __init__.py subsequently aligned to LF; no model rerun for this non-executable newline difference."
+}

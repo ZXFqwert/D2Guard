@@ -11,6 +11,8 @@ from d2v2.compression import fast_view
 from original_laya import payload_for
 from d2v2.views import encode_view, check_fields
 from d2v2.decision import decide as table_decide
+from d2v2.store import source_identity
+from d2v2.policy import is_egress_sink
 
 
 def rows(path):
@@ -61,11 +63,43 @@ def verify(folder):
     checks['immutable_evidence_hashes_valid']=all(hashlib.sha256(raw.encode()).hexdigest()==sha for raw,sha in conn.execute('SELECT raw,sha FROM events'))
     checks['producer_sequences_complete']=all(count==last for _,count,last in conn.execute('SELECT agent,count(*),max(seq) FROM producer_events GROUP BY agent'))
     checks['native_call_ids_have_candidate_refs']=all(conn.execute('SELECT proposal_ref FROM calls WHERE id=?',(c['id'],)).fetchone()[0] for c in calls)
+    stage_b=conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='source_analysis'").fetchone()
+    if stage_b:
+        sources=list(conn.execute('SELECT id,type,uri,sha FROM sources'))
+        checks['stage_b_source_ids_valid']=all(source_identity(kind,uri,sha)[0]==sid for sid,kind,uri,sha in sources)
+        source_ids={s[0] for s in sources}
+        checks['stage_b_integrity_labels_resolve']=all(label in source_ids or conn.execute('SELECT 1 FROM label_aliases WHERE old_label=?',(label,)).fetchone() for label, in conn.execute("SELECT label FROM context_labels WHERE kind='integrity'"))
+        mapping_ok=True;token_refs_ok=True
+        for eid,data in conn.execute('SELECT event_id,data FROM normalized_evidence'):
+            norm=json.loads(data);raw=conn.execute('SELECT raw FROM events WHERE id=?',(eid,)).fetchone()[0]
+            spans=norm['char_to_raw']
+            mapping_ok &= len(spans)==len(norm['text']) and all(0<=a<=b<=len(raw) for a,b in spans)
+            offsets=norm['detection_token_offsets']
+            mapping_ok &= offsets is not None and norm['tokenizer'] is not None
+            if offsets is not None:
+                expected=[[min(x[0] for x in spans[a:b]),max(x[1] for x in spans[a:b])] if spans[a:b] else [0,0] for a,b in offsets]
+                mapping_ok &= expected==norm['token_to_raw']
+        for data, in conn.execute('SELECT data FROM directives UNION ALL SELECT data FROM unknowns'):
+            ref=json.loads(data)['evidence_ref']
+            row=conn.execute('SELECT data FROM normalized_evidence WHERE event_id=?',(ref['event_id'],)).fetchone()
+            if not row:token_refs_ok=False;continue
+            offsets=json.loads(row[0])['raw_token_offsets']
+            if offsets is None:token_refs_ok=False;continue
+            indices=[i for i,(a,b) in enumerate(offsets) if a<ref['char_span'][1] and b>ref['char_span'][0]]
+            token_refs_ok &= ref.get('token_span')==([indices[0],indices[-1]+1] if indices else [0,0]) and bool(ref.get('tokenizer'))
+        checks['stage_b_normalized_token_mappings_valid']=bool(sources) and mapping_ok
+        checks['stage_b_evidence_token_spans_valid']=token_refs_ok
+        checks['stage_b_policy_yaml_hashed']='src/d2v2/policies.yaml' in manifest['source_sha256']
+        anchors=[json.loads(data) for data, in conn.execute('SELECT data FROM grants')]
+        checks['stage_b_task_brief_budget_explicit']=all(a['task_brief_overflow']==(a['task_brief_tokens']>150) for a in anchors)
     conn.close()
     frames=rows(folder/'security_chain.jsonl')
     checks['hot_slots_bounded']=all(len(e['state']['active_taints'])<=8 and len(e['state']['recent_steps'])<=8 for e in frames)
     core=[e for e in decisions if e.get('type')=='decision']
     learned=[e for e in core if e['fast'].get('model_used')]
+    if stage_b:
+        checks['stage_b_shared_sink_definition']=all(e['decision_facts']['untrusted_sink']==is_egress_sink(e['evidence']['security_delta']['tool'],verdicts[e['call_id']]['args']) for e in core)
+        checks['stage_b_views_use_task_brief']=all(v['payload']['task']==e['previous_security_state']['authority_anchor']['task_brief'] for e in learned for v in e['fast']['views'].values())
     def exact_input(e):
         if e['fast'].get('schema')=='question-views-v1':
             for view in e['fast']['views'].values():

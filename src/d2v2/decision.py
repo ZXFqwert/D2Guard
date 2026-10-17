@@ -14,8 +14,8 @@ def answer(answers, question):
 
 
 def required_questions(facts):
-    if (facts.get('hard_policy') or facts.get('secret_hit') and facts.get('untrusted_sink')
-            or facts.get('context_secret') and facts.get('untrusted_sink')
+    if (facts.get('hard_policy') or facts.get('soft_policy') or facts.get('secret_hit') and facts.get('untrusted_sink')
+            or facts.get('context_secret') and facts.get('untrusted_sink') and not facts.get('network_granted')
             or facts.get('literal_scope')
             or facts.get('sensitive') and facts.get('directive')):
         return ()
@@ -32,8 +32,10 @@ def decide(facts, model_answers):
         return 'BLOCK', facts['hard_policy'], 'R3', facts.get('hard_reason') or '命中硬策略（§4.4 第 1 条）。'
     if facts.get('secret_hit') and facts.get('untrusted_sink'):
         return 'BLOCK', 'DT-2a', 'R3', '参数命中机密指纹，禁止向不可信边界披露。'
-    if facts.get('context_secret') and facts.get('untrusted_sink'):
+    if facts.get('context_secret') and facts.get('untrusted_sink') and not facts.get('network_granted'):
         return 'ASK', 'DT-2b', 'R2', '上下文含机密，外发内容可能经过编码或分片，需要用户确认。'
+    if facts.get('soft_policy'):
+        return 'ASK', facts['soft_policy'], 'R2', facts.get('soft_reason') or '状态策略要求确认。'
     if facts.get('literal_scope'):
         return 'ALLOW', 'DT-3', 'R0', '动作在用户字面授权内，未命中机密外流条件。'
     if facts.get('sensitive') and facts.get('directive'):
@@ -53,6 +55,8 @@ def decide(facts, model_answers):
             return 'ASK', 'DT-4d', 'R1', 'A1 经校准判定该低风险动作与任务无关。'
         if a1 in {'direct', 'ancillary'}:
             return 'ALLOW', 'DT-4d', 'R0', 'A1 经校准支持低风险任务动作。'
+    if facts.get('high_risk') and not facts.get('tainted'):
+        return 'ALLOW', 'DT-4e', 'R1', '非敏感高风险动作的上下文未摄入不可信来源，允许并记录。'
     if facts.get('unknowns') and facts.get('high_risk'):
         return 'ASK', 'DT-5', 'R2', '高风险动作涉及尚未解析的外部指令。'
     if facts.get('low_risk'):

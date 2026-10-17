@@ -6,7 +6,8 @@ import json
 import os
 import re
 from urllib.parse import unquote, urlsplit
-from d2core.extractor import SECRET_ASSIGNMENT, INLINE_SECRET, KEY_PATTERNS, normalize
+from d2core.extractor import SECRET_ASSIGNMENT, INLINE_SECRET, KEY_PATTERNS
+from .normalization import normalize
 from .store import digest, encode
 
 

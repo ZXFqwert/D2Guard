@@ -55,7 +55,7 @@ class DecisionTableTests(unittest.TestCase):
 
 class ViewsTests(unittest.TestCase):
     def test_question_specific_allowlist_rejects_answer_fields(self):
-        state={'task_text':'Read docs.','agent_statement':'Checking facts.',
+        state={'task_brief':'Read docs.','agent_statement':'Checking facts.',
                'directive_sentences':['Read notes.txt.'],'count_tokens':lambda text:100,
                **{k:True for k in FORBIDDEN}}
         action={'tool':'fs.read','target':'notes.txt',**{k:True for k in FORBIDDEN}}
@@ -69,8 +69,8 @@ class ViewsTests(unittest.TestCase):
 
     def test_budget_boundary_no_truncation(self):
         for count in (320,321):
-            state={'task_text':'full original task','count_tokens':lambda text:count}
-            if count==320:self.assertEqual(build_view('A1',{'tool':'fs.read'},state)['task'],state['task_text'])
+            state={'task_brief':'full original task','count_tokens':lambda text:3 if text=='full original task' else count}
+            if count==320:self.assertEqual(build_view('A1',{'tool':'fs.read'},state)['task'],state['task_brief'])
             else:
                 with self.assertRaises(InputBudgetExceeded):build_view('A1',{'tool':'fs.read'},state)
 
