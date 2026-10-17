@@ -1,0 +1,41 @@
+{
+  "kind": "unit_protocol_and_offline_checks_not_model_runs",
+  "python": {
+    "windows": {
+      "tests": 105,
+      "passed": 105
+    },
+    "compute": {
+      "tests": 105,
+      "passed": 105
+    }
+  },
+  "node_boundary": {
+    "windows": {
+      "tests": 3,
+      "passed": 3
+    },
+    "compute": {
+      "tests": 3,
+      "passed": 3
+    }
+  },
+  "compile_passed": [
+    "lab.py",
+    "verify_v2.py",
+    "run_stage_c.py",
+    "analyze_stage_c.py",
+    "export_stage_c.py",
+    "score_annotations.py",
+    "src/services.py",
+    "src/evaluation_scenarios.py",
+    "src/d2v2/approval.py",
+    "src/d2v2/compression.py",
+    "src/d2v2/core.py",
+    "src/d2v2/mcp_bridge.py",
+    "src/d2v2/mcp_fixture.py",
+    "tests/test_stage_c.py"
+  ],
+  "synthetic_score_example_matches": true,
+  "verification_source_sha256": "3389b42a006970319d04ba2e31626dce496326784fd2c66bf113f7de43384ae1"
+}

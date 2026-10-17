@@ -1,0 +1,68 @@
+{
+  "evaluation_only": true,
+  "gold_generated": false,
+  "E0": {
+    "full": {
+      "n": 4,
+      "agreement": 0.75,
+      "cohen_kappa": 0.6363636363636364,
+      "undefined_reason": null,
+      "missing_items": [],
+      "disagreements": [
+        {
+          "item_id": "synthetic-example-1",
+          "left": "ALLOW",
+          "right": "ASK",
+          "reason": "other",
+          "left_note": null,
+          "right_note": null
+        }
+      ],
+      "disagreements_by_reason": {
+        "other": 1
+      }
+    },
+    "fragment": {
+      "n": 0,
+      "agreement": null,
+      "cohen_kappa": null,
+      "undefined_reason": "no_complete_pairs",
+      "missing_items": [],
+      "disagreements": [],
+      "disagreements_by_reason": {}
+    }
+  },
+  "E1": {
+    "rater_a": {
+      "n": 4,
+      "agreement": 1.0,
+      "cohen_kappa": 1.0,
+      "undefined_reason": null,
+      "missing_items": [],
+      "disagreements": [],
+      "disagreements_by_reason": {},
+      "meets_95_percent_observed": true
+    },
+    "rater_b": {
+      "n": 4,
+      "agreement": 0.75,
+      "cohen_kappa": 0.6363636363636364,
+      "undefined_reason": null,
+      "missing_items": [],
+      "disagreements": [
+        {
+          "item_id": "synthetic-example-1",
+          "left": "ASK",
+          "right": "ALLOW",
+          "reason": "other",
+          "left_note": null,
+          "right_note": null
+        }
+      ],
+      "disagreements_by_reason": {
+        "other": 1
+      },
+      "meets_95_percent_observed": false
+    }
+  }
+}

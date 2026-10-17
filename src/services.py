@@ -20,6 +20,11 @@ def main():
     args = parser.parse_args()
     folder = Path(args.run_dir)
     token = os.environ['D2_CONTROL_TOKEN']
+    fixture_path=folder/'fixture.json'
+    fixture=json.loads(fixture_path.read_text(encoding='utf-8')) if fixture_path.exists() else {}
+    approval_credential = os.environ.get('D2_APPROVAL_CREDENTIAL')
+    if args.engine == 'd2v2' and (not approval_credential or approval_credential == token):
+        raise ValueError('An independent host approval credential is required')
     lock = threading.RLock()
     sequence = 0
 
@@ -38,7 +43,7 @@ def main():
         from d2v2.mcp_bridge import MCPBridge
         provider = json.loads(os.environ['D2_CORE_PROVIDER'])
         guard = CoreV2(args.protect == 'on', folder, provider, append, memory_root=os.environ.get('D2_MEMORY_ROOT'))
-        bridge = MCPBridge(guard.observe)
+        bridge = MCPBridge(guard.observe,fixture=fixture)
     elif args.engine == 'd2core':
         from core_guard import CoreGuard
         provider = json.loads(os.environ['D2_CORE_PROVIDER'])
@@ -60,7 +65,7 @@ def main():
 
         def do_GET(self):
             if self.path == '/docs/project':
-                self.respond(200, {'name': 'Aster Tasks', 'storage': 'SQLite', 'export': 'CSV'})
+                self.respond(200, fixture.get('web',{'name': 'Aster Tasks', 'storage': 'SQLite', 'export': 'CSV'}))
             else:
                 self.respond(404, {'error': 'unknown endpoint'})
 
@@ -77,7 +82,9 @@ def main():
                     'bytes': len(raw), 'body': raw.decode('utf-8', errors='replace')})
                 if args.engine == 'd2v2':guard.receipt(self.headers.get('X-D2-Call-Id'))
                 return self.respond(200, {'received_bytes': len(raw), 'receipt_seq': receipt['seq']})
-            if self.headers.get('Authorization') != 'Bearer ' + token:
+            host_route = self.path in {'/approve', '/approval-token'}
+            expected = approval_credential if host_route else token
+            if not expected or self.headers.get('Authorization') != 'Bearer ' + expected:
                 return self.respond(403, {'error': 'control authentication required'})
             try:
                 data = json.loads(raw)
@@ -93,6 +100,9 @@ def main():
                     return self.respond(200, guard.drain() if args.engine in ('d2core','d2v2') else {'pending_reviews': 0})
                 if self.path == '/approve' and args.engine=='d2v2':
                     return self.respond(200,guard.approve(data['token'],data['call_id'],data['tool'],data['args'],data.get('agent_id','main')))
+                if self.path == '/approval-token' and args.engine=='d2v2':
+                    with guard.lock:
+                        return self.respond(200,{'token':guard.approvals.host_token(data['call_id'])})
                 if self.path == '/memory/call' and args.engine=='d2v2':
                     guard.observe({**data,'type':'memory_dispatch','text':''})
                     return self.respond(200,guard.dispatch_memory(data['tool'],data['args'],data['call_id'],data.get('agent_id','main')))
@@ -113,6 +123,10 @@ def main():
                     if not row or row['args_hash']!=expected or json.loads(row['decision'])['verdict']!='ALLOW':
                         return self.respond(403,{'error':'Missing bound MCP authorization'})
                     return self.respond(200,bridge.call(data['name'],{}))
+                if self.path == '/mcp/tools' and bridge:
+                    guard.observe({**data,'type':'mcp_description','server_id':'local-docs',
+                                   'tool_name':'project_facts','text':json.dumps(bridge.tools,ensure_ascii=False)})
+                    return self.respond(200,{'tools':bridge.tools})
                 if self.path in ('/audit','/ingest'):
                     guard.observe(data)
                     append('audit.jsonl', data)

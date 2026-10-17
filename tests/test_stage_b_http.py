@@ -25,7 +25,7 @@ class ApprovalHTTPTest(unittest.TestCase):
             def run():
                 try:services.main()
                 except BaseException as exc:errors.append(type(exc).__name__)
-            with patch('d2v2.core.CoreV2',core_factory),patch('services.ThreadingHTTPServer',server_factory),patch.dict(os.environ,{'D2_CONTROL_TOKEN':'unit-control','D2_CORE_PROVIDER':'{"api_key":""}','D2_MEMORY_ROOT':str(Path(directory)/'.local/memory')}),patch('sys.argv',['services.py','--run-dir',directory,'--protect','on','--engine','d2v2']):
+            with patch('d2v2.core.CoreV2',core_factory),patch('services.ThreadingHTTPServer',server_factory),patch.dict(os.environ,{'D2_CONTROL_TOKEN':'unit-control','D2_APPROVAL_CREDENTIAL':'unit-host','D2_CORE_PROVIDER':'{"api_key":""}','D2_MEMORY_ROOT':str(Path(directory)/'.local/memory')}),patch('sys.argv',['services.py','--run-dir',directory,'--protect','on','--engine','d2v2']):
                 thread=threading.Thread(target=run,daemon=True);thread.start()
                 try:
                     deadline=time.monotonic()+10
@@ -41,13 +41,20 @@ class ApprovalHTTPTest(unittest.TestCase):
                         post('/audit',{'event_id':'proposal','type':'assistant_turn','proposals':[{'call_id':'c','tool':'fs_write','args':args}]})
                         decision=post('/decision',{'call_id':'c','tool':'fs_write','args':args})
                         self.assertEqual(decision['verdict'],'ASK')
-                        request={'token':decision['approval_token'],'call_id':'c','tool':'fs_write','args':args}
+                        self.assertNotIn('approval_token',decision)
+                        self.assertEqual(client.post('/approval-token',json={'call_id':'c'}).status_code,403)
+                        host={'Authorization':'Bearer unit-host'}
+                        secret=client.post('/approval-token',json={'call_id':'c'},headers=host).json()['token']
+                        request={'token':secret,'call_id':'c','tool':'fs_write','args':args}
+                        self.assertEqual(client.post('/approve',json=request).status_code,403)
                         self.assertEqual(client.post('/approve',json=request,headers={'Authorization':'Bearer wrong'}).status_code,403)
-                        approved=post('/approve',request);self.assertEqual(approved['approval_status'],'approved_once')
-                        self.assertEqual(client.post('/approve',json=request).status_code,400)
+                        approved=client.post('/approve',json=request,headers=host);self.assertEqual(approved.json()['approval_status'],'approved_once')
+                        self.assertEqual(client.post('/approve',json=request,headers=host).status_code,400)
                         post('/audit',{'event_id':'start','type':'tool_started','call_id':'c'})
                 finally:
                     if servers:servers[0].shutdown()
                     thread.join(10)
                     for core in cores:core.drain(2);core.store.db.close()
                 self.assertFalse(thread.is_alive());self.assertFalse(errors)
+                for path in Path(directory).rglob('*'):
+                    if path.is_file():self.assertNotIn(secret.encode(),path.read_bytes(),str(path))

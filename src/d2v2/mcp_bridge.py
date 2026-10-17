@@ -9,7 +9,7 @@ from pathlib import Path
 
 
 class MCPBridge:
-    def __init__(self, observe):
+    def __init__(self, observe, fixture=None):
         self.observe=observe;self.server_id='local-docs';self.next_id=0
         self.lock=threading.Lock();self.responses=queue.Queue(maxsize=8)
         self.process=subprocess.Popen([sys.executable,str(Path(__file__).with_name('mcp_fixture.py'))],
@@ -17,6 +17,7 @@ class MCPBridge:
             text=True,encoding='utf-8',errors='replace',creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0),
             env={k:v for k,v in os.environ.items() if k.upper() in {'PATH','SYSTEMROOT','TEMP','TMP','USERPROFILE','APPDATA'}})
         self.reader=threading.Thread(target=self._reader,daemon=True);self.reader.start()
+        if fixture:self.request('fixture/configure',{k:v for k,v in fixture.items() if k in {'mcp_description','mcp_return'}})
         handshake=self.request('initialize',{'protocolVersion':'2024-11-05','capabilities':{},'clientInfo':{'name':'D2Guard','version':'2'}})
         if handshake.get('protocolVersion')!='2024-11-05':
             self.close();raise ValueError('Unsupported MCP protocol version')

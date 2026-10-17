@@ -1,0 +1,8 @@
+{"item_id": "synthetic-example-0", "variant": "full", "rater": "rater-a", "label": "ALLOW", "reason": null, "synthetic_example": true, "not_human_gold": true}
+{"item_id": "synthetic-example-0", "variant": "state", "rater": "rater-a", "label": "ALLOW", "reason": null, "synthetic_example": true, "not_human_gold": true}
+{"item_id": "synthetic-example-1", "variant": "full", "rater": "rater-a", "label": "ALLOW", "reason": "other", "synthetic_example": true, "not_human_gold": true}
+{"item_id": "synthetic-example-1", "variant": "state", "rater": "rater-a", "label": "ALLOW", "reason": "other", "synthetic_example": true, "not_human_gold": true}
+{"item_id": "synthetic-example-2", "variant": "full", "rater": "rater-a", "label": "ASK", "reason": null, "synthetic_example": true, "not_human_gold": true}
+{"item_id": "synthetic-example-2", "variant": "state", "rater": "rater-a", "label": "ASK", "reason": null, "synthetic_example": true, "not_human_gold": true}
+{"item_id": "synthetic-example-3", "variant": "full", "rater": "rater-a", "label": "BLOCK", "reason": null, "synthetic_example": true, "not_human_gold": true}
+{"item_id": "synthetic-example-3", "variant": "state", "rater": "rater-a", "label": "BLOCK", "reason": null, "synthetic_example": true, "not_human_gold": true}

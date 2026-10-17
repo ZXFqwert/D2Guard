@@ -35,6 +35,8 @@ class CoreV2:
         self.taints=deque(maxlen=8);self.pending=None;self.integrity_fault=False
         self.approvals=Approvals(self.store)
         self.memory=MemoryStore(memory_root or self.folder/'.local/memory')
+        fixture=self.folder/'fixture.json'
+        self.file_sources=json.loads(fixture.read_text(encoding='utf-8')).get('file_sources',{}) if fixture.exists() else {}
         old=self.store.db.execute('SELECT data FROM grants ORDER BY version DESC LIMIT 1').fetchone()
         if old:self.anchor=json.loads(old[0])
         old=self.store.db.execute("SELECT decision FROM calls WHERE status='ASK' ORDER BY rowid LIMIT 1").fetchone()
@@ -91,6 +93,7 @@ class CoreV2:
                 uri=args.get('path') or args.get('url') or 'agent://'+agent+'/result'
                 if tool in {'memory_read','memory_write'}:uri='memory://local/'+args['key']
                 if tool=='mcp_call':uri='mcp://'+event.get('server_id','local-docs')+'/'+args.get('name','unknown')
+                if tool=='fs_read':source=self.file_sources.get(args.get('path'),source)
             elif kind=='mcp_description':source='MCP_DESC';uri='mcp://'+event['server_id']+'/'+event['tool_name']
             elif kind=='memory_recall':source='MEMORY';uri='memory://local/'+event['key']
             elif kind=='assistant_turn':
@@ -343,7 +346,8 @@ class CoreV2:
             if verdict=='ASK':
                 result['approval_origin_call_id']=self.pending.get('approval_origin_call_id',cid) if self.pending else cid
                 if not self.pending:
-                    result['approval_token']=self.approvals.issue(cid,ah,agent)
+                    self.approvals.issue(cid,ah,agent)
+                    result.update(self.approvals.summary(cid))
                     self.pending=result
             self.store.db.execute('INSERT INTO calls VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET decision=excluded.decision,status=excluded.status',
                 (cid,agent,ah,prior['proposal_ref'] if prior else None,encode(result),verdict))

@@ -6,7 +6,7 @@ import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { workspacePath, networkTarget } from '../src/boundary.mjs';
 
-export default function (pi: ExtensionAPI) {
+export default async function (pi: ExtensionAPI) {
   const workspace = process.env.D2_WORKSPACE!;
   const origin = process.env.D2_SERVICE_ORIGIN!;
   const agentId = process.env.D2_AGENT_ID || 'main';
@@ -153,8 +153,9 @@ export default function (pi: ExtensionAPI) {
       return reply(result.text);
     }
   });
+  const mcpTools = v2 ? await control('/mcp/tools', {}) : null;
   if (v2) pi.registerTool({ name: 'mcp_call', label: 'Read public facts through MCP',
-    description: 'Call the local MCP docs server through D2Guard. project_facts returns public project facts with no parameters or side effects.',
+    description: mcpTools.tools[0].description,
     parameters: Type.Object({ name: Type.Literal('project_facts') }), executionMode: 'sequential',
     async execute(id,args) {
       await audit({ type: 'tool_started', call_id: id });

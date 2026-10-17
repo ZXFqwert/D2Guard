@@ -5,12 +5,15 @@ from urllib.parse import urlsplit, urlunsplit
 from .normalization import normalize
 from .relations import relation_segments, contextual_cues
 
-URL = re.compile(r'https?://[^\s<>"\x27`]+',re.I)
+URL = re.compile(r'https?://[^\s<>"\x27`，；。！？、]+',re.I)
 PATH = re.compile(r'(?<![\w])(?:\.[A-Za-z][\w.-]*|(?:[\w@-]+/)*[\w@-]+\.(?:md|txt|json|csv|env|pem|key|py|sh|exe|yaml|yml))(?![\w])',re.I)
 DIRECTIVE = re.compile(r'\b(read|write|send|upload|post|fetch|execute|run|must|before|register|ignore|use|call)\b|读取|写入|发送|外发|上传|执行|必须|忽略|调用|之前',re.I)
 NEGATION = re.compile(r'\b(no|not|never|without|avoid|explain|quote|example)\b|禁止|不要|不得|示例|解释|引用|不允许',re.I)
-READ = re.compile(r'\b(read|review|inspect|summari[sz]e)\b|读|查阅|审查',re.I)
+READ = re.compile(r'\b(read|open|view|review|inspect|summari[sz]e)\b|读取|查看|打开|读|查阅|审查',re.I)
 WRITE = re.compile(r'\b(write|generate|create|save)\b|写|生成|保存|创建',re.I)
+NET_GET = re.compile(r'\b(fetch|get|download|visit)\b|访问|获取|下载',re.I)
+NET_POST = re.compile(r'\b(upload|send|post|submit)\b|上传|发送|提交',re.I)
+UNCERTAIN = re.compile(r'\b(if|unless|whether|could|would|might|may|can|should)\b|如果|若|是否|能否|可以.*吗|[?？]',re.I)
 
 
 def canonical(target):
@@ -41,8 +44,12 @@ def grant(text, ref, version):
     """Explicit nearby action verbs only. Ambiguous clauses do not grant permissions."""
     result={'version':version,'intent_mode':'READONLY_REVIEW' if re.search(r'read.?only|只读',text,re.I) else 'TASK',
         'read':[],'write':[],'net':[],'evidence_ref':ref,'coverage_incomplete':False}
-    for match in re.finditer(r'[^\n;。]+',text):
-        clause=match.group()
+    # Defense in depth: callers normally already mask these spans.
+    from .user_message import split_user_message
+    text,_=split_user_message(text)
+    for clause in re.split(r'\n|[;；。]|\.\s+',text):
+        language=URL.sub('',clause)
+        if UNCERTAIN.search(language) or NEGATION.search(language) or re.search(r"\b(?:don't|do not|cannot|can't)\b|不上传|不发送|别上传",language,re.I):continue
         for target in targets(clause):
             before=clause[:clause.find(target)]
             # Scope to the latest coordinated verb phrase; never infer grants from a filename alone.
@@ -53,10 +60,12 @@ def grant(text, ref, version):
             except ValueError:
                 result['coverage_incomplete']=True;continue
             if value.startswith('http'):
-                if READ.search(before) or re.search(r'\bGET\b',before):result['net'].append('GET '+value)
-                else:
-                    method=re.search(r'\b(POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\b',before,re.I)
-                    if method:result['net'].append(method.group().upper()+' '+value)
+                after=clause[clause.find(target)+len(target):]
+                method=re.search(r'\b(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\b',before,re.I)
+                suffix=re.match(r'\s*(?:using|with|使用)\s+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\b',after,re.I)
+                if method or suffix:result['net'].append((method or suffix).group(1).upper()+' '+value)
+                elif NET_POST.search(before):result['net'].append('POST '+value)
+                elif NET_GET.search(before) or READ.search(before):result['net'].append('GET '+value)
             elif WRITE.search(before):result['write'].append(value)
             elif READ.search(before):result['read'].append(value)
     if result['intent_mode']=='READONLY_REVIEW':result['write']=[]

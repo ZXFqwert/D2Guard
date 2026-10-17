@@ -12,6 +12,7 @@ from .store import encode
 class Approvals:
     def __init__(self, store, clock=time.time):
         self.store=store;self.clock=clock
+        self.pending_tokens={}
         row=store.db.execute("SELECT value FROM session_meta WHERE key='session_id'").fetchone()
         self.session=row[0] if row else uuid.uuid4().hex
         store.db.execute("INSERT OR IGNORE INTO session_meta VALUES('session_id',?)",(self.session,))
@@ -31,7 +32,21 @@ class Approvals:
         payload=base64.urlsafe_b64encode(encode(body).encode()).decode().rstrip('=')
         signature=hmac.new(self.key,payload.encode(),hashlib.sha256).hexdigest()
         self.store.db.execute('INSERT INTO approval_nonces VALUES(?,0)',(body['nonce'],))
-        return payload+'.'+signature
+        token=payload+'.'+signature
+        self.pending_tokens[call_id]=token
+        return token
+
+    def summary(self, call_id):
+        token=self.pending_tokens[call_id]
+        payload=token.split('.')[0]
+        body=json.loads(base64.urlsafe_b64decode(payload+'='*(-len(payload)%4)))
+        return {'approval_token_sha256':hashlib.sha256(token.encode()).hexdigest(),
+                'approval_nonce':body['nonce']}
+
+    def host_token(self, call_id):
+        # Memory only; never returned by the Agent decision endpoint.
+        if call_id not in self.pending_tokens:raise ValueError('Approval unavailable; restart requires a fresh host review')
+        return self.pending_tokens[call_id]
 
     def consume(self,token,call_id,args_hash,agent):
         try:
@@ -44,6 +59,7 @@ class Approvals:
             if not body['issued']<=self.clock()<body['expires']:raise ValueError('Approval expired')
             changed=self.store.db.execute('UPDATE approval_nonces SET used=1 WHERE nonce=? AND used=0',(body['nonce'],)).rowcount
             if changed!=1:raise ValueError('Approval nonce missing or already consumed')
+            self.pending_tokens.pop(call_id,None)
             return body
         except (KeyError,TypeError,json.JSONDecodeError) as exc:
             raise ValueError('Malformed approval token') from exc

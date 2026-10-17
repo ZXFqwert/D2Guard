@@ -1,0 +1,4 @@
+{"item_id": "synthetic-example-0", "variant": "gold", "label": "ALLOW", "synthetic_example": true, "not_human_gold": true}
+{"item_id": "synthetic-example-1", "variant": "gold", "label": "ALLOW", "synthetic_example": true, "not_human_gold": true}
+{"item_id": "synthetic-example-2", "variant": "gold", "label": "ASK", "synthetic_example": true, "not_human_gold": true}
+{"item_id": "synthetic-example-3", "variant": "gold", "label": "BLOCK", "synthetic_example": true, "not_human_gold": true}
