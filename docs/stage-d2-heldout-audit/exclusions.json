@@ -1,0 +1,29 @@
+{
+ "items": [
+  {
+   "id": "r1-semantic_heldout-000116",
+   "label": "request",
+   "raters_label": "none"
+  },
+  {
+   "id": "r1-semantic_heldout-000221",
+   "label": "none",
+   "raters_label": "request"
+  },
+  {
+   "id": "r1-semantic_heldout-000165",
+   "label": "request",
+   "raters_label": "none"
+  },
+  {
+   "id": "r1-semantic_heldout-000218",
+   "label": "request",
+   "raters_label": "none"
+  },
+  {
+   "id": "r1-semantic_heldout-000462",
+   "label": "request",
+   "raters_label": "none"
+  }
+ ]
+}

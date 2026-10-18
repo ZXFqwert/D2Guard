@@ -2,6 +2,7 @@
 import json
 import queue
 import re
+import os
 import threading
 import time
 import uuid
@@ -38,6 +39,16 @@ class CoreV2:
         # No environment/configuration means no S1. Loaded models observe only
         # until a separately reviewed acceptance explicitly enables additions.
         self.content_add_risk=False
+        if self.content_fast is None and fast is None and os.environ.get('D2_S1_CONFIG'):
+            config_path=os.environ['D2_S1_CONFIG']
+            config=json.loads(Path(config_path).read_text(encoding='utf-8'))
+            if config.get('schema')=='d3-request-v1':
+                from .request_model import RequestContentModel
+                self.content_fast=RequestContentModel(config_path)
+                self.content_add_risk=self.content_fast.add_risk_enabled
+            else:
+                from .content_model import ContentModel
+                self.content_fast=ContentModel(config_path)
         self.anchor={'version':0,'read':[],'write':[],'net':[],'coverage_incomplete':True}
         self.taints=deque(maxlen=8);self.pending=None;self.integrity_fault=False
         self.approvals=Approvals(self.store)
@@ -235,10 +246,10 @@ class CoreV2:
             if self.content_fast is not None:
                 try:
                     s1=self.content_fast.classify(raw,source)
-                    if self.content_add_risk and s1.get('calibrated') and s1.get('threshold_passed') and s1['label']=='to_agent':
+                    if self.content_add_risk and s1.get('calibrated') and s1.get('threshold_passed') and s1['label'] in {'request','to_agent'}:
                         if not any(r['stance']=='requested' for d in directives for r in d['action_relations']) or incomplete:
                             unknowns.append({'evidence_ref':{**ref,'char_span':[0,len(raw)]},
-                                       'reason':'Calibrated S1 to_agent without complete extracted relation',
+                                       'reason':'Calibrated S1 operation request without complete extracted relation',
                                        'signal':'model:D2Guard-Laya:S1','s1':s1})
                 except (RuntimeError,ValueError) as exc:
                     s1={'model_used':False,'error_type':type(exc).__name__,'fallback':'rule:DIRECTIVE'}

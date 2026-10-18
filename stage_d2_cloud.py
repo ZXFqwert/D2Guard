@@ -1,6 +1,7 @@
 """Stage D-double-prime cloud adapter. Secrets never enter arguments or logs."""
 from __future__ import annotations
 import json
+import os
 import re
 import threading
 import time
@@ -25,6 +26,31 @@ class CloudFailure(RuntimeError):
     """A deliberately sanitized error, without response bodies or headers."""
 
 
+def record_identity(identity_path, model, returned):
+    """Thread and process safe metadata, without request bodies or credentials."""
+    identity_path=Path(identity_path)
+    with LOCK, identity_path.with_suffix('.lock').open('a+b') as lock:
+        if lock.tell()==0:lock.write(b'0');lock.flush()
+        lock.seek(0)
+        if os.name=='nt':
+            import msvcrt
+            msvcrt.locking(lock.fileno(),msvcrt.LK_LOCK,1)
+        else:
+            import fcntl
+            fcntl.flock(lock.fileno(),fcntl.LOCK_EX)
+        try:
+            identities=json.loads(identity_path.read_text(encoding='utf-8')) if identity_path.exists() else {}
+            counts=identities.setdefault(model,{})
+            counts[returned]=counts.get(returned,0)+1
+            temporary=identity_path.with_suffix('.tmp-'+str(os.getpid()))
+            temporary.write_text(json.dumps(identities,indent=2),encoding='utf-8')
+            temporary.replace(identity_path)
+        finally:
+            lock.seek(0)
+            if os.name=='nt':msvcrt.locking(lock.fileno(),msvcrt.LK_UNLCK,1)
+            else:fcntl.flock(lock.fileno(),fcntl.LOCK_UN)
+
+
 def credentials():
     values = {}
     for line in (ROOT / '.local/teacher.env').read_text(encoding='utf-8-sig').splitlines():
@@ -35,6 +61,29 @@ def credentials():
     if urlsplit(base).scheme != 'https' or not key:
         raise CloudFailure('Invalid local teacher configuration')
     return base, key
+
+
+def append_request_record(path, record):
+    """Serialize append across processes, including Windows append semantics."""
+    path=Path(path)
+    if set(record)!={'model','seconds','tokens'}:
+        raise ValueError('Request logs permit only model, seconds and tokens')
+    with LOCK, path.with_suffix('.append.lock').open('a+b') as lock:
+        if lock.tell()==0:lock.write(b'0');lock.flush()
+        lock.seek(0)
+        if os.name=='nt':
+            import msvcrt
+            msvcrt.locking(lock.fileno(),msvcrt.LK_LOCK,1)
+        else:
+            import fcntl
+            fcntl.flock(lock.fileno(),fcntl.LOCK_EX)
+        try:
+            with path.open('a',encoding='utf-8') as stream:
+                stream.write(json.dumps(record)+'\n')
+        finally:
+            lock.seek(0)
+            if os.name=='nt':msvcrt.locking(lock.fileno(),msvcrt.LK_UNLCK,1)
+            else:fcntl.flock(lock.fileno(),fcntl.LOCK_UN)
 
 
 def call(model, messages, *, max_tokens=1024, temperature=0, log_path=None, thinking=None):
@@ -59,12 +108,8 @@ def call(model, messages, *, max_tokens=1024, temperature=0, log_path=None, thin
             actual = body.get('model', '')
             safe = actual if isinstance(actual, str) and re.fullmatch(r'[A-Za-z0-9._:/-]{1,100}', actual) and key not in actual else '[invalid]'
             raise CloudFailure('Returned model name differs: ' + safe)
-        with LOCK:
-            identity_path = ROOT / '.local/stage-d2/returned-models.json'
-            identities = json.loads(identity_path.read_text()) if identity_path.exists() else {}
-            counts = identities.setdefault(model, {})
-            counts[body['model']] = counts.get(body['model'], 0) + 1
-            identity_path.write_text(json.dumps(identities, indent=2), encoding='utf-8')
+        identity_path = (Path(log_path).parent if log_path else ROOT / '.local/stage-d2') / 'returned-models.json'
+        record_identity(identity_path,model,body['model'])
         choice = body['choices'][0]
         if choice.get('finish_reason') != 'stop':
             raise CloudFailure('Incomplete response')
@@ -82,10 +127,8 @@ def call(model, messages, *, max_tokens=1024, temperature=0, log_path=None, thin
         raise CloudFailure('Cloud operation failed: ' + type(error).__name__) from None
     finally:
         if log_path:
-            with LOCK:
-                with Path(log_path).open('a', encoding='utf-8') as stream:
-                    stream.write(json.dumps({'model': model, 'seconds': time.monotonic() - started,
-                                             'tokens': usage}) + '\n')
+            append_request_record(log_path,{'model': model, 'seconds': time.monotonic() - started,
+                                           'tokens': usage})
 
 
 def smoke():

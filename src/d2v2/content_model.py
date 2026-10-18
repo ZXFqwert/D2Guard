@@ -6,11 +6,12 @@ import shutil
 from pathlib import Path
 import numpy as np
 from .content_schema import LABELS,S1,QUESTIONS,S2_TYPES
-from .normalization import normalize
+from .semantic_view import semantic_view
 
 
-def windows(tok,text,source_type):
-    """All content is covered by <=256-token views; no silent tail truncation."""
+def windows(tok,text,source_type,view_budget=256):
+    """Cover all content; default remains 256, D3 explicitly requests 384."""
+    if view_budget not in (256,384):raise ValueError('Unsupported S1 view budget')
     encoded=tok(text,add_special_tokens=False,return_offsets_mapping=True)
     offsets=encoded['offset_mapping']
     if not offsets:return [{'source_type':source_type,'fragment':text}]
@@ -18,11 +19,11 @@ def windows(tok,text,source_type):
     # Reserve room for JSON keys/source type; validate the actual serialized view.
     start=0
     while start<len(offsets):
-        end=min(start+220,len(offsets))
+        end=min(start+(384 if view_budget==384 else 220),len(offsets))
         while True:
             part=text[offsets[start][0]:offsets[end-1][1]]
             v={'source_type':source_type,'fragment':part}
-            if len(tok(json.dumps(v,ensure_ascii=False),add_special_tokens=False)['input_ids'])<=256:break
+            if len(tok(json.dumps(v,ensure_ascii=False),add_special_tokens=False)['input_ids'])<=view_budget:break
             end-=1
             if end<=start:raise ValueError('Source type alone exceeds S1 view budget')
         result.append(v)
@@ -34,7 +35,7 @@ def windows(tok,text,source_type):
 def model_items(tok,text,source_type,max_len=512,question_id='S1',question=None):
     from laya.train import items_from_rows
     from laya.common import build_sequence
-    vs=windows(tok,normalize(text)[0],source_type)
+    vs=windows(tok,semantic_view(text),source_type)
     items,skipped=items_from_rows(tok,[{'state':v,'questions':{question_id:question or QUESTIONS[question_id]},'expected':{question_id:'A'}} for v in vs],max_len,192)
     if skipped or len(items)!=len(vs):raise ValueError('S1 items skipped: '+str(skipped))
     for it in items:

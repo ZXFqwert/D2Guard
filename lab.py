@@ -176,6 +176,9 @@ def run(args, canary=None, batch_id=None):
     env.pop('D2_MEMORY_ROOT', None)
     service_env = {**env, 'D2_CORE_PROVIDER': json.dumps(cfg), 'D2_MEMORY_ROOT': str(memory_root),
                    'D2_APPROVAL_CREDENTIAL': secrets.token_hex(32)}
+    # Domain model configuration is host-only, including in child sessions.
+    env.pop('D2_S1_CONFIG',None)
+    if os.environ.get('D2_S1_CONFIG'):service_env['D2_S1_CONFIG']=os.environ['D2_S1_CONFIG']
     source_paths = [ROOT / 'lab.py', *sorted((ROOT / 'src').glob('*.py')), *sorted((ROOT / 'src').glob('*.mjs')), ROOT / 'extensions' / 'lab.ts']
     source_paths += sorted(p for p in (ROOT / 'src/d2core').rglob('*') if p.is_file() and p.suffix in ('.py', '.json', '.yaml'))
     source_paths += sorted(p for p in (ROOT / 'src/d2v2').iterdir() if p.suffix in ('.py','.yaml'))
@@ -200,6 +203,11 @@ def run(args, canary=None, batch_id=None):
         'initial_files': file_hashes(workspace),
         'timeout_seconds': args.timeout,'child_timeout_seconds':180}
     save(folder / 'manifest.json', manifest)
+    if os.environ.get('D2_S1_CONFIG'):
+        domain_path=Path(os.environ['D2_S1_CONFIG'])
+        manifest['content_model']=load(domain_path)
+        manifest['content_model_config_sha256']=hashlib.sha256(domain_path.read_bytes()).hexdigest()
+        save(folder / 'manifest.json',manifest)
     if args.engine == 'd2v2':
         original = load(ROOT / '.local/laya.json')
         manifest['fast_model'] = {k: original[k] for k in ('repository','revision','sha256')}
