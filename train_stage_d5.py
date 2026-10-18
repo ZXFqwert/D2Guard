@@ -2,9 +2,9 @@
 import argparse,dataclasses,hashlib,json,random,shutil,signal,time
 from pathlib import Path
 import numpy as np
-from stage_d5_protocol import ROOT,OUT,read,budget as stage_budget
+from stage_d5_protocol import ROOT,OUT,read,budget as stage_budget,training_deadline
 def plan():
-    p=json.loads((OUT/"protocol.json").read_text());return {**p,"stage_budget_seconds":16200}
+    p=json.loads((OUT/"protocol.json").read_text());return p
 from stage_d5_model import items_for,predict_laya,predict_baseline,baseline_text,views_for,calibrate,QUESTION,softmax
 from stage_d2_metrics import LABELS
 from train_stage_d import hashes
@@ -28,7 +28,7 @@ def main(name,round_number,smoke=False):
     clock=folder/'training-clock.json'
     if not clock.exists():
         with clock.open('x') as f:json.dump({'started_unix':time.time()},f)
-    started=time.time();deadline=min(json.loads(clock.read_text())['started_unix']+3600,plan()['started_unix']+plan()['stage_budget_seconds'])
+    started=time.time();deadline=training_deadline(json.loads(clock.read_text()),plan())
     def budget(*args):
         if time.time()>=deadline:raise TimeoutError('Training/evaluation 60-minute wall-clock limit')
     signal.signal(signal.SIGALRM,lambda *args:(_ for _ in ()).throw(TimeoutError('Training/evaluation 60-minute stop')))

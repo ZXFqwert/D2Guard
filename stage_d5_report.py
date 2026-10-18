@@ -3,7 +3,7 @@ import collections
 import json
 import re
 import time
-from stage_d5_protocol import ROOT,OUT,read,sha,save,blocked_sources,RUBRIC
+from stage_d5_protocol import ROOT,OUT,read,sha,save,blocked_sources,RUBRIC,active_rows
 
 
 def get(name,default=None):
@@ -30,7 +30,7 @@ def review_breakdown(name):
     if not source.exists() or not votes.exists():return None
     from stage_d5_protocol import MODELS,teacher_role
     models=('deepseek-v4.1-flash','mimo-v2.5') if name in ('pilot','native','commands','real-test-relabel') else MODELS
-    rows=read(source);by={(v['id'],teacher_role(v['model'])):v for v in read(votes)};result={}
+    rows=active_rows(name,read(source));by={(v['id'],teacher_role(v['model'])):v for v in read(votes)};result={}
     for category in sorted({r.get('category','synthetic') for r in rows}):
         subset=[r for r in rows if r.get('category','synthetic')==category];complete=0;agreed=[]
         for r in subset:
@@ -50,7 +50,7 @@ def error_summary(name):
 
 def main():
     protocol=get('protocol');stop=get('stage-stop');gate=get('admission');isolation=get('isolation');probe=get('probe');evaluation=get('evaluation');runner=get('training-runner')
-    pause_total=protocol.get('authorized_pause_seconds',0)+protocol.get('glm_switch_pause',{}).get('pause_seconds',0)+protocol.get('codex_resume_pause',{}).get('pause_seconds',0)
+    pause_total=protocol.get('authorized_pause_seconds',0)+protocol.get('glm_switch_pause',{}).get('pause_seconds',0)+protocol.get('codex_resume_pause',{}).get('pause_seconds',0)+protocol.get('quoted_replacement_resume_pause',{}).get('pause_seconds',0)
     training={b:get(b+'-training') for b in ('multilingual','english')}
     reviews={n:get(n+'-review') for n in ('pilot','native','commands','synthetic-request','injected','injected-extra','injected-quoted','real-test-relabel')}
     inventory=get('inventory',[]);sources=get('sources',[]);calls=collections.defaultdict(lambda:{'requests':0,'known_usage_requests':0,'known_total_tokens':0,'total_seconds':0.,'no_usage_ge_90_seconds':0})
@@ -62,7 +62,7 @@ def main():
         if row['tokens'] is not None:v['known_usage_requests']+=1;v['known_total_tokens']+=row['tokens'].get('total_tokens',0)
     for v in calls.values():v['mean_seconds']=v['total_seconds']/v['requests']
     from stage_d5_resume_glm import agreement,gate_agreement,QUEUES
-    glm_counts={n:agreement(n,read(OUT/(n+'.jsonl'))) for n in QUEUES}
+    glm_counts={n:agreement(n,active_rows(n,read(OUT/(n+'.jsonl')))) for n in QUEUES}
     matched_early={}
     for n in QUEUES:
         sample=get(n+'-glm-early-sample')
@@ -95,7 +95,7 @@ def main():
             rows=read(p);cohorts[name]={'status':'teacher_agreed_before_isolation' if name.endswith('-agreed') else 'generated_candidate_not_admitted' if name.startswith('injected') else 'derived_corpus','n':len(rows),'sha256':sha(p),'split':dict(collections.Counter(r.get('split','unknown') for r in rows)),'origin':dict(collections.Counter(r.get('origin','unknown') for r in rows)),'label':dict(collections.Counter(r.get('label','unknown') for r in rows)),'kind':dict(collections.Counter(r.get('kind','unknown') for r in rows)),'category':dict(collections.Counter(r.get('category','synthetic') for r in rows))}
     files=sorted(p.name for p in ROOT.glob('stage_d5_*.py'))+['train_stage_d5.py','evaluate_stage_d5.py','stage_d2_cloud.py','tests/test_stage_d5.py','src/d2v2/request_model.py','src/d2v2/core.py','lab.py','docs/24-stage-d5-report.md','docs/stage-d5-results.json','docs/stage-d5-verification.md','docs/03-status.md','docs/整体设计文档.md','docs/12-codex-execution-plan.md']
     blind=OUT/'reviewer-blind.jsonl'
-    result={'stage':'D5','status':status,'glm_switch_checkpoint':'acb585c','glm_switch':get('teacher-switch-glm'),'glm_screen':get('diag/screen-report-glm-b8-8000'),'glm_early_gates':get('glm-early-gates'),'teacher_agreement_before':get('glm-before-agreement'),'teacher_agreement_current':glm_counts,'same_sample_early_comparison':matched_early,'paused_seconds_total':pause_total,'reused_teacher_cohorts':['pilot','native','commands','real-test-relabel'],'latest_policy_cleanup':get('latest-policy-cleanup'),'checkpoint':'878b758e27e690b8cb4a860fe3ae49af33c270be','protocol':protocol,'stop':stop,'transport_check_after_repeated_timeout':get('transport-check-second'),'cloud_errors':{n:error_summary(n) for n in ('native','commands','synthetic-request','real-test-relabel','injected','generation-extra')},'elapsed_minutes':(time.time()-protocol['started_unix']-pause_total)/60,'elapsed_including_pause_minutes':(time.time()-protocol['started_unix'])/60,'authorized_resume':get('resume-authorized-v41'),'teacher_switch':get('teacher-switch'),'transport_recovery':{'check':get('transport-check'),'teacher_resume':get('injected-resume'),'generator_resume':get('generation-extra-resume'),'user_confirmed_temporary_network_outage':True},'reviews':reviews,'partial_snapshot':get('resumed-stop-snapshot'),'synthetic_reclassification':get('synthetic-reclassification'),'reviews_by_category':{n:review_breakdown(n) for n in reviews},'generation':get('generation'),'generation_extra':get('generation-extra'),'quoted_supplement':get('quoted-supplement-plan'),'generation_quoted':get('generation-quoted'),'quoted_smoke':get('quoted-smoke-summary'),'injection_render':get('injection-render'),'command_collection':get('commands-summary'),'encoding_smoke':get('encoding-smoke'),'source_inventory':inventory,'source_fetch_summary':{'candidate_repositories':len(sources),'accepted_license_records':sum(s.get('accepted_license',False) for s in sources)},'assembly':get('assembly'),'cohorts':cohorts,'isolation':isolation,'admission':gate,'probe':probe,'training_runner':runner,'training':training,'epoch_history':{b:get(b+'-epochs') for b in training},'supplement_plan':get('supplement-plan'),'evaluation':evaluation,'cloud_calls_completed_lower_bound':dict(calls),'cloud_log_scopes':[str(p.relative_to(ROOT)) for p in request_logs],'tests':tests,'checks':checks,'security':get('security-verification'),'changed_files':files,'offline_recompute':offline,'regression':regression,'activation':activation,'real_run_ids':(regression or {}).get('run_ids',[]),'verify_v2':regression.get('all_verified') if regression else None,'S1_added_ASK':ask_details if regression else None,'reviewer_blind_package':{'private_path':'.local/stage-d5/reviewer-blind.jsonl','sha256':sha(blind),'fields':['id','text']} if blind.exists() else None}
+    result={'stage':'D5','status':status,'retired_quoted_cohort':{k:v for k,v in get('retired-quoted-cohort',{}).items() if k!='ids'},'historical_failed_gate':get('glm-early-gates-before-quoted-retirement'),'quoted_replacement_gates':{str(n):get(f'quoted-replacement-gate-{n}') for n in (208,640)},'glm_switch_checkpoint':'acb585c','glm_switch':get('teacher-switch-glm'),'glm_screen':get('diag/screen-report-glm-b8-8000'),'glm_early_gates':get('glm-early-gates'),'teacher_agreement_before':get('glm-before-agreement'),'teacher_agreement_current':glm_counts,'same_sample_early_comparison':matched_early,'paused_seconds_total':pause_total,'reused_teacher_cohorts':['pilot','native','commands','real-test-relabel'],'latest_policy_cleanup':get('latest-policy-cleanup'),'checkpoint':'878b758e27e690b8cb4a860fe3ae49af33c270be','protocol':protocol,'stop':stop,'transport_check_after_repeated_timeout':get('transport-check-second'),'cloud_errors':{n:error_summary(n) for n in ('native','commands','synthetic-request','real-test-relabel','injected','generation-extra')},'elapsed_minutes':(time.time()-protocol['started_unix']-pause_total)/60,'elapsed_including_pause_minutes':(time.time()-protocol['started_unix'])/60,'authorized_resume':get('resume-authorized-v41'),'teacher_switch':get('teacher-switch'),'transport_recovery':{'check':get('transport-check'),'teacher_resume':get('injected-resume'),'generator_resume':get('generation-extra-resume'),'user_confirmed_temporary_network_outage':True},'reviews':reviews,'partial_snapshot':get('resumed-stop-snapshot'),'synthetic_reclassification':get('synthetic-reclassification'),'reviews_by_category':{n:review_breakdown(n) for n in reviews},'generation':get('generation'),'generation_extra':get('generation-extra'),'quoted_supplement':get('quoted-supplement-plan'),'generation_quoted':get('generation-quoted'),'quoted_smoke':get('quoted-smoke-summary'),'injection_render':get('injection-render'),'command_collection':get('commands-summary'),'encoding_smoke':get('encoding-smoke'),'source_inventory':inventory,'source_fetch_summary':{'candidate_repositories':len(sources),'accepted_license_records':sum(s.get('accepted_license',False) for s in sources)},'assembly':get('assembly'),'cohorts':cohorts,'isolation':isolation,'admission':gate,'probe':probe,'training_runner':runner,'training':training,'epoch_history':{b:get(b+'-epochs') for b in training},'supplement_plan':get('supplement-plan'),'evaluation':evaluation,'cloud_calls_completed_lower_bound':dict(calls),'cloud_log_scopes':[str(p.relative_to(ROOT)) for p in request_logs],'tests':tests,'checks':checks,'security':get('security-verification'),'changed_files':files,'offline_recompute':offline,'regression':regression,'activation':activation,'real_run_ids':(regression or {}).get('run_ids',[]),'verify_v2':regression.get('all_verified') if regression else None,'S1_added_ASK':ask_details if regression else None,'reviewer_blind_package':{'private_path':'.local/stage-d5/reviewer-blind.jsonl','sha256':sha(blind),'fields':['id','text']} if blind.exists() else None}
     save('final-result-private.json',result)
     machine=ROOT/'docs/stage-d5-results.json';machine.write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
     early_table=[]
@@ -118,7 +118,7 @@ def main():
         '## 换教师能力检查与早期门槛',
         'GLM在72条三类训练侧小集上72/72，各类24/24；既有DeepSeek票复用。新构造队列逐类三方一致率低于70%立即停止；旧合成队列依用户后续指令按新定义的双教师一致率逐类检查，允许request改为none，历史contract_label仅作溯源。70%线和最终模型验收线不变。',
         table(['队列','类别','有效对数','一致数','一致率','队列门槛通过'],early_table),
-        '原注入quoted的剩余8条即使全部一致，也最多69/100，不能达到70%；已停止，未进入后续全量换票和训练。' if stop and stop.get('error_type')=='TeacherEarlyAgreementGate' else '早期门槛细节见机读结果。',
+        '原注入队列的650条旧quoted已按用户授权整批退出，原始失败检查与票据保留审计。新构造独立执行原70%门槛，其他有效数据不重做；新批次结果见机读结果quoted_replacement_gates。',
         table(['队列','原始构造类别','旧MiMo有效对','旧三方一致','GLM有效对','新三方一致'],before_after),
         '上表前后有效对数不同，不把数量直接当作模型准确率提升。相同早期样本的对照及完整交叉分布保留在机读结果same_sample_early_comparison。旧合成的历史构造标签只用于溯源，不作为新定义的准入基准。',
         '## 最终教师提示词全文','```text\n'+RUBRIC+'\n```',

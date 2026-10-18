@@ -182,4 +182,26 @@ class GLMEarlyGateTests(unittest.TestCase):
             self.assertTrue(all(v['rate']==1 for v in counts.values()))
             self.assertTrue(all(v['teacher_agreement_n']==1 for v in counts.values()))
 
+class RetiredCohortTests(unittest.TestCase):
+    def test_training_uses_authorized_stage_deadline_without_expanding_fit_clock(self):
+        from stage_d5_protocol import training_deadline
+        clock={'started_unix':10000}
+        protocol={'started_unix':0,'stage_deadline_unix':20000}
+        self.assertEqual(training_deadline(clock,protocol),13600)
+        protocol['stage_deadline_unix']=11000
+        self.assertEqual(training_deadline(clock,protocol),11000)
+
+    def test_retirement_excludes_entire_cohort_regardless_of_votes(self):
+        import tempfile
+        from pathlib import Path
+        import stage_d5_protocol as module
+        with tempfile.TemporaryDirectory() as tmp:
+            folder=Path(tmp)
+            (folder/'retired-quoted-cohort.json').write_text(json.dumps({'ids':['old_agreed','old_disagreed']}))
+            rows=[{'id':i} for i in ('old_agreed','old_disagreed','valid_request','new_quoted')]
+            with patch.object(module,'OUT',folder):
+                actual=module.active_rows('injected',rows)
+            self.assertEqual([r['id'] for r in actual],['valid_request','new_quoted'])
+            self.assertEqual(len(rows),4)
+
 if __name__=='__main__':unittest.main()

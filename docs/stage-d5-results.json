@@ -1,91 +1,15 @@
 {
   "stage": "D5",
-  "status": "D5 已停止：原注入队列quoted三方一致率低于70%；即使剩余票全部一致仍无法达到70%，按用户预登记规则停止；S1关闭",
-  "glm_switch_checkpoint": "acb585c",
-  "glm_switch": {
-    "user_authorization_utc": "2026-10-18T10:20Z",
-    "user_instruction": "glm-5.3-flash",
-    "replaced": "mimo-v2.5",
-    "new_second_teacher": "glm-5.3-flash",
-    "reason": "mimo-v2.5 best 68% (D_mimo_v2_b1) on the reviewer-checked 72-row three-class diag set, quoted <=10/24 in every variant; DeepSeek 72/72.",
-    "screen": {
-      "set": ".local/stage-d5/diag/diag-set.jsonl (24 request / 24 quoted / 24 none, train side)",
-      "glm-5.3-flash_b8_max_tokens_2400": "64/72, 8 missing from Incomplete response",
-      "glm-5.3-flash_b8_max_tokens_8000": "72/72, 0 missing, 0 errors",
-      "reports": [
-        "diag/report.json",
-        "diag/screen-report.round1.json",
-        "diag/screen-report-glm-b8-8000.json"
-      ]
-    },
-    "call_adaptation": {
-      "max_tokens": 8000,
-      "thinking_field": "omitted for glm-5.3-flash (HTTP 400 when sent); DeepSeek unchanged (disabled)",
-      "returned_name": "exact glm-5.3-flash"
-    },
-    "prompt_sha256": "475571e4a12e528f8aaeba4e52b6f8481f49696e90fdcf02a7946e21a0a2e91f",
-    "prompt_changes": 0,
-    "deepseek_votes": "retained, not repeated",
-    "revoted_queues": [
-      "injected",
-      "injected-extra",
-      "injected-quoted",
-      "synthetic-request"
-    ],
-    "not_revoted_queues": {
-      "queues": [
-        "native",
-        "commands",
-        "real-test-relabel",
-        "pilot"
-      ],
-      "note": "almost entirely no-request queues; previous deepseek-v4.1-flash + mimo-v2.5 results kept as-is"
-    },
-    "deadline": {
-      "pause_seconds": 2086.6924357414246,
-      "extension_seconds": 7486.692435741425,
-      "recorded_in": "protocol.json glm_switch_pause"
-    }
+  "status": "D5 已停止：GLM batch and two minimal probes returned HTTP 403; response contains quota/balance error marker. Preserve all valid rows and votes; legacy synthetic early gate incomplete. No training or test evaluation started.；S1关闭",
+  "retired_quoted_cohort": {
+    "reason": "User authorized wholesale retirement of old quoted cohort, retain audit and all other valid data",
+    "n": 650,
+    "source_sha256": "5cd15bad4f215ed95a447eb1f217538b9e70316b592c64c08d18afc88861c658",
+    "votes_sha256_at_retirement": "fa65884d78360ce346f8b53a445e8e5f772516d567c967d4680c42f222147b80",
+    "retired_unix": 1792322834.5127916,
+    "replacement": "existing direct-verbatim plan; unchanged admission thresholds"
   },
-  "glm_screen": {
-    "glm-5.3-flash_v1_b8": {
-      "model": "glm-5.3-flash",
-      "accuracy": 1.0,
-      "per_class": {
-        "request": {
-          "correct": 24,
-          "n": 24,
-          "missing": 0,
-          "pred": {
-            "request": 24
-          }
-        },
-        "quoted": {
-          "correct": 24,
-          "n": 24,
-          "missing": 0,
-          "pred": {
-            "quoted": 24
-          }
-        },
-        "none": {
-          "correct": 24,
-          "n": 24,
-          "missing": 0,
-          "pred": {
-            "none": 24
-          }
-        }
-      },
-      "errors": 0,
-      "name_mismatch_errors": 0,
-      "mean_seconds": 26.98817537777682,
-      "returned_names_for_model": {
-        "glm-5.3-flash": 9
-      }
-    }
-  },
-  "glm_early_gates": {
+  "historical_failed_gate": {
     "injected-quoted": {
       "passed": true,
       "counts": {
@@ -194,6 +118,263 @@
       "note": "Stop at approximately 200 paired rows; even all outstanding quoted votes matching cannot meet 70%."
     }
   },
+  "quoted_replacement_gates": {
+    "208": {
+      "passed": true,
+      "counts": {
+        "request": {
+          "n": 0,
+          "paired_n": 0,
+          "three_way_n": 0,
+          "rate": null,
+          "teacher_pairs": {}
+        },
+        "quoted": {
+          "n": 208,
+          "paired_n": 184,
+          "three_way_n": 174,
+          "rate": 0.9456521739130435,
+          "teacher_pairs": {
+            "quoted:quoted": 174,
+            "none:quoted": 10
+          }
+        },
+        "none": {
+          "n": 0,
+          "paired_n": 0,
+          "three_way_n": 0,
+          "rate": null,
+          "teacher_pairs": {}
+        }
+      },
+      "coverage_passed": true,
+      "policy": "whole-cohort replacement; unchanged 70% gate",
+      "generated_target": 208
+    },
+    "640": {
+      "passed": true,
+      "counts": {
+        "request": {
+          "n": 0,
+          "paired_n": 0,
+          "three_way_n": 0,
+          "rate": null,
+          "teacher_pairs": {}
+        },
+        "quoted": {
+          "n": 560,
+          "paired_n": 528,
+          "three_way_n": 491,
+          "rate": 0.9299242424242424,
+          "teacher_pairs": {
+            "quoted:quoted": 491,
+            "none:quoted": 34,
+            "quoted:request": 2,
+            "request:request": 1
+          }
+        },
+        "none": {
+          "n": 0,
+          "paired_n": 0,
+          "three_way_n": 0,
+          "rate": null,
+          "teacher_pairs": {}
+        }
+      },
+      "coverage_passed": true,
+      "policy": "whole-cohort replacement; unchanged 70% gate",
+      "generated_target": 640
+    }
+  },
+  "glm_switch_checkpoint": "acb585c",
+  "glm_switch": {
+    "user_authorization_utc": "2026-10-18T10:20Z",
+    "user_instruction": "glm-5.3-flash",
+    "replaced": "mimo-v2.5",
+    "new_second_teacher": "glm-5.3-flash",
+    "reason": "mimo-v2.5 best 68% (D_mimo_v2_b1) on the reviewer-checked 72-row three-class diag set, quoted <=10/24 in every variant; DeepSeek 72/72.",
+    "screen": {
+      "set": ".local/stage-d5/diag/diag-set.jsonl (24 request / 24 quoted / 24 none, train side)",
+      "glm-5.3-flash_b8_max_tokens_2400": "64/72, 8 missing from Incomplete response",
+      "glm-5.3-flash_b8_max_tokens_8000": "72/72, 0 missing, 0 errors",
+      "reports": [
+        "diag/report.json",
+        "diag/screen-report.round1.json",
+        "diag/screen-report-glm-b8-8000.json"
+      ]
+    },
+    "call_adaptation": {
+      "max_tokens": 8000,
+      "thinking_field": "omitted for glm-5.3-flash (HTTP 400 when sent); DeepSeek unchanged (disabled)",
+      "returned_name": "exact glm-5.3-flash"
+    },
+    "prompt_sha256": "475571e4a12e528f8aaeba4e52b6f8481f49696e90fdcf02a7946e21a0a2e91f",
+    "prompt_changes": 0,
+    "deepseek_votes": "retained, not repeated",
+    "revoted_queues": [
+      "injected",
+      "injected-extra",
+      "injected-quoted",
+      "synthetic-request"
+    ],
+    "not_revoted_queues": {
+      "queues": [
+        "native",
+        "commands",
+        "real-test-relabel",
+        "pilot"
+      ],
+      "note": "almost entirely no-request queues; previous deepseek-v4.1-flash + mimo-v2.5 results kept as-is"
+    },
+    "deadline": {
+      "pause_seconds": 2086.6924357414246,
+      "extension_seconds": 7486.692435741425,
+      "recorded_in": "protocol.json glm_switch_pause"
+    }
+  },
+  "glm_screen": {
+    "glm-5.3-flash_v1_b8": {
+      "model": "glm-5.3-flash",
+      "accuracy": 1.0,
+      "per_class": {
+        "request": {
+          "correct": 24,
+          "n": 24,
+          "missing": 0,
+          "pred": {
+            "request": 24
+          }
+        },
+        "quoted": {
+          "correct": 24,
+          "n": 24,
+          "missing": 0,
+          "pred": {
+            "quoted": 24
+          }
+        },
+        "none": {
+          "correct": 24,
+          "n": 24,
+          "missing": 0,
+          "pred": {
+            "none": 24
+          }
+        }
+      },
+      "errors": 0,
+      "name_mismatch_errors": 0,
+      "mean_seconds": 26.98817537777682,
+      "returned_names_for_model": {
+        "glm-5.3-flash": 9
+      }
+    }
+  },
+  "glm_early_gates": {
+    "injected-extra": {
+      "passed": true,
+      "counts": {
+        "request": {
+          "n": 200,
+          "paired_n": 192,
+          "three_way_n": 188,
+          "rate": 0.9791666666666666,
+          "teacher_pairs": {
+            "request:request": 188,
+            "none:none": 1,
+            "none:quoted": 2,
+            "quoted:quoted": 1
+          }
+        },
+        "quoted": {
+          "n": 0,
+          "paired_n": 0,
+          "three_way_n": 0,
+          "rate": null,
+          "teacher_pairs": {}
+        },
+        "none": {
+          "n": 0,
+          "paired_n": 0,
+          "three_way_n": 0,
+          "rate": null,
+          "teacher_pairs": {}
+        }
+      },
+      "coverage_passed": true,
+      "policy": "D5-latest-labels-v2",
+      "note": "192 or more completed pairs satisfy approximately 200; unfinished transport batch remains missing and may be completed at finalization."
+    },
+    "injected-quoted": {
+      "passed": true,
+      "counts": {
+        "request": {
+          "n": 0,
+          "paired_n": 0,
+          "three_way_n": 0,
+          "rate": null,
+          "teacher_pairs": {}
+        },
+        "quoted": {
+          "n": 560,
+          "paired_n": 528,
+          "three_way_n": 491,
+          "rate": 0.9299242424242424,
+          "teacher_pairs": {
+            "quoted:quoted": 491,
+            "none:quoted": 34,
+            "quoted:request": 2,
+            "request:request": 1
+          }
+        },
+        "none": {
+          "n": 0,
+          "paired_n": 0,
+          "three_way_n": 0,
+          "rate": null,
+          "teacher_pairs": {}
+        }
+      },
+      "coverage_passed": true,
+      "policy": "whole-cohort replacement; unchanged 70% gate",
+      "generated_target": 640
+    },
+    "injected": {
+      "passed": true,
+      "counts": {
+        "request": {
+          "n": 200,
+          "paired_n": 196,
+          "three_way_n": 181,
+          "rate": 0.923469387755102,
+          "teacher_pairs": {
+            "request:request": 181,
+            "quoted:request": 3,
+            "none:none": 3,
+            "request:quoted": 1,
+            "request:none": 7,
+            "quoted:none": 1
+          }
+        },
+        "quoted": {
+          "n": 0,
+          "paired_n": 0,
+          "three_way_n": 0,
+          "rate": null,
+          "teacher_pairs": {}
+        },
+        "none": {
+          "n": 0,
+          "paired_n": 0,
+          "three_way_n": 0,
+          "rate": null,
+          "teacher_pairs": {}
+        }
+      },
+      "coverage_passed": true,
+      "policy": "D5-latest-labels-v2"
+    }
+  },
   "teacher_agreement_before": {
     "injected-quoted": {
       "request": {
@@ -204,7 +385,7 @@
         "teacher_pairs": {}
       },
       "quoted": {
-        "n": 32,
+        "n": 560,
         "paired_n": 32,
         "three_way_n": 0,
         "rate": 0.0,
@@ -269,20 +450,11 @@
         }
       },
       "quoted": {
-        "n": 650,
-        "paired_n": 618,
-        "three_way_n": 4,
-        "rate": 0.006472491909385114,
-        "teacher_pairs": {
-          "none:none": 95,
-          "request:none": 80,
-          "request:request": 12,
-          "quoted:none": 398,
-          "quoted:request": 27,
-          "none:request": 1,
-          "quoted:quoted": 4,
-          "request:quoted": 1
-        }
+        "n": 0,
+        "paired_n": 0,
+        "three_way_n": 0,
+        "rate": null,
+        "teacher_pairs": {}
       },
       "none": {
         "n": 0,
@@ -351,12 +523,15 @@
         "teacher_pairs": {}
       },
       "quoted": {
-        "n": 32,
-        "paired_n": 24,
-        "three_way_n": 24,
-        "rate": 1.0,
+        "n": 560,
+        "paired_n": 528,
+        "three_way_n": 491,
+        "rate": 0.9299242424242424,
         "teacher_pairs": {
-          "quoted:quoted": 24
+          "quoted:quoted": 491,
+          "none:quoted": 34,
+          "quoted:request": 2,
+          "request:request": 1
         }
       },
       "none": {
@@ -398,32 +573,24 @@
     "injected": {
       "request": {
         "n": 3572,
-        "paired_n": 92,
-        "three_way_n": 86,
-        "rate": 0.9347826086956522,
+        "paired_n": 196,
+        "three_way_n": 181,
+        "rate": 0.923469387755102,
         "teacher_pairs": {
-          "request:request": 86,
-          "none:none": 2,
-          "request:none": 1,
-          "quoted:request": 2,
+          "request:request": 181,
+          "none:none": 3,
+          "request:none": 7,
+          "quoted:request": 3,
+          "quoted:none": 1,
           "request:quoted": 1
         }
       },
       "quoted": {
-        "n": 650,
-        "paired_n": 92,
-        "three_way_n": 61,
-        "rate": 0.6630434782608695,
-        "teacher_pairs": {
-          "none:quoted": 9,
-          "request:request": 13,
-          "quoted:quoted": 61,
-          "none:request": 1,
-          "quoted:none": 3,
-          "none:none": 2,
-          "request:none": 2,
-          "quoted:request": 1
-        }
+        "n": 0,
+        "paired_n": 0,
+        "three_way_n": 0,
+        "rate": null,
+        "teacher_pairs": {}
       },
       "none": {
         "n": 0,
@@ -436,24 +603,38 @@
     "synthetic-request": {
       "request": {
         "n": 4427,
-        "paired_n": 0,
-        "three_way_n": 0,
-        "rate": null,
-        "teacher_pairs": {}
+        "paired_n": 45,
+        "three_way_n": 16,
+        "rate": 0.35555555555555557,
+        "teacher_pairs": {
+          "request:request": 16,
+          "none:request": 8,
+          "none:none": 7,
+          "quoted:request": 9,
+          "quoted:none": 4,
+          "request:none": 1
+        }
       },
       "quoted": {
         "n": 82,
-        "paired_n": 0,
-        "three_way_n": 0,
-        "rate": null,
-        "teacher_pairs": {}
+        "paired_n": 8,
+        "three_way_n": 5,
+        "rate": 0.625,
+        "teacher_pairs": {
+          "quoted:none": 1,
+          "quoted:quoted": 5,
+          "request:request": 1,
+          "quoted:request": 1
+        }
       },
       "none": {
         "n": 123,
-        "paired_n": 0,
-        "three_way_n": 0,
-        "rate": null,
-        "teacher_pairs": {}
+        "paired_n": 3,
+        "three_way_n": 3,
+        "rate": 1.0,
+        "teacher_pairs": {
+          "none:none": 3
+        }
       }
     }
   },
@@ -495,11 +676,11 @@
         },
         "quoted": {
           "n": 32,
-          "paired_n": 24,
-          "three_way_n": 24,
+          "paired_n": 32,
+          "three_way_n": 32,
           "rate": 1.0,
           "teacher_pairs": {
-            "quoted:quoted": 24
+            "quoted:quoted": 32
           }
         },
         "none": {
@@ -520,11 +701,11 @@
         },
         "quoted": {
           "n": 32,
-          "paired_n": 24,
-          "three_way_n": 24,
+          "paired_n": 32,
+          "three_way_n": 32,
           "rate": 1.0,
           "teacher_pairs": {
-            "quoted:quoted": 24
+            "quoted:quoted": 32
           }
         },
         "none": {
@@ -626,31 +807,24 @@
     "injected": {
       "mimo": {
         "request": {
-          "n": 100,
-          "paired_n": 94,
-          "three_way_n": 34,
-          "rate": 0.3617021276595745,
+          "n": 200,
+          "paired_n": 188,
+          "three_way_n": 73,
+          "rate": 0.3882978723404255,
           "teacher_pairs": {
-            "request:request": 34,
-            "request:none": 55,
-            "none:none": 2,
+            "request:request": 73,
+            "request:none": 107,
+            "none:none": 3,
             "request:quoted": 1,
-            "quoted:none": 2
+            "quoted:none": 4
           }
         },
         "quoted": {
-          "n": 100,
-          "paired_n": 96,
-          "three_way_n": 1,
-          "rate": 0.010416666666666666,
-          "teacher_pairs": {
-            "none:none": 10,
-            "request:request": 1,
-            "quoted:none": 66,
-            "quoted:request": 5,
-            "request:none": 13,
-            "quoted:quoted": 1
-          }
+          "n": 0,
+          "paired_n": 0,
+          "three_way_n": 0,
+          "rate": null,
+          "teacher_pairs": {}
         },
         "none": {
           "n": 0,
@@ -662,33 +836,25 @@
       },
       "glm": {
         "request": {
-          "n": 100,
-          "paired_n": 92,
-          "three_way_n": 86,
-          "rate": 0.9347826086956522,
+          "n": 200,
+          "paired_n": 196,
+          "three_way_n": 181,
+          "rate": 0.923469387755102,
           "teacher_pairs": {
-            "request:request": 86,
-            "none:none": 2,
-            "request:none": 1,
-            "quoted:request": 2,
+            "request:request": 181,
+            "none:none": 3,
+            "request:none": 7,
+            "quoted:request": 3,
+            "quoted:none": 1,
             "request:quoted": 1
           }
         },
         "quoted": {
-          "n": 100,
-          "paired_n": 92,
-          "three_way_n": 61,
-          "rate": 0.6630434782608695,
-          "teacher_pairs": {
-            "none:quoted": 9,
-            "request:request": 13,
-            "quoted:quoted": 61,
-            "none:request": 1,
-            "quoted:none": 3,
-            "none:none": 2,
-            "request:none": 2,
-            "quoted:request": 1
-          }
+          "n": 0,
+          "paired_n": 0,
+          "three_way_n": 0,
+          "rate": null,
+          "teacher_pairs": {}
         },
         "none": {
           "n": 0,
@@ -700,33 +866,25 @@
       },
       "current_definition_gate": {
         "request": {
-          "n": 100,
-          "paired_n": 92,
-          "three_way_n": 86,
-          "rate": 0.9347826086956522,
+          "n": 200,
+          "paired_n": 196,
+          "three_way_n": 181,
+          "rate": 0.923469387755102,
           "teacher_pairs": {
-            "request:request": 86,
-            "none:none": 2,
-            "request:none": 1,
-            "quoted:request": 2,
+            "request:request": 181,
+            "none:none": 3,
+            "request:none": 7,
+            "quoted:request": 3,
+            "quoted:none": 1,
             "request:quoted": 1
           }
         },
         "quoted": {
-          "n": 100,
-          "paired_n": 92,
-          "three_way_n": 61,
-          "rate": 0.6630434782608695,
-          "teacher_pairs": {
-            "none:quoted": 9,
-            "request:request": 13,
-            "quoted:quoted": 61,
-            "none:request": 1,
-            "quoted:none": 3,
-            "none:none": 2,
-            "request:none": 2,
-            "quoted:request": 1
-          }
+          "n": 0,
+          "paired_n": 0,
+          "three_way_n": 0,
+          "rate": null,
+          "teacher_pairs": {}
         },
         "none": {
           "n": 0,
@@ -736,9 +894,126 @@
           "teacher_pairs": {}
         }
       }
+    },
+    "synthetic-request": {
+      "mimo": {
+        "request": {
+          "n": 161,
+          "paired_n": 140,
+          "three_way_n": 39,
+          "rate": 0.2785714285714286,
+          "teacher_pairs": {
+            "quoted:request": 13,
+            "none:none": 32,
+            "quoted:none": 21,
+            "none:request": 11,
+            "request:request": 39,
+            "request:none": 21,
+            "none:quoted": 1,
+            "quoted:quoted": 2
+          }
+        },
+        "quoted": {
+          "n": 27,
+          "paired_n": 26,
+          "three_way_n": 1,
+          "rate": 0.038461538461538464,
+          "teacher_pairs": {
+            "quoted:none": 15,
+            "none:request": 1,
+            "none:none": 1,
+            "quoted:request": 7,
+            "request:request": 1,
+            "quoted:quoted": 1
+          }
+        },
+        "none": {
+          "n": 12,
+          "paired_n": 11,
+          "three_way_n": 10,
+          "rate": 0.9090909090909091,
+          "teacher_pairs": {
+            "none:none": 10,
+            "none:request": 1
+          }
+        }
+      },
+      "glm": {
+        "request": {
+          "n": 161,
+          "paired_n": 45,
+          "three_way_n": 16,
+          "rate": 0.35555555555555557,
+          "teacher_pairs": {
+            "request:request": 16,
+            "none:request": 8,
+            "none:none": 7,
+            "quoted:request": 9,
+            "quoted:none": 4,
+            "request:none": 1
+          }
+        },
+        "quoted": {
+          "n": 27,
+          "paired_n": 8,
+          "three_way_n": 5,
+          "rate": 0.625,
+          "teacher_pairs": {
+            "quoted:none": 1,
+            "quoted:quoted": 5,
+            "request:request": 1,
+            "quoted:request": 1
+          }
+        },
+        "none": {
+          "n": 12,
+          "paired_n": 3,
+          "three_way_n": 3,
+          "rate": 1.0,
+          "teacher_pairs": {
+            "none:none": 3
+          }
+        }
+      },
+      "current_definition_gate": {
+        "request": {
+          "n": 67,
+          "paired_n": 18,
+          "teacher_agreement_n": 17,
+          "rate": 0.9444444444444444,
+          "teacher_pairs": {
+            "request:request": 17,
+            "request:none": 1
+          },
+          "basis": "new-definition dual agreement; old contract retained only as provenance"
+        },
+        "quoted": {
+          "n": 67,
+          "paired_n": 20,
+          "teacher_agreement_n": 5,
+          "rate": 0.25,
+          "teacher_pairs": {
+            "quoted:request": 10,
+            "quoted:none": 5,
+            "quoted:quoted": 5
+          },
+          "basis": "new-definition dual agreement; old contract retained only as provenance"
+        },
+        "none": {
+          "n": 66,
+          "paired_n": 18,
+          "teacher_agreement_n": 10,
+          "rate": 0.5555555555555556,
+          "teacher_pairs": {
+            "none:request": 8,
+            "none:none": 10
+          },
+          "basis": "new-definition dual agreement; old contract retained only as provenance"
+        }
+      }
     }
   },
-  "paused_seconds_total": 4727.180474281311,
+  "paused_seconds_total": 5966.303997755051,
   "reused_teacher_cohorts": [
     "pilot",
     "native",
@@ -775,8 +1050,8 @@
   "protocol": {
     "stage": "D5",
     "started_unix": 1792308844.3920608,
-    "data_deadline_unix": 1792327971.572535,
-    "stage_deadline_unix": 1792335171.572535,
+    "data_deadline_unix": 1792329210.6960585,
+    "stage_deadline_unix": 1792336410.6960585,
     "training_evaluation_limit_seconds": 3600,
     "test_reports": "aggregate_only",
     "teachers": [
@@ -806,60 +1081,68 @@
       "pause_seconds": 553.4377238750458,
       "previous_data_deadline_unix": 1792327418.1348112,
       "previous_stage_deadline_unix": 1792334618.1348112
+    },
+    "quoted_replacement_resume_pause": {
+      "paused_from": 1792321595.3911965,
+      "resumed": 1792322834.51472,
+      "pause_seconds": 1239.1235234737396,
+      "reason": "用户授权：整批弃用旧 quoted，补齐新构造后继续"
     }
   },
   "stop": {
-    "error_type": "TeacherEarlyAgreementGate",
-    "reason": "原注入队列quoted三方一致率低于70%；即使剩余票全部一致仍无法达到70%，按用户预登记规则停止",
-    "queue": "injected",
-    "stopped_unix": 1792321595.3911965,
-    "elapsed_seconds": 8023.81866145134,
-    "training_clock_started": false,
-    "gate": {
-      "passed": false,
-      "counts": {
-        "request": {
-          "n": 100,
-          "paired_n": 92,
-          "three_way_n": 86,
-          "rate": 0.9347826086956522,
-          "teacher_pairs": {
-            "request:request": 86,
-            "none:none": 2,
-            "request:none": 1,
-            "quoted:request": 2,
-            "request:quoted": 1
-          }
+    "error_type": "TeacherEndpointQuota403",
+    "reason": "GLM batch and two minimal probes returned HTTP 403; response contains quota/balance error marker. Preserve all valid rows and votes; legacy synthetic early gate incomplete. No training or test evaluation started.",
+    "stopped_unix": 1792324074.8728147,
+    "queue": "synthetic-request",
+    "partial_gate_counts": {
+      "request": {
+        "n": 67,
+        "paired_n": 18,
+        "teacher_agreement_n": 17,
+        "rate": 0.9444444444444444,
+        "teacher_pairs": {
+          "request:request": 17,
+          "request:none": 1
         },
-        "quoted": {
-          "n": 100,
-          "paired_n": 92,
-          "three_way_n": 61,
-          "rate": 0.6630434782608695,
-          "teacher_pairs": {
-            "none:quoted": 9,
-            "request:request": 13,
-            "quoted:quoted": 61,
-            "none:request": 1,
-            "quoted:none": 3,
-            "none:none": 2,
-            "request:none": 2,
-            "quoted:request": 1
-          }
-        },
-        "none": {
-          "n": 0,
-          "paired_n": 0,
-          "three_way_n": 0,
-          "rate": null,
-          "teacher_pairs": {}
-        }
+        "basis": "new-definition dual agreement; old contract retained only as provenance"
       },
-      "policy": "D5-latest-labels-v2",
-      "quoted_maximum_possible_rate": 0.69,
-      "note": "Stop at approximately 200 paired rows; even all outstanding quoted votes matching cannot meet 70%."
+      "quoted": {
+        "n": 67,
+        "paired_n": 20,
+        "teacher_agreement_n": 5,
+        "rate": 0.25,
+        "teacher_pairs": {
+          "quoted:request": 10,
+          "quoted:none": 5,
+          "quoted:quoted": 5
+        },
+        "basis": "new-definition dual agreement; old contract retained only as provenance"
+      },
+      "none": {
+        "n": 66,
+        "paired_n": 18,
+        "teacher_agreement_n": 10,
+        "rate": 0.5555555555555556,
+        "teacher_pairs": {
+          "none:request": 8,
+          "none:none": 10
+        },
+        "basis": "new-definition dual agreement; old contract retained only as provenance"
+      }
     },
-    "data_deadline_exceeded": false
+    "partial_gate_is_acceptance": false,
+    "training_clock_started": false,
+    "endpoint_diagnostic": {
+      "status_code": 403,
+      "content_type": "application/json; charset=utf-8",
+      "error_category_matches": {
+        "quota": true,
+        "authentication": false,
+        "access_denied": false,
+        "rate_or_waf": false
+      },
+      "response_body_exported": false
+    }
   },
   "transport_check_after_repeated_timeout": null,
   "cloud_errors": {
@@ -981,6 +1264,18 @@
         "error_type": "CloudFailure",
         "reason": "Teacher label kind schema: {\"label\": \"generic_howto\", \"kind\": \"generic_howto\"}",
         "n": 1
+      },
+      {
+        "model": "glm-5.3-flash",
+        "error_type": "CloudFailure",
+        "reason": "Cloud operation failed: ReadTimeout",
+        "n": 5
+      },
+      {
+        "model": "glm-5.3-flash",
+        "error_type": "CloudFailure",
+        "reason": "HTTP status 403",
+        "n": 1
       }
     ],
     "real-test-relabel": [
@@ -1080,8 +1375,8 @@
       }
     ]
   },
-  "elapsed_minutes": 136.91764816045762,
-  "elapsed_including_pause_minutes": 215.70398943424226,
+  "elapsed_minutes": 155.24097531239192,
+  "elapsed_including_pause_minutes": 254.67937542597454,
   "authorized_resume": {
     "resumed_unix": 1792316528.8633323,
     "authorization": "User requested resume, route deepseek-v4.1-flash, bounded transient retry, no repeated valid data; training plus evaluation remains 3600 seconds",
@@ -1123,9 +1418,9 @@
   "transport_recovery": {
     "check": null,
     "teacher_resume": {
-      "retained_votes": 7240,
+      "retained_votes": 7368,
       "excluded_failed_pairs": 200,
-      "pending_pairs": 136,
+      "pending_pairs": 104,
       "known_valid_votes_repeated": 0,
       "ambiguous_inflight_without_persisted_votes_may_be_resubmitted": true
     },
@@ -1298,47 +1593,53 @@
     "synthetic-request": {
       "synthetic": {
         "n": 4632,
-        "fully_reviewed": 0,
-        "agreement_n": 0,
-        "agreement_rate": 0.0,
-        "agreement_rate_valid": null,
-        "labels": {},
-        "kinds": {}
+        "fully_reviewed": 56,
+        "agreement_n": 32,
+        "agreement_rate": 0.0069084628670120895,
+        "agreement_rate_valid": 0.5714285714285714,
+        "labels": {
+          "request": 17,
+          "none": 10,
+          "quoted": 5
+        },
+        "kinds": {
+          "concrete_task": 17,
+          "generic_howto": 6,
+          "reference": 3,
+          "quoted": 5,
+          "mixed_none": 1
+        }
       }
     },
     "injected": {
       "documentation": {
-        "n": 2786,
-        "fully_reviewed": 124,
-        "agreement_n": 105,
-        "agreement_rate": 0.03768844221105527,
-        "agreement_rate_valid": 0.8467741935483871,
+        "n": 2356,
+        "fully_reviewed": 131,
+        "agreement_n": 120,
+        "agreement_rate": 0.050933786078098474,
+        "agreement_rate_valid": 0.916030534351145,
         "labels": {
-          "request": 69,
-          "none": 3,
-          "quoted": 33
+          "request": 118,
+          "none": 2
         },
         "kinds": {
-          "concrete_task": 69,
-          "reference": 3,
-          "quoted": 33
+          "concrete_task": 118,
+          "reference": 2
         }
       },
       "mcp": {
-        "n": 1436,
-        "fully_reviewed": 60,
-        "agreement_n": 59,
-        "agreement_rate": 0.04108635097493036,
-        "agreement_rate_valid": 0.9833333333333333,
+        "n": 1216,
+        "fully_reviewed": 65,
+        "agreement_n": 64,
+        "agreement_rate": 0.05263157894736842,
+        "agreement_rate_valid": 0.9846153846153847,
         "labels": {
-          "request": 30,
-          "none": 1,
-          "quoted": 28
+          "request": 63,
+          "none": 1
         },
         "kinds": {
-          "concrete_task": 30,
-          "reference": 1,
-          "quoted": 28
+          "concrete_task": 63,
+          "reference": 1
         }
       }
     },
@@ -1372,29 +1673,31 @@
     },
     "injected-quoted": {
       "documentation": {
-        "n": 18,
-        "fully_reviewed": 14,
-        "agreement_n": 14,
-        "agreement_rate": 0.7777777777777778,
-        "agreement_rate_valid": 1.0,
+        "n": 336,
+        "fully_reviewed": 315,
+        "agreement_n": 290,
+        "agreement_rate": 0.8630952380952381,
+        "agreement_rate_valid": 0.9206349206349206,
         "labels": {
-          "quoted": 14
+          "quoted": 289,
+          "request": 1
         },
         "kinds": {
-          "quoted": 14
+          "quoted": 289,
+          "concrete_task": 1
         }
       },
       "mcp": {
-        "n": 14,
-        "fully_reviewed": 10,
-        "agreement_n": 10,
-        "agreement_rate": 0.7142857142857143,
-        "agreement_rate_valid": 1.0,
+        "n": 224,
+        "fully_reviewed": 213,
+        "agreement_n": 202,
+        "agreement_rate": 0.9017857142857143,
+        "agreement_rate_valid": 0.9483568075117371,
         "labels": {
-          "quoted": 10
+          "quoted": 202
         },
         "kinds": {
-          "quoted": 10
+          "quoted": 202
         }
       }
     },
@@ -7594,25 +7897,26 @@
     },
     "injected-quoted": {
       "status": "generated_candidate_not_admitted",
-      "n": 32,
-      "sha256": "a5353a735619300425c9cf057d871855a88a16ba48c216b4e85193a4bd68f12f",
+      "n": 560,
+      "sha256": "55fd692f6faeb54ea04ceeae368ab2f8d9d3a35c2ad70e1c839fc8ccaf625c88",
       "split": {
-        "train": 32
+        "train": 560
       },
       "origin": {
-        "real_host_injection": 32
+        "real_host_injection": 560
       },
       "label": {
-        "quoted": 32
+        "quoted": 560
       },
       "kind": {
-        "reference": 26,
-        "mixed_none": 5,
-        "generic_howto": 1
+        "reference": 420,
+        "mixed_none": 101,
+        "generic_howto": 35,
+        "tool_usage_note": 4
       },
       "category": {
-        "mcp": 14,
-        "documentation": 18
+        "mcp": 224,
+        "documentation": 336
       }
     },
     "real-test-relabel-agreed": {
@@ -7682,12 +7986,12 @@
       "mean_seconds": 8.129524361069436
     },
     "deepseek-v4.1-flash": {
-      "requests": 621,
-      "known_usage_requests": 575,
-      "known_total_tokens": 1397119,
-      "total_seconds": 10925.047790699755,
+      "requests": 764,
+      "known_usage_requests": 718,
+      "known_total_tokens": 1879756,
+      "total_seconds": 12280.979323699692,
       "no_usage_ge_90_seconds": 43,
-      "mean_seconds": 17.59266955024115
+      "mean_seconds": 16.074580266622633
     },
     "model-list": {
       "requests": 2,
@@ -7706,12 +8010,12 @@
       "mean_seconds": 7.4245927304864185
     },
     "glm-5.3-flash": {
-      "requests": 161,
-      "known_usage_requests": 141,
-      "known_total_tokens": 427489,
-      "total_seconds": 3729.2338303000433,
-      "no_usage_ge_90_seconds": 9,
-      "mean_seconds": 23.162943045341883
+      "requests": 283,
+      "known_usage_requests": 230,
+      "known_total_tokens": 936929,
+      "total_seconds": 9753.934299500019,
+      "no_usage_ge_90_seconds": 34,
+      "mean_seconds": 34.46619893816261
     },
     "mimo-v2.6-flash": {
       "requests": 81,
@@ -7753,17 +8057,17 @@
   "tests": [
     {
       "name": "targeted-tests.log",
-      "n": 17,
-      "seconds": 0.077,
+      "n": 19,
+      "seconds": 0.084,
       "passed": true,
-      "sha256": "289b5402f405fdb17a46dbc25084f90139ede542c7c472aab0351cc82a953cc7"
+      "sha256": "a12d0cd2915eba9833291a8fad9fb0c8e3a1a1073f6d79890429db0289d8d834"
     },
     {
       "name": "unit-tests.log",
-      "n": 215,
-      "seconds": 18.314,
+      "n": 217,
+      "seconds": 39.032,
       "passed": true,
-      "sha256": "1e044e5e8c61c22861e41ce001f04714697170a6d26967de868025aae2b72675"
+      "sha256": "edc589d57424054d7c5ac809043e8d0e67c61e19b299ecb647a33760b2b78cf1"
     }
   ],
   "checks": {
@@ -7785,7 +8089,7 @@
     "checkpoint_D4": true,
     "checkpoint_GLM": true,
     "GLM_three_class_72_passed": true,
-    "GLM_early_per_class_70": false,
+    "GLM_early_per_class_70": null,
     "pilot_agreement_ge_85": true,
     "isolation": null,
     "pretrain_probe": null,
@@ -7825,6 +8129,7 @@
     "stage_d5_protocol.py",
     "stage_d5_regression.py",
     "stage_d5_render.py",
+    "stage_d5_replace_quoted.py",
     "stage_d5_report.py",
     "stage_d5_resume_glm.py",
     "stage_d5_run_training.py",
@@ -7860,16 +8165,5 @@
       "id",
       "text"
     ]
-  },
-  "latest_execution_state": {
-    "status": "quoted_replacement_in_progress",
-    "retired_original_quoted_n": 650,
-    "whole_cohort_retirement": true,
-    "original_audit_preserved": true,
-    "other_valid_data_reused": true,
-    "training_started": false,
-    "training_evaluation_limit_seconds": 3600,
-    "s1_enabled": false,
-    "historical_stop_and_gate_results_retained": true
   }
 }

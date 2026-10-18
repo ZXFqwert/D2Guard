@@ -71,3 +71,7 @@ def active_rows(name, rows):
     retired=json.loads(manifest.read_text(encoding='utf-8'))
     ids=set(retired['ids'])
     return [r for r in rows if r['id'] not in ids]
+
+
+def training_deadline(clock, protocol):
+    return min(clock["started_unix"]+3600, protocol["stage_deadline_unix"])

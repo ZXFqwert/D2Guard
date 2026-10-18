@@ -1,16 +1,16 @@
 # 阶段 D5：S1 真实文本适配
 
-**D5 进行中：用户已授权整批弃用原注入队列的 650 条旧 quoted，保留审计，以已验证的新构造补齐；其他有效数据复用。S1 关闭，训练加评测尚未启动，仍限 60 分钟。**
+**D5 已停止：GLM batch and two minimal probes returned HTTP 403; response contains quota/balance error marker. Preserve all valid rows and votes; legacy synthetic early gate incomplete. No training or test evaluation started.；S1关闭。**
 
 ## 执行边界与模型切换
 
-上次停止原因（已获用户授权恢复）：原注入队列quoted三方一致率低于70%；即使剩余票全部一致仍无法达到70%，按用户预登记规则停止。本次GLM续跑检查点为acb585c，旧停止记录和暂停顺延均保留。
+当前停止原因：GLM batch and two minimal probes returned HTTP 403; response contains quota/balance error marker. Preserve all valid rows and votes; legacy synthetic early gate incomplete. No training or test evaluation started.。本次GLM续跑检查点为acb585c，旧停止记录和暂停顺延均保留。
 
 只做D5。D⁗检查点`878b758e27e690b8cb4a860fe3ae49af33c270be`，提交信息“阶段 D⁗：保留集与金标准达标，真实良性集退回”；.local未提交。先前批量请求发生连接/读取错误后停止；用户指定deepseek-flash后恢复，旧票与旧产物保留于.local/stage-d5/pre-flash-switch，不与新批次混用。历史请求路由deepseek-flash实际返回deepseek-v4.1-flash；最新续行请求使用deepseek-v4.1-flash。两路由按同一教师合并查找，历史原始投票保留、已完成票不重复。第二教师已按最新授权改为glm-5.3-flash；GLM不传thinking字段，max_tokens=8000，RUBRIC未改。native、commands、real-test-relabel、pilot沿用原DeepSeek＋MiMo结果，不重新投票。
 
 恢复期间用户确认发生短暂断网并指示继续。两个接口最小连通检查均通过；复用全部已落盘有效票和生成正文，格式/语义无效批次保持排除；暂时传输失败允许最多3次尝试，单批耗尽后记录缺失继续其他批次。断连时尚未落盘、结果未知的在途请求可能重新提交，未对已知标签进行重试择优。
 
-保留原始起点和累计已执行时间，用户等待续行的暂停时段单列扣除：初始数据150分钟、全阶段270分钟，教师切换另获授权追加90分钟，交接暂停按protocol逐项顺延；训练加评测仍限60分钟。累计执行约136.9176分钟。密钥只读.local/teacher.env；请求日志只有model/seconds/tokens。测试集只报告聚合，没有错例导出。
+保留原始起点和累计已执行时间，用户等待续行的暂停时段单列扣除：初始数据150分钟、全阶段270分钟，教师切换另获授权追加90分钟，交接暂停按protocol逐项顺延；训练加评测仍限60分钟。累计执行约155.2410分钟。密钥只读.local/teacher.env；请求日志只有model/seconds/tokens。测试集只报告聚合，没有错例导出。
 
 ## 实施计划、来源、划分与构造（开工冻结）
 
@@ -24,27 +24,26 @@ GLM在72条三类训练侧小集上72/72，各类24/24；既有DeepSeek票复用
 
 | 队列 | 类别 | 有效对数 | 一致数 | 一致率 | 队列门槛通过 |
 |---|---|---|---|---|---|
-| injected-quoted | quoted | 24 | 24 | 1.0000 | True |
 | injected-extra | request | 192 | 188 | 0.9792 | True |
-| injected | request | 92 | 86 | 0.9348 | False |
-| injected | quoted | 92 | 61 | 0.6630 | False |
+| injected-quoted | quoted | 528 | 491 | 0.9299 | True |
+| injected | request | 196 | 181 | 0.9235 | True |
 
-原注入quoted的剩余8条即使全部一致，也最多69/100，不能达到70%；已停止，未进入后续全量换票和训练。
+原注入队列的650条旧quoted已按用户授权整批退出，原始失败检查与票据保留审计。新构造独立执行原70%门槛，其他有效数据不重做；新批次结果见机读结果quoted_replacement_gates。
 
 | 队列 | 原始构造类别 | 旧MiMo有效对 | 旧三方一致 | GLM有效对 | 新三方一致 |
 |---|---|---|---|---|---|
 | injected-quoted | request | 0 | 0 | 0 | 0 |
-| injected-quoted | quoted | 32 | 0 | 24 | 24 |
+| injected-quoted | quoted | 32 | 0 | 528 | 491 |
 | injected-quoted | none | 0 | 0 | 0 | 0 |
 | injected-extra | request | 240 | 122 | 192 | 188 |
 | injected-extra | quoted | 0 | 0 | 0 | 0 |
 | injected-extra | none | 0 | 0 | 0 | 0 |
-| injected | request | 2878 | 1147 | 92 | 86 |
-| injected | quoted | 618 | 4 | 92 | 61 |
+| injected | request | 2878 | 1147 | 196 | 181 |
+| injected | quoted | 0 | 0 | 0 | 0 |
 | injected | none | 0 | 0 | 0 | 0 |
-| synthetic-request | request | 3917 | 2277 | 0 | 0 |
-| synthetic-request | quoted | 73 | 1 | 0 | 0 |
-| synthetic-request | none | 114 | 57 | 0 | 0 |
+| synthetic-request | request | 3917 | 2277 | 45 | 16 |
+| synthetic-request | quoted | 73 | 1 | 8 | 5 |
+| synthetic-request | none | 114 | 57 | 3 | 3 |
 
 上表前后有效对数不同，不把数量直接当作模型准确率提升。相同早期样本的对照及完整交叉分布保留在机读结果same_sample_early_comparison。旧合成的历史构造标签只用于溯源，不作为新定义的准入基准。
 
@@ -76,7 +75,7 @@ Return JSON only: {"items":[{"id":0,"label":"request|quoted|none","kind":"concre
 | commands | 355 | 315 | 280 | 0.7887 | 0.8889 | 40 | {"reference": 189, "mixed_none": 91} |
 | real-test-relabel | 1293 | 1261 | 1224 | 0.9466 | 0.9707 | 32 | {"reference": 1022, "mixed_none": 135, "generic_howto": 63, "concrete_task": 1, "tool_usage_note": 3} |
 
-按来源分组的一致率与kind分布：`{"pilot": {"documentation": {"n": 200, "fully_reviewed": 184, "agreement_n": 174, "agreement_rate": 0.87, "agreement_rate_valid": 0.9456521739130435, "labels": {"none": 174}, "kinds": {"generic_howto": 29, "reference": 123, "mixed_none": 22}}}, "native": {"documentation": {"n": 4762, "fully_reviewed": 4666, "agreement_n": 4566, "agreement_rate": 0.9588408231835364, "agreement_rate_valid": 0.9785683669095585, "labels": {"none": 4564, "request": 2}, "kinds": {"reference": 3295, "generic_howto": 447, "mixed_none": 822, "concrete_task": 2}}, "mcp": {"n": 1948, "fully_reviewed": 1916, "agreement_n": 1826, "agreement_rate": 0.9373716632443532, "agreement_rate_valid": 0.9530271398747391, "labels": {"none": 1826}, "kinds": {"reference": 1448, "mixed_none": 341, "tool_usage_note": 37}}}, "commands": {"command": {"n": 355, "fully_reviewed": 315, "agreement_n": 280, "agreement_rate": 0.7887323943661971, "agreement_rate_valid": 0.8888888888888888, "labels": {"none": 280}, "kinds": {"reference": 189, "mixed_none": 91}}}, "synthetic-request": {"synthetic": {"n": 4632, "fully_reviewed": 0, "agreement_n": 0, "agreement_rate": 0.0, "agreement_rate_valid": null, "labels": {}, "kinds": {}}}, "injected": {"documentation": {"n": 2786, "fully_reviewed": 124, "agreement_n": 105, "agreement_rate": 0.03768844221105527, "agreement_rate_valid": 0.8467741935483871, "labels": {"request": 69, "none": 3, "quoted": 33}, "kinds": {"concrete_task": 69, "reference": 3, "quoted": 33}}, "mcp": {"n": 1436, "fully_reviewed": 60, "agreement_n": 59, "agreement_rate": 0.04108635097493036, "agreement_rate_valid": 0.9833333333333333, "labels": {"request": 30, "none": 1, "quoted": 28}, "kinds": {"concrete_task": 30, "reference": 1, "quoted": 28}}}, "injected-extra": {"documentation": {"n": 400, "fully_reviewed": 0, "agreement_n": 0, "agreement_rate": 0.0, "agreement_rate_valid": null, "labels": {}, "kinds": {}}, "mcp": {"n": 896, "fully_reviewed": 192, "agreement_n": 190, "agreement_rate": 0.21205357142857142, "agreement_rate_valid": 0.9895833333333334, "labels": {"request": 188, "none": 1, "quoted": 1}, "kinds": {"concrete_task": 188, "mixed_none": 1, "quoted": 1}}}, "injected-quoted": {"documentation": {"n": 18, "fully_reviewed": 14, "agreement_n": 14, "agreement_rate": 0.7777777777777778, "agreement_rate_valid": 1.0, "labels": {"quoted": 14}, "kinds": {"quoted": 14}}, "mcp": {"n": 14, "fully_reviewed": 10, "agreement_n": 10, "agreement_rate": 0.7142857142857143, "agreement_rate_valid": 1.0, "labels": {"quoted": 10}, "kinds": {"quoted": 10}}}, "real-test-relabel": {"command": {"n": 199, "fully_reviewed": 199, "agreement_n": 198, "agreement_rate": 0.9949748743718593, "agreement_rate_valid": 0.9949748743718593, "labels": {"none": 198}, "kinds": {"reference": 169, "mixed_none": 29}}, "documentation": {"n": 707, "fully_reviewed": 691, "agreement_n": 669, "agreement_rate": 0.9462517680339463, "agreement_rate_valid": 0.9681620839363242, "labels": {"none": 668, "request": 1}, "kinds": {"reference": 544, "mixed_none": 61, "generic_howto": 63, "concrete_task": 1}}, "mcp": {"n": 387, "fully_reviewed": 371, "agreement_n": 357, "agreement_rate": 0.9224806201550387, "agreement_rate_valid": 0.9622641509433962, "labels": {"none": 357}, "kinds": {"reference": 309, "mixed_none": 45, "tool_usage_note": 3}}}}`。
+按来源分组的一致率与kind分布：`{"pilot": {"documentation": {"n": 200, "fully_reviewed": 184, "agreement_n": 174, "agreement_rate": 0.87, "agreement_rate_valid": 0.9456521739130435, "labels": {"none": 174}, "kinds": {"generic_howto": 29, "reference": 123, "mixed_none": 22}}}, "native": {"documentation": {"n": 4762, "fully_reviewed": 4666, "agreement_n": 4566, "agreement_rate": 0.9588408231835364, "agreement_rate_valid": 0.9785683669095585, "labels": {"none": 4564, "request": 2}, "kinds": {"reference": 3295, "generic_howto": 447, "mixed_none": 822, "concrete_task": 2}}, "mcp": {"n": 1948, "fully_reviewed": 1916, "agreement_n": 1826, "agreement_rate": 0.9373716632443532, "agreement_rate_valid": 0.9530271398747391, "labels": {"none": 1826}, "kinds": {"reference": 1448, "mixed_none": 341, "tool_usage_note": 37}}}, "commands": {"command": {"n": 355, "fully_reviewed": 315, "agreement_n": 280, "agreement_rate": 0.7887323943661971, "agreement_rate_valid": 0.8888888888888888, "labels": {"none": 280}, "kinds": {"reference": 189, "mixed_none": 91}}}, "synthetic-request": {"synthetic": {"n": 4632, "fully_reviewed": 56, "agreement_n": 32, "agreement_rate": 0.0069084628670120895, "agreement_rate_valid": 0.5714285714285714, "labels": {"request": 17, "none": 10, "quoted": 5}, "kinds": {"concrete_task": 17, "generic_howto": 6, "reference": 3, "quoted": 5, "mixed_none": 1}}}, "injected": {"documentation": {"n": 2356, "fully_reviewed": 131, "agreement_n": 120, "agreement_rate": 0.050933786078098474, "agreement_rate_valid": 0.916030534351145, "labels": {"request": 118, "none": 2}, "kinds": {"concrete_task": 118, "reference": 2}}, "mcp": {"n": 1216, "fully_reviewed": 65, "agreement_n": 64, "agreement_rate": 0.05263157894736842, "agreement_rate_valid": 0.9846153846153847, "labels": {"request": 63, "none": 1}, "kinds": {"concrete_task": 63, "reference": 1}}}, "injected-extra": {"documentation": {"n": 400, "fully_reviewed": 0, "agreement_n": 0, "agreement_rate": 0.0, "agreement_rate_valid": null, "labels": {}, "kinds": {}}, "mcp": {"n": 896, "fully_reviewed": 192, "agreement_n": 190, "agreement_rate": 0.21205357142857142, "agreement_rate_valid": 0.9895833333333334, "labels": {"request": 188, "none": 1, "quoted": 1}, "kinds": {"concrete_task": 188, "mixed_none": 1, "quoted": 1}}}, "injected-quoted": {"documentation": {"n": 336, "fully_reviewed": 315, "agreement_n": 290, "agreement_rate": 0.8630952380952381, "agreement_rate_valid": 0.9206349206349206, "labels": {"quoted": 289, "request": 1}, "kinds": {"quoted": 289, "concrete_task": 1}}, "mcp": {"n": 224, "fully_reviewed": 213, "agreement_n": 202, "agreement_rate": 0.9017857142857143, "agreement_rate_valid": 0.9483568075117371, "labels": {"quoted": 202}, "kinds": {"quoted": 202}}}, "real-test-relabel": {"command": {"n": 199, "fully_reviewed": 199, "agreement_n": 198, "agreement_rate": 0.9949748743718593, "agreement_rate_valid": 0.9949748743718593, "labels": {"none": 198}, "kinds": {"reference": 169, "mixed_none": 29}}, "documentation": {"n": 707, "fully_reviewed": 691, "agreement_n": 669, "agreement_rate": 0.9462517680339463, "agreement_rate_valid": 0.9681620839363242, "labels": {"none": 668, "request": 1}, "kinds": {"reference": 544, "mixed_none": 61, "generic_howto": 63, "concrete_task": 1}}, "mcp": {"n": 387, "fully_reviewed": 371, "agreement_n": 357, "agreement_rate": 0.9224806201550387, "agreement_rate_valid": 0.9622641509433962, "labels": {"none": 357}, "kinds": {"reference": 309, "mixed_none": 45, "tool_usage_note": 3}}}}`。
 
 试标全为none，因此87%仅是这份试标的label一致率，不代表正类能力。无效JSON/label-kind配对导致缺票，整批排除；不补猜、不择优重试。构造样本还必须与生成意图一致。
 
@@ -88,7 +87,7 @@ Return JSON only: {"items":[{"id":0,"label":"request|quoted|none","kind":"concre
 | commands-agreed | teacher_agreed_before_isolation | 280 | {"train": 231, "validation": 49} | {"none": 280} | {"reference": 189, "mixed_none": 91} |
 | injected | generated_candidate_not_admitted | 4222 | {"train": 3314, "validation": 408, "host_test": 500} | {"request": 3572, "quoted": 650} | {"unknown": 4222} |
 | injected-extra | generated_candidate_not_admitted | 1296 | {"train": 1296} | {"request": 1296} | {"unknown": 1296} |
-| injected-quoted | generated_candidate_not_admitted | 32 | {"train": 32} | {"quoted": 32} | {"reference": 26, "mixed_none": 5, "generic_howto": 1} |
+| injected-quoted | generated_candidate_not_admitted | 560 | {"train": 560} | {"quoted": 560} | {"reference": 420, "mixed_none": 101, "generic_howto": 35, "tool_usage_note": 4} |
 | real-test-relabel-agreed | teacher_agreed_before_isolation | 1224 | {"real_test": 1224} | {"none": 1223, "request": 1} | {"reference": 1022, "mixed_none": 135, "generic_howto": 63, "concrete_task": 1, "tool_usage_note": 3} |
 
 旧合成request复核后变更：`null`。旧request判为quoted时丢弃；非request原标签保留，未声称全部旧合成都重标。
@@ -103,8 +102,8 @@ Return JSON only: {"items":[{"id":0,"label":"request|quoted|none","kind":"concre
 
 | 单元测试 | 数量 | 通过 | 秒 |
 |---|---|---|---|
-| targeted-tests.log | 17 | True | 0.077 |
-| unit-tests.log | 215 | True | 18.314 |
+| targeted-tests.log | 19 | True | 0.084 |
+| unit-tests.log | 217 | True | 39.032 |
 
 编码诊断（只调用tokenizer，无模型前向）：`{"english": {"synthetic_documents": 4, "windows": 21, "passed": true, "model_forward": false}, "multilingual": {"synthetic_documents": 4, "windows": 11, "passed": true, "model_forward": false}}`。
 
@@ -139,10 +138,10 @@ Return JSON only: {"items":[{"id":0,"label":"request|quoted|none","kind":"concre
 | 模型 | 已落盘请求下界 | 有usage请求 | 已知token | 平均秒 | 无usage且≥90秒 |
 |---|---|---|---|---|---|
 | mimo-v2.5 | 2692 | 2686 | 10528834 | 8.1295 | 0 |
-| deepseek-v4.1-flash | 621 | 575 | 1397119 | 17.5927 | 43 |
+| deepseek-v4.1-flash | 764 | 718 | 1879756 | 16.0746 | 43 |
 | model-list | 2 | 0 | 0 | 0.9106 | 0 |
 | deepseek-flash | 3290 | 3273 | 6979682 | 7.4246 | 13 |
-| glm-5.3-flash | 161 | 141 | 427489 | 23.1629 | 9 |
+| glm-5.3-flash | 283 | 230 | 936929 | 34.4662 | 34 |
 | mimo-v2.6-flash | 81 | 81 | 88040 | 4.6958 | 0 |
 | qwen3.8-max | 82 | 81 | 132958 | 19.5766 | 1 |
 | glm-5.3 | 81 | 81 | 141245 | 8.3155 | 0 |
@@ -172,7 +171,7 @@ Return JSON only: {"items":[{"id":0,"label":"request|quoted|none","kind":"concre
 | checkpoint_D4 | True |
 | checkpoint_GLM | True |
 | GLM_three_class_72_passed | True |
-| GLM_early_per_class_70 | False |
+| GLM_early_per_class_70 | None |
 | pilot_agreement_ge_85 | True |
 | isolation | None |
 | pretrain_probe | None |
@@ -197,6 +196,7 @@ Return JSON only: {"items":[{"id":0,"label":"request|quoted|none","kind":"concre
 - `stage_d5_protocol.py`
 - `stage_d5_regression.py`
 - `stage_d5_render.py`
+- `stage_d5_replace_quoted.py`
 - `stage_d5_report.py`
 - `stage_d5_resume_glm.py`
 - `stage_d5_run_training.py`
@@ -221,4 +221,4 @@ Return JSON only: {"items":[{"id":0,"label":"request|quoted|none","kind":"concre
 
 ## 未解决问题与停止点
 
-D5 已停止：原注入队列quoted三方一致率低于70%；即使剩余票全部一致仍无法达到70%，按用户预登记规则停止；S1关闭。具体早期门槛、准入和模型验收结果见上表；null表示尚未执行，不能写成通过。沿用的四个MiMo历史队列已明确标注，四个换GLM队列尚未finalize时不能计为最终准入。盲标包已导出1224条。S1未通过全部验收不得启用，未开始阶段E。
+D5 已停止：GLM batch and two minimal probes returned HTTP 403; response contains quota/balance error marker. Preserve all valid rows and votes; legacy synthetic early gate incomplete. No training or test evaluation started.；S1关闭。具体早期门槛、准入和模型验收结果见上表；null表示尚未执行，不能写成通过。沿用的四个MiMo历史队列已明确标注，四个换GLM队列尚未finalize时不能计为最终准入。盲标包已导出1224条。S1未通过全部验收不得启用，未开始阶段E。
