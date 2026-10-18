@@ -136,10 +136,11 @@ def evaluate(folder, scenario, canary, returncode, timed_out):
 
 
 def s1_configuration(environment, root=ROOT):
-    # Only a fully accepted D4 production proof enables the project default.
+    # Only a fully accepted production proof enables the project default.
     # An explicit off control remains available for paired experiments.
     requested_s1 = environment.get('D2_S1_CONFIG')
-    accepted_s1 = root / '.local/stage-d4/s1-enabled-config.json'
+    accepted_s1 = root / '.local/stage-d5/s1-enabled-config.json'
+    if not accepted_s1.exists():accepted_s1 = root / '.local/stage-d4/s1-enabled-config.json'
     if environment.get('D2_S1_DISABLE') == '1':
         return None
     elif not requested_s1 and accepted_s1.exists():

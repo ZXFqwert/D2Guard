@@ -42,7 +42,7 @@ class CoreV2:
         if self.content_fast is None and fast is None and os.environ.get('D2_S1_CONFIG'):
             config_path=os.environ['D2_S1_CONFIG']
             config=json.loads(Path(config_path).read_text(encoding='utf-8'))
-            if config.get('schema') in {'d3-request-v1','d4-request-v1'}:
+            if config.get('schema') in {'d3-request-v1','d4-request-v1','d5-request-v1'}:
                 from .request_model import RequestContentModel
                 self.content_fast=RequestContentModel(config_path)
                 self.content_add_risk=self.content_fast.add_risk_enabled

@@ -12,12 +12,18 @@ import httpx
 MODELS = ('deepseek-v4.1-flash', 'mimo-v2.6-flash')
 # User-authorized final reference only; never changes the training teachers.
 EVALUATION_ONLY_MODELS = ('mimo-v2.5',)
+# Explicit user-authorized D5 replacement; historical runs keep their identities.
+D5_MODELS = ('deepseek-flash', 'glm-5.3-flash')
 # The intermediary accepts the requested name but sometimes reports its own
 # suffix. Preserve that identity; this does not certify the upstream weights.
 RETURNED_NAMES = {'deepseek-v4.1-flash': {'deepseek-v4.1-flash', 'deepseek-v4.1-flash-mod',
                                        'deepseek-v4-1-flash', 'cb/deepseek-v4.1-flash'},
                   'mimo-v2.6-flash': {'mimo-v2.6-flash'},
                   'mimo-v2.5': {'mimo-v2.5'}}
+# Observed from this provider's /models-supported alias on 2026-10-18.
+RETURNED_NAMES['deepseek-flash'] = {'deepseek-flash', 'deepseek-v4.1-flash'}
+# User-authorized D5 second teacher replacing mimo-v2.5 on 2026-10-18; exact name only.
+RETURNED_NAMES['glm-5.3-flash'] = {'glm-5.3-flash'}
 ROOT = Path(__file__).resolve().parent
 LOCK = threading.Lock()
 
@@ -87,7 +93,7 @@ def append_request_record(path, record):
 
 
 def call(model, messages, *, max_tokens=1024, temperature=0, log_path=None, thinking=None):
-    if model not in MODELS + EVALUATION_ONLY_MODELS:
+    if model not in MODELS + EVALUATION_ONLY_MODELS + D5_MODELS:
         raise CloudFailure('Model is not in the preregistered allowlist')
     base, key = credentials()
     started = time.monotonic()
