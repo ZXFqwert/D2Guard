@@ -1,7 +1,7 @@
 """Assemble agreed cohorts, preserving frozen inputs and explicit size gates."""
 import collections
 import json
-from stage_d5_protocol import ROOT,OUT,read,save,sha,write_rows,blocked_sources
+from stage_d5_protocol import ROOT,OUT,read,save,sha,write_rows,blocked_sources,active_rows
 
 def assemble():
     oldtrain=[r for r in read(ROOT/'.local/stage-d3/admitted.jsonl') if r['split']=='train']
@@ -30,6 +30,7 @@ def assemble():
     if (OUT/'injection-quoted-plan.jsonl').exists():
         if not (OUT/'injected-quoted-agreed.jsonl').exists():raise ValueError('Quoted supplementary review incomplete')
         injections+=read(OUT/'injected-quoted-agreed.jsonl')
+    injections=active_rows('injections',injections)
     if len({r['id'] for r in injections})!=len(injections):raise ValueError('Injection cohort IDs overlap')
     test=[];contract_disagree=collections.Counter()
     for r in injections:

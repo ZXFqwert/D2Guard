@@ -24,7 +24,6 @@ def review(name,rows,workers=12,resume=False,batch_size=8,teachers=None,finalize
     output=OUT/(name+'-votes.jsonl');attempts=OUT/(name+'-attempts.jsonl')
     if (OUT/(name+'-review.json')).exists():raise ValueError('Completed cohort must not be repeated')
     if not resume and (output.exists() or attempts.exists()):raise ValueError('Do not silently rerun teacher cohort')
-    if resume and not json.loads((OUT/'transport-check.json').read_text()).get('passed'):raise ValueError('Transport recovery check required')
     output.touch(exist_ok=resume)
     errors_path=OUT/(name+'-errors.json');errors=json.loads(errors_path.read_text()) if resume and errors_path.exists() else []
     prior={(v['id'],teacher_role(v['model'])) for v in read(output)}

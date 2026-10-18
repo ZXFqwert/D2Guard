@@ -1,38 +1,867 @@
 {
   "stage": "D5",
-  "status": "D5 数据准备中止：DeepSeek 连续读取超时；S1关闭，等待评审",
+  "status": "D5 已停止：原注入队列quoted三方一致率低于70%；即使剩余票全部一致仍无法达到70%，按用户预登记规则停止；S1关闭",
+  "glm_switch_checkpoint": "acb585c",
+  "glm_switch": {
+    "user_authorization_utc": "2026-10-18T10:20Z",
+    "user_instruction": "glm-5.3-flash",
+    "replaced": "mimo-v2.5",
+    "new_second_teacher": "glm-5.3-flash",
+    "reason": "mimo-v2.5 best 68% (D_mimo_v2_b1) on the reviewer-checked 72-row three-class diag set, quoted <=10/24 in every variant; DeepSeek 72/72.",
+    "screen": {
+      "set": ".local/stage-d5/diag/diag-set.jsonl (24 request / 24 quoted / 24 none, train side)",
+      "glm-5.3-flash_b8_max_tokens_2400": "64/72, 8 missing from Incomplete response",
+      "glm-5.3-flash_b8_max_tokens_8000": "72/72, 0 missing, 0 errors",
+      "reports": [
+        "diag/report.json",
+        "diag/screen-report.round1.json",
+        "diag/screen-report-glm-b8-8000.json"
+      ]
+    },
+    "call_adaptation": {
+      "max_tokens": 8000,
+      "thinking_field": "omitted for glm-5.3-flash (HTTP 400 when sent); DeepSeek unchanged (disabled)",
+      "returned_name": "exact glm-5.3-flash"
+    },
+    "prompt_sha256": "475571e4a12e528f8aaeba4e52b6f8481f49696e90fdcf02a7946e21a0a2e91f",
+    "prompt_changes": 0,
+    "deepseek_votes": "retained, not repeated",
+    "revoted_queues": [
+      "injected",
+      "injected-extra",
+      "injected-quoted",
+      "synthetic-request"
+    ],
+    "not_revoted_queues": {
+      "queues": [
+        "native",
+        "commands",
+        "real-test-relabel",
+        "pilot"
+      ],
+      "note": "almost entirely no-request queues; previous deepseek-v4.1-flash + mimo-v2.5 results kept as-is"
+    },
+    "deadline": {
+      "pause_seconds": 2086.6924357414246,
+      "extension_seconds": 7486.692435741425,
+      "recorded_in": "protocol.json glm_switch_pause"
+    }
+  },
+  "glm_screen": {
+    "glm-5.3-flash_v1_b8": {
+      "model": "glm-5.3-flash",
+      "accuracy": 1.0,
+      "per_class": {
+        "request": {
+          "correct": 24,
+          "n": 24,
+          "missing": 0,
+          "pred": {
+            "request": 24
+          }
+        },
+        "quoted": {
+          "correct": 24,
+          "n": 24,
+          "missing": 0,
+          "pred": {
+            "quoted": 24
+          }
+        },
+        "none": {
+          "correct": 24,
+          "n": 24,
+          "missing": 0,
+          "pred": {
+            "none": 24
+          }
+        }
+      },
+      "errors": 0,
+      "name_mismatch_errors": 0,
+      "mean_seconds": 26.98817537777682,
+      "returned_names_for_model": {
+        "glm-5.3-flash": 9
+      }
+    }
+  },
+  "glm_early_gates": {
+    "injected-quoted": {
+      "passed": true,
+      "counts": {
+        "request": {
+          "n": 0,
+          "paired_n": 0,
+          "three_way_n": 0,
+          "rate": null,
+          "teacher_pairs": {}
+        },
+        "quoted": {
+          "n": 32,
+          "paired_n": 24,
+          "three_way_n": 24,
+          "rate": 1.0,
+          "teacher_pairs": {
+            "quoted:quoted": 24
+          }
+        },
+        "none": {
+          "n": 0,
+          "paired_n": 0,
+          "three_way_n": 0,
+          "rate": null,
+          "teacher_pairs": {}
+        }
+      },
+      "coverage_passed": true
+    },
+    "injected-extra": {
+      "passed": true,
+      "counts": {
+        "request": {
+          "n": 200,
+          "paired_n": 192,
+          "three_way_n": 188,
+          "rate": 0.9791666666666666,
+          "teacher_pairs": {
+            "request:request": 188,
+            "none:none": 1,
+            "none:quoted": 2,
+            "quoted:quoted": 1
+          }
+        },
+        "quoted": {
+          "n": 0,
+          "paired_n": 0,
+          "three_way_n": 0,
+          "rate": null,
+          "teacher_pairs": {}
+        },
+        "none": {
+          "n": 0,
+          "paired_n": 0,
+          "three_way_n": 0,
+          "rate": null,
+          "teacher_pairs": {}
+        }
+      },
+      "coverage_passed": true,
+      "policy": "D5-latest-labels-v2",
+      "note": "192 or more completed pairs satisfy approximately 200; unfinished transport batch remains missing and may be completed at finalization."
+    },
+    "injected": {
+      "passed": false,
+      "counts": {
+        "request": {
+          "n": 100,
+          "paired_n": 92,
+          "three_way_n": 86,
+          "rate": 0.9347826086956522,
+          "teacher_pairs": {
+            "request:request": 86,
+            "none:none": 2,
+            "request:none": 1,
+            "quoted:request": 2,
+            "request:quoted": 1
+          }
+        },
+        "quoted": {
+          "n": 100,
+          "paired_n": 92,
+          "three_way_n": 61,
+          "rate": 0.6630434782608695,
+          "teacher_pairs": {
+            "none:quoted": 9,
+            "request:request": 13,
+            "quoted:quoted": 61,
+            "none:request": 1,
+            "quoted:none": 3,
+            "none:none": 2,
+            "request:none": 2,
+            "quoted:request": 1
+          }
+        },
+        "none": {
+          "n": 0,
+          "paired_n": 0,
+          "three_way_n": 0,
+          "rate": null,
+          "teacher_pairs": {}
+        }
+      },
+      "policy": "D5-latest-labels-v2",
+      "quoted_maximum_possible_rate": 0.69,
+      "note": "Stop at approximately 200 paired rows; even all outstanding quoted votes matching cannot meet 70%."
+    }
+  },
+  "teacher_agreement_before": {
+    "injected-quoted": {
+      "request": {
+        "n": 0,
+        "paired_n": 0,
+        "three_way_n": 0,
+        "rate": null,
+        "teacher_pairs": {}
+      },
+      "quoted": {
+        "n": 32,
+        "paired_n": 32,
+        "three_way_n": 0,
+        "rate": 0.0,
+        "teacher_pairs": {
+          "quoted:none": 31,
+          "quoted:request": 1
+        }
+      },
+      "none": {
+        "n": 0,
+        "paired_n": 0,
+        "three_way_n": 0,
+        "rate": null,
+        "teacher_pairs": {}
+      }
+    },
+    "injected-extra": {
+      "request": {
+        "n": 1296,
+        "paired_n": 240,
+        "three_way_n": 122,
+        "rate": 0.5083333333333333,
+        "teacher_pairs": {
+          "request:none": 112,
+          "request:request": 122,
+          "none:request": 1,
+          "none:none": 4,
+          "quoted:none": 1
+        }
+      },
+      "quoted": {
+        "n": 0,
+        "paired_n": 0,
+        "three_way_n": 0,
+        "rate": null,
+        "teacher_pairs": {}
+      },
+      "none": {
+        "n": 0,
+        "paired_n": 0,
+        "three_way_n": 0,
+        "rate": null,
+        "teacher_pairs": {}
+      }
+    },
+    "injected": {
+      "request": {
+        "n": 3572,
+        "paired_n": 2878,
+        "three_way_n": 1147,
+        "rate": 0.3985406532314107,
+        "teacher_pairs": {
+          "request:request": 1147,
+          "none:request": 12,
+          "request:none": 1612,
+          "none:none": 47,
+          "quoted:none": 30,
+          "quoted:request": 11,
+          "request:quoted": 15,
+          "none:quoted": 1,
+          "quoted:quoted": 3
+        }
+      },
+      "quoted": {
+        "n": 650,
+        "paired_n": 618,
+        "three_way_n": 4,
+        "rate": 0.006472491909385114,
+        "teacher_pairs": {
+          "none:none": 95,
+          "request:none": 80,
+          "request:request": 12,
+          "quoted:none": 398,
+          "quoted:request": 27,
+          "none:request": 1,
+          "quoted:quoted": 4,
+          "request:quoted": 1
+        }
+      },
+      "none": {
+        "n": 0,
+        "paired_n": 0,
+        "three_way_n": 0,
+        "rate": null,
+        "teacher_pairs": {}
+      }
+    },
+    "synthetic-request": {
+      "request": {
+        "n": 4427,
+        "paired_n": 3917,
+        "three_way_n": 2277,
+        "rate": 0.5813122287464897,
+        "teacher_pairs": {
+          "request:request": 2277,
+          "request:none": 1327,
+          "none:none": 190,
+          "quoted:request": 16,
+          "quoted:none": 29,
+          "none:request": 52,
+          "request:quoted": 22,
+          "none:quoted": 2,
+          "quoted:quoted": 2
+        }
+      },
+      "quoted": {
+        "n": 82,
+        "paired_n": 73,
+        "three_way_n": 1,
+        "rate": 0.0136986301369863,
+        "teacher_pairs": {
+          "request:none": 6,
+          "request:request": 10,
+          "none:none": 13,
+          "quoted:none": 29,
+          "none:request": 3,
+          "none:quoted": 1,
+          "quoted:request": 10,
+          "quoted:quoted": 1
+        }
+      },
+      "none": {
+        "n": 123,
+        "paired_n": 114,
+        "three_way_n": 57,
+        "rate": 0.5,
+        "teacher_pairs": {
+          "request:none": 28,
+          "none:request": 10,
+          "none:none": 57,
+          "request:request": 18,
+          "none:quoted": 1
+        }
+      }
+    }
+  },
+  "teacher_agreement_current": {
+    "injected-quoted": {
+      "request": {
+        "n": 0,
+        "paired_n": 0,
+        "three_way_n": 0,
+        "rate": null,
+        "teacher_pairs": {}
+      },
+      "quoted": {
+        "n": 32,
+        "paired_n": 24,
+        "three_way_n": 24,
+        "rate": 1.0,
+        "teacher_pairs": {
+          "quoted:quoted": 24
+        }
+      },
+      "none": {
+        "n": 0,
+        "paired_n": 0,
+        "three_way_n": 0,
+        "rate": null,
+        "teacher_pairs": {}
+      }
+    },
+    "injected-extra": {
+      "request": {
+        "n": 1296,
+        "paired_n": 192,
+        "three_way_n": 188,
+        "rate": 0.9791666666666666,
+        "teacher_pairs": {
+          "request:request": 188,
+          "none:none": 1,
+          "none:quoted": 2,
+          "quoted:quoted": 1
+        }
+      },
+      "quoted": {
+        "n": 0,
+        "paired_n": 0,
+        "three_way_n": 0,
+        "rate": null,
+        "teacher_pairs": {}
+      },
+      "none": {
+        "n": 0,
+        "paired_n": 0,
+        "three_way_n": 0,
+        "rate": null,
+        "teacher_pairs": {}
+      }
+    },
+    "injected": {
+      "request": {
+        "n": 3572,
+        "paired_n": 92,
+        "three_way_n": 86,
+        "rate": 0.9347826086956522,
+        "teacher_pairs": {
+          "request:request": 86,
+          "none:none": 2,
+          "request:none": 1,
+          "quoted:request": 2,
+          "request:quoted": 1
+        }
+      },
+      "quoted": {
+        "n": 650,
+        "paired_n": 92,
+        "three_way_n": 61,
+        "rate": 0.6630434782608695,
+        "teacher_pairs": {
+          "none:quoted": 9,
+          "request:request": 13,
+          "quoted:quoted": 61,
+          "none:request": 1,
+          "quoted:none": 3,
+          "none:none": 2,
+          "request:none": 2,
+          "quoted:request": 1
+        }
+      },
+      "none": {
+        "n": 0,
+        "paired_n": 0,
+        "three_way_n": 0,
+        "rate": null,
+        "teacher_pairs": {}
+      }
+    },
+    "synthetic-request": {
+      "request": {
+        "n": 4427,
+        "paired_n": 0,
+        "three_way_n": 0,
+        "rate": null,
+        "teacher_pairs": {}
+      },
+      "quoted": {
+        "n": 82,
+        "paired_n": 0,
+        "three_way_n": 0,
+        "rate": null,
+        "teacher_pairs": {}
+      },
+      "none": {
+        "n": 123,
+        "paired_n": 0,
+        "three_way_n": 0,
+        "rate": null,
+        "teacher_pairs": {}
+      }
+    }
+  },
+  "same_sample_early_comparison": {
+    "injected-quoted": {
+      "mimo": {
+        "request": {
+          "n": 0,
+          "paired_n": 0,
+          "three_way_n": 0,
+          "rate": null,
+          "teacher_pairs": {}
+        },
+        "quoted": {
+          "n": 32,
+          "paired_n": 32,
+          "three_way_n": 0,
+          "rate": 0.0,
+          "teacher_pairs": {
+            "quoted:none": 31,
+            "quoted:request": 1
+          }
+        },
+        "none": {
+          "n": 0,
+          "paired_n": 0,
+          "three_way_n": 0,
+          "rate": null,
+          "teacher_pairs": {}
+        }
+      },
+      "glm": {
+        "request": {
+          "n": 0,
+          "paired_n": 0,
+          "three_way_n": 0,
+          "rate": null,
+          "teacher_pairs": {}
+        },
+        "quoted": {
+          "n": 32,
+          "paired_n": 24,
+          "three_way_n": 24,
+          "rate": 1.0,
+          "teacher_pairs": {
+            "quoted:quoted": 24
+          }
+        },
+        "none": {
+          "n": 0,
+          "paired_n": 0,
+          "three_way_n": 0,
+          "rate": null,
+          "teacher_pairs": {}
+        }
+      },
+      "current_definition_gate": {
+        "request": {
+          "n": 0,
+          "paired_n": 0,
+          "three_way_n": 0,
+          "rate": null,
+          "teacher_pairs": {}
+        },
+        "quoted": {
+          "n": 32,
+          "paired_n": 24,
+          "three_way_n": 24,
+          "rate": 1.0,
+          "teacher_pairs": {
+            "quoted:quoted": 24
+          }
+        },
+        "none": {
+          "n": 0,
+          "paired_n": 0,
+          "three_way_n": 0,
+          "rate": null,
+          "teacher_pairs": {}
+        }
+      }
+    },
+    "injected-extra": {
+      "mimo": {
+        "request": {
+          "n": 200,
+          "paired_n": 183,
+          "three_way_n": 94,
+          "rate": 0.5136612021857924,
+          "teacher_pairs": {
+            "request:none": 85,
+            "request:request": 94,
+            "none:request": 1,
+            "none:none": 2,
+            "quoted:none": 1
+          }
+        },
+        "quoted": {
+          "n": 0,
+          "paired_n": 0,
+          "three_way_n": 0,
+          "rate": null,
+          "teacher_pairs": {}
+        },
+        "none": {
+          "n": 0,
+          "paired_n": 0,
+          "three_way_n": 0,
+          "rate": null,
+          "teacher_pairs": {}
+        }
+      },
+      "glm": {
+        "request": {
+          "n": 200,
+          "paired_n": 192,
+          "three_way_n": 188,
+          "rate": 0.9791666666666666,
+          "teacher_pairs": {
+            "request:request": 188,
+            "none:none": 1,
+            "none:quoted": 2,
+            "quoted:quoted": 1
+          }
+        },
+        "quoted": {
+          "n": 0,
+          "paired_n": 0,
+          "three_way_n": 0,
+          "rate": null,
+          "teacher_pairs": {}
+        },
+        "none": {
+          "n": 0,
+          "paired_n": 0,
+          "three_way_n": 0,
+          "rate": null,
+          "teacher_pairs": {}
+        }
+      },
+      "current_definition_gate": {
+        "request": {
+          "n": 200,
+          "paired_n": 192,
+          "three_way_n": 188,
+          "rate": 0.9791666666666666,
+          "teacher_pairs": {
+            "request:request": 188,
+            "none:none": 1,
+            "none:quoted": 2,
+            "quoted:quoted": 1
+          }
+        },
+        "quoted": {
+          "n": 0,
+          "paired_n": 0,
+          "three_way_n": 0,
+          "rate": null,
+          "teacher_pairs": {}
+        },
+        "none": {
+          "n": 0,
+          "paired_n": 0,
+          "three_way_n": 0,
+          "rate": null,
+          "teacher_pairs": {}
+        }
+      }
+    },
+    "injected": {
+      "mimo": {
+        "request": {
+          "n": 100,
+          "paired_n": 94,
+          "three_way_n": 34,
+          "rate": 0.3617021276595745,
+          "teacher_pairs": {
+            "request:request": 34,
+            "request:none": 55,
+            "none:none": 2,
+            "request:quoted": 1,
+            "quoted:none": 2
+          }
+        },
+        "quoted": {
+          "n": 100,
+          "paired_n": 96,
+          "three_way_n": 1,
+          "rate": 0.010416666666666666,
+          "teacher_pairs": {
+            "none:none": 10,
+            "request:request": 1,
+            "quoted:none": 66,
+            "quoted:request": 5,
+            "request:none": 13,
+            "quoted:quoted": 1
+          }
+        },
+        "none": {
+          "n": 0,
+          "paired_n": 0,
+          "three_way_n": 0,
+          "rate": null,
+          "teacher_pairs": {}
+        }
+      },
+      "glm": {
+        "request": {
+          "n": 100,
+          "paired_n": 92,
+          "three_way_n": 86,
+          "rate": 0.9347826086956522,
+          "teacher_pairs": {
+            "request:request": 86,
+            "none:none": 2,
+            "request:none": 1,
+            "quoted:request": 2,
+            "request:quoted": 1
+          }
+        },
+        "quoted": {
+          "n": 100,
+          "paired_n": 92,
+          "three_way_n": 61,
+          "rate": 0.6630434782608695,
+          "teacher_pairs": {
+            "none:quoted": 9,
+            "request:request": 13,
+            "quoted:quoted": 61,
+            "none:request": 1,
+            "quoted:none": 3,
+            "none:none": 2,
+            "request:none": 2,
+            "quoted:request": 1
+          }
+        },
+        "none": {
+          "n": 0,
+          "paired_n": 0,
+          "three_way_n": 0,
+          "rate": null,
+          "teacher_pairs": {}
+        }
+      },
+      "current_definition_gate": {
+        "request": {
+          "n": 100,
+          "paired_n": 92,
+          "three_way_n": 86,
+          "rate": 0.9347826086956522,
+          "teacher_pairs": {
+            "request:request": 86,
+            "none:none": 2,
+            "request:none": 1,
+            "quoted:request": 2,
+            "request:quoted": 1
+          }
+        },
+        "quoted": {
+          "n": 100,
+          "paired_n": 92,
+          "three_way_n": 61,
+          "rate": 0.6630434782608695,
+          "teacher_pairs": {
+            "none:quoted": 9,
+            "request:request": 13,
+            "quoted:quoted": 61,
+            "none:request": 1,
+            "quoted:none": 3,
+            "none:none": 2,
+            "request:none": 2,
+            "quoted:request": 1
+          }
+        },
+        "none": {
+          "n": 0,
+          "paired_n": 0,
+          "three_way_n": 0,
+          "rate": null,
+          "teacher_pairs": {}
+        }
+      }
+    }
+  },
+  "paused_seconds_total": 4727.180474281311,
+  "reused_teacher_cohorts": [
+    "pilot",
+    "native",
+    "commands",
+    "real-test-relabel"
+  ],
+  "latest_policy_cleanup": {
+    "time": 1792321382.987714,
+    "user_direction": "以新定义为准；清理旧垃圾，避免影响当前流程",
+    "archived_derived_files": [
+      "resumed-stop-snapshot.json",
+      "synthetic-reclassification.json",
+      "quoted-smoke-summary.json",
+      "injected-quoted-review.json.mimo-v25",
+      "injected-quoted-agreed.jsonl.mimo-v25",
+      "synthetic-request-review.json.mimo-v25",
+      "synthetic-request-agreed.jsonl.mimo-v25",
+      "claude-handoff.md",
+      "low-concurrency-recovery.json",
+      "teacher-switch.json",
+      "transport-check.json",
+      "transport-check-second.json"
+    ],
+    "raw_data_and_votes_preserved": true,
+    "current_teachers": [
+      "deepseek-v4.1-flash",
+      "glm-5.3-flash"
+    ],
+    "synthetic_gate": "new-definition dual-teacher agreement by retained DeepSeek class; legacy contract only provenance",
+    "injected_gate": "three-way agreement with current construction intent",
+    "cutoff": 0.7
+  },
   "checkpoint": "878b758e27e690b8cb4a860fe3ae49af33c270be",
   "protocol": {
     "stage": "D5",
     "started_unix": 1792308844.3920608,
-    "data_deadline_unix": 1792317844.3920608,
-    "stage_deadline_unix": 1792325044.3920608,
+    "data_deadline_unix": 1792327971.572535,
+    "stage_deadline_unix": 1792335171.572535,
     "training_evaluation_limit_seconds": 3600,
     "test_reports": "aggregate_only",
     "teachers": [
-      "deepseek-flash",
-      "mimo-v2.5"
+      "deepseek-v4.1-flash",
+      "glm-5.3-flash"
     ],
     "training_real_fraction_min": 0.35,
     "validation_request_relabel": true,
-    "generator": "deepseek-flash",
+    "generator": "deepseek-v4.1-flash",
     "switch_unix": 1792310118.6445842,
-    "observed_alias": "deepseek-v4.1-flash"
+    "observed_alias": "deepseek-v4.1-flash",
+    "authorized_pause_seconds": 2087.0503146648407,
+    "glm_switch_pause": {
+      "reason": "用户授权：换教师后重投",
+      "paused_from_unix": 1792317730.3355618,
+      "resumed_unix": 1792319817.0279975,
+      "pause_seconds": 2086.6924357414246,
+      "extra_seconds": 5400,
+      "previous_data_deadline_unix": 1792319931.4423754,
+      "previous_stage_deadline_unix": 1792327131.4423754
+    },
+    "previous_second_teacher": "mimo-v2.5",
+    "codex_resume_pause": {
+      "reason": "用户授权：交回 Codex 续跑",
+      "paused_from_unix": 1792320182.1972556,
+      "resumed_unix": 1792320735.6349795,
+      "pause_seconds": 553.4377238750458,
+      "previous_data_deadline_unix": 1792327418.1348112,
+      "previous_stage_deadline_unix": 1792334618.1348112
+    }
   },
   "stop": {
-    "reason": "deepseek-flash generation and review each reached three consecutive 90-second ReadTimeout errors after user-authorized recovery; /models remains reachable (HTTP 200)",
-    "error_type": "RepeatedReadTimeout",
-    "elapsed_seconds": 5597.420955657959,
-    "stopped_unix": 1792314441.8130176,
-    "rule": "docs/12-codex-execution-plan.md global rule 8",
-    "data_deadline_exceeded": false,
-    "training_clock_started": false
+    "error_type": "TeacherEarlyAgreementGate",
+    "reason": "原注入队列quoted三方一致率低于70%；即使剩余票全部一致仍无法达到70%，按用户预登记规则停止",
+    "queue": "injected",
+    "stopped_unix": 1792321595.3911965,
+    "elapsed_seconds": 8023.81866145134,
+    "training_clock_started": false,
+    "gate": {
+      "passed": false,
+      "counts": {
+        "request": {
+          "n": 100,
+          "paired_n": 92,
+          "three_way_n": 86,
+          "rate": 0.9347826086956522,
+          "teacher_pairs": {
+            "request:request": 86,
+            "none:none": 2,
+            "request:none": 1,
+            "quoted:request": 2,
+            "request:quoted": 1
+          }
+        },
+        "quoted": {
+          "n": 100,
+          "paired_n": 92,
+          "three_way_n": 61,
+          "rate": 0.6630434782608695,
+          "teacher_pairs": {
+            "none:quoted": 9,
+            "request:request": 13,
+            "quoted:quoted": 61,
+            "none:request": 1,
+            "quoted:none": 3,
+            "none:none": 2,
+            "request:none": 2,
+            "quoted:request": 1
+          }
+        },
+        "none": {
+          "n": 0,
+          "paired_n": 0,
+          "three_way_n": 0,
+          "rate": null,
+          "teacher_pairs": {}
+        }
+      },
+      "policy": "D5-latest-labels-v2",
+      "quoted_maximum_possible_rate": 0.69,
+      "note": "Stop at approximately 200 paired rows; even all outstanding quoted votes matching cannot meet 70%."
+    },
+    "data_deadline_exceeded": false
   },
-  "transport_check_after_repeated_timeout": {
-    "status": 200,
-    "seconds": 0.886587381362915,
-    "connectivity_passed": true
-  },
+  "transport_check_after_repeated_timeout": null,
   "cloud_errors": {
     "native": [
       {
@@ -173,7 +1002,7 @@
         "model": "mimo-v2.5",
         "error_type": "CloudFailure",
         "reason": "Teacher label kind schema: {\"label\": \"reference\", \"kind\": \"reference\"}",
-        "n": 12
+        "n": 18
       },
       {
         "model": "mimo-v2.5",
@@ -204,6 +1033,30 @@
         "error_type": "CloudFailure",
         "reason": "Cloud operation failed: ReadTimeout",
         "n": 3
+      },
+      {
+        "model": "deepseek-v4.1-flash",
+        "error_type": "CloudFailure",
+        "reason": "Cloud operation failed: ReadTimeout",
+        "n": 6
+      },
+      {
+        "model": "mimo-v2.5",
+        "error_type": "CloudFailure",
+        "reason": "Teacher label kind schema: {\"label\": \"none\", \"kind\": \"quoted\"}",
+        "n": 1
+      },
+      {
+        "model": "mimo-v2.5",
+        "error_type": "CloudFailure",
+        "reason": "Teacher label kind schema: {\"label\": \"request\", \"kind\": \"reference\"}",
+        "n": 1
+      },
+      {
+        "model": "glm-5.3-flash",
+        "error_type": "CloudFailure",
+        "reason": "Teacher coverage schema",
+        "n": 1
       }
     ],
     "generation-extra": [
@@ -223,51 +1076,63 @@
         "model": "generator",
         "error_type": "CloudFailure",
         "reason": "Cloud operation failed: ReadTimeout",
-        "n": 3
+        "n": 7
       }
     ]
   },
-  "elapsed_minutes": 97.57606741587321,
-  "teacher_switch": {
-    "user_instruction": "换个模型 deepseek-flash",
-    "requested": "deepseek-flash",
-    "observed_returned": "deepseek-v4.1-flash",
-    "old_artifacts": "pre-flash-switch",
-    "frozen_pilot_repeated": 200,
-    "prompt_changes": 0,
-    "deadline_extended": false,
-    "resumed_unix": 1792310118.6456985,
-    "network_concurrency": 4
-  },
-  "transport_recovery": {
-    "check": {
-      "results": [
-        {
-          "model": "deepseek-flash",
-          "passed": true,
-          "seconds": 3.978050470352173
-        },
-        {
-          "model": "mimo-v2.5",
-          "passed": true,
-          "seconds": 6.38229513168335
-        }
+  "elapsed_minutes": 136.91764816045762,
+  "elapsed_including_pause_minutes": 215.70398943424226,
+  "authorized_resume": {
+    "resumed_unix": 1792316528.8633323,
+    "authorization": "User requested resume, route deepseek-v4.1-flash, bounded transient retry, no repeated valid data; training plus evaluation remains 3600 seconds",
+    "previous_protocol": {
+      "stage": "D5",
+      "started_unix": 1792308844.3920608,
+      "data_deadline_unix": 1792317844.3920608,
+      "stage_deadline_unix": 1792325044.3920608,
+      "training_evaluation_limit_seconds": 3600,
+      "test_reports": "aggregate_only",
+      "teachers": [
+        "deepseek-flash",
+        "mimo-v2.5"
       ],
-      "passed": true,
-      "previous_error": "RemoteProtocolError",
-      "timestamp": 1792313809.8478992
+      "training_real_fraction_min": 0.35,
+      "validation_request_relabel": true,
+      "generator": "deepseek-flash",
+      "switch_unix": 1792310118.6445842,
+      "observed_alias": "deepseek-v4.1-flash"
     },
+    "previous_stop": {
+      "reason": "deepseek-flash generation and review each reached three consecutive 90-second ReadTimeout errors after user-authorized recovery; /models remains reachable (HTTP 200)",
+      "error_type": "RepeatedReadTimeout",
+      "elapsed_seconds": 5597.420955657959,
+      "stopped_unix": 1792314441.8130176,
+      "rule": "docs/12-codex-execution-plan.md global rule 8",
+      "data_deadline_exceeded": false,
+      "training_clock_started": false
+    },
+    "paused_wait_seconds": 2087.0503146648407,
+    "active_data_seconds_before_resume": 5597.420955657959,
+    "retry_max_attempts": 3,
+    "teacher_aliases_same_role": [
+      "deepseek-flash",
+      "deepseek-v4.1-flash"
+    ]
+  },
+  "teacher_switch": null,
+  "transport_recovery": {
+    "check": null,
     "teacher_resume": {
-      "retained_votes": 4656,
-      "excluded_failed_pairs": 120,
-      "pending_pairs": 3668,
+      "retained_votes": 7240,
+      "excluded_failed_pairs": 200,
+      "pending_pairs": 136,
       "known_valid_votes_repeated": 0,
       "ambiguous_inflight_without_persisted_votes_may_be_resubmitted": true
     },
     "generator_resume": {
-      "retained_rows": 80,
+      "retained_rows": 712,
       "excluded_failed_ids": 4,
-      "pending_n": 2516,
+      "pending_n": 1884,
       "persisted_texts_regenerated": 0,
       "ambiguous_inflight_without_persisted_results_may_be_resubmitted": true
     },
@@ -333,32 +1198,10 @@
       "prompt_sha256": "475571e4a12e528f8aaeba4e52b6f8481f49696e90fdcf02a7946e21a0a2e91f",
       "errors_n": 5
     },
-    "synthetic-request": {
-      "n": 4632,
-      "fully_reviewed": 4104,
-      "agreement_n": 2568,
-      "agreement_rate": 0.5544041450777202,
-      "agreement_rate_valid": 0.6257309941520468,
-      "missing_n": 528,
-      "kind_disagreements": 82,
-      "kind": {
-        "concrete_task": 2305,
-        "mixed_none": 82,
-        "generic_howto": 35,
-        "reference": 142,
-        "quoted": 3,
-        "tool_usage_note": 1
-      },
-      "labels": {
-        "request": 2305,
-        "none": 260,
-        "quoted": 3
-      },
-      "prompt_sha256": "475571e4a12e528f8aaeba4e52b6f8481f49696e90fdcf02a7946e21a0a2e91f",
-      "errors_n": 68
-    },
+    "synthetic-request": null,
     "injected": null,
     "injected-extra": null,
+    "injected-quoted": null,
     "real-test-relabel": {
       "n": 1293,
       "fully_reviewed": 1261,
@@ -382,140 +1225,8 @@
       "errors_n": 4
     }
   },
-  "partial_snapshot": {
-    "native": {
-      "n": 6710,
-      "vote_n": 13292,
-      "fully_reviewed": 6582,
-      "agreement_n": 6392,
-      "agreement_rate": 0.952608047690015,
-      "labels": {
-        "none": 6390,
-        "request": 2
-      },
-      "kinds": {
-        "reference": 4743,
-        "generic_howto": 447,
-        "mixed_none": 1163,
-        "concrete_task": 2,
-        "tool_usage_note": 37
-      },
-      "contract_agreement": {},
-      "review_completed": true,
-      "final_admission": false
-    },
-    "commands": {
-      "n": 355,
-      "vote_n": 670,
-      "fully_reviewed": 315,
-      "agreement_n": 280,
-      "agreement_rate": 0.7887323943661971,
-      "labels": {
-        "none": 280
-      },
-      "kinds": {
-        "reference": 189,
-        "mixed_none": 91
-      },
-      "contract_agreement": {},
-      "review_completed": true,
-      "final_admission": false
-    },
-    "synthetic-request": {
-      "n": 4632,
-      "vote_n": 8720,
-      "fully_reviewed": 4104,
-      "agreement_n": 2568,
-      "agreement_rate": 0.5544041450777202,
-      "labels": {
-        "request": 2305,
-        "none": 260,
-        "quoted": 3
-      },
-      "kinds": {
-        "concrete_task": 2305,
-        "mixed_none": 82,
-        "generic_howto": 35,
-        "reference": 142,
-        "quoted": 3,
-        "tool_usage_note": 1
-      },
-      "contract_agreement": {},
-      "review_completed": true,
-      "final_admission": false
-    },
-    "real-test-relabel": {
-      "n": 1293,
-      "vote_n": 2554,
-      "fully_reviewed": 1261,
-      "agreement_n": 1224,
-      "agreement_rate": 0.9466357308584686,
-      "labels": {
-        "none": 1223,
-        "request": 1
-      },
-      "kinds": {
-        "reference": 1022,
-        "mixed_none": 135,
-        "generic_howto": 63,
-        "concrete_task": 1,
-        "tool_usage_note": 3
-      },
-      "contract_agreement": {},
-      "review_completed": true,
-      "final_admission": false
-    },
-    "injected": {
-      "n": 4222,
-      "vote_n": 5976,
-      "fully_reviewed": 2904,
-      "agreement_n": 1102,
-      "agreement_rate": 0.261013737565135,
-      "labels": {
-        "request": 999,
-        "none": 99,
-        "quoted": 4
-      },
-      "kinds": {
-        "concrete_task": 999,
-        "reference": 74,
-        "mixed_none": 18,
-        "generic_howto": 7,
-        "quoted": 4
-      },
-      "contract_agreement": {
-        "train:request": 992,
-        "train:quoted": 1
-      },
-      "review_completed": false,
-      "final_admission": false
-    },
-    "injected-extra": {
-      "n": 676,
-      "vote_n": 0,
-      "fully_reviewed": 0,
-      "agreement_n": 0,
-      "agreement_rate": 0.0,
-      "labels": {},
-      "kinds": {},
-      "contract_agreement": {},
-      "review_completed": false,
-      "final_admission": false
-    }
-  },
-  "synthetic_reclassification": {
-    "counts": {
-      "train:request_to_request": 2027,
-      "train:discard_missing_or_disagree": 1814,
-      "train:request_to_none": 237,
-      "train:discard_quoted": 3,
-      "validation:discard_missing_or_disagree": 250,
-      "validation:request_to_request": 278,
-      "validation:request_to_none": 23
-    },
-    "original_files_unchanged": true,
-    "final_admission": false
-  },
+  "partial_snapshot": null,
+  "synthetic_reclassification": null,
   "reviews_by_category": {
     "pilot": {
       "documentation": {
@@ -587,65 +1298,106 @@
     "synthetic-request": {
       "synthetic": {
         "n": 4632,
-        "fully_reviewed": 4104,
-        "agreement_n": 2568,
-        "agreement_rate": 0.5544041450777202,
-        "agreement_rate_valid": 0.6257309941520468,
-        "labels": {
-          "request": 2305,
-          "none": 260,
-          "quoted": 3
-        },
-        "kinds": {
-          "concrete_task": 2305,
-          "mixed_none": 82,
-          "generic_howto": 35,
-          "reference": 142,
-          "quoted": 3,
-          "tool_usage_note": 1
-        }
+        "fully_reviewed": 0,
+        "agreement_n": 0,
+        "agreement_rate": 0.0,
+        "agreement_rate_valid": null,
+        "labels": {},
+        "kinds": {}
       }
     },
     "injected": {
       "documentation": {
         "n": 2786,
-        "fully_reviewed": 1852,
-        "agreement_n": 570,
-        "agreement_rate": 0.20459440057430006,
-        "agreement_rate_valid": 0.3077753779697624,
+        "fully_reviewed": 124,
+        "agreement_n": 105,
+        "agreement_rate": 0.03768844221105527,
+        "agreement_rate_valid": 0.8467741935483871,
         "labels": {
-          "request": 503,
-          "none": 64,
-          "quoted": 3
+          "request": 69,
+          "none": 3,
+          "quoted": 33
         },
         "kinds": {
-          "concrete_task": 503,
-          "reference": 40,
-          "mixed_none": 17,
-          "generic_howto": 7,
-          "quoted": 3
+          "concrete_task": 69,
+          "reference": 3,
+          "quoted": 33
         }
       },
       "mcp": {
         "n": 1436,
-        "fully_reviewed": 1052,
-        "agreement_n": 532,
-        "agreement_rate": 0.37047353760445684,
-        "agreement_rate_valid": 0.5057034220532319,
+        "fully_reviewed": 60,
+        "agreement_n": 59,
+        "agreement_rate": 0.04108635097493036,
+        "agreement_rate_valid": 0.9833333333333333,
         "labels": {
-          "request": 496,
-          "none": 35,
+          "request": 30,
+          "none": 1,
+          "quoted": 28
+        },
+        "kinds": {
+          "concrete_task": 30,
+          "reference": 1,
+          "quoted": 28
+        }
+      }
+    },
+    "injected-extra": {
+      "documentation": {
+        "n": 400,
+        "fully_reviewed": 0,
+        "agreement_n": 0,
+        "agreement_rate": 0.0,
+        "agreement_rate_valid": null,
+        "labels": {},
+        "kinds": {}
+      },
+      "mcp": {
+        "n": 896,
+        "fully_reviewed": 192,
+        "agreement_n": 190,
+        "agreement_rate": 0.21205357142857142,
+        "agreement_rate_valid": 0.9895833333333334,
+        "labels": {
+          "request": 188,
+          "none": 1,
           "quoted": 1
         },
         "kinds": {
-          "concrete_task": 496,
-          "reference": 34,
+          "concrete_task": 188,
           "mixed_none": 1,
           "quoted": 1
         }
       }
     },
-    "injected-extra": null,
+    "injected-quoted": {
+      "documentation": {
+        "n": 18,
+        "fully_reviewed": 14,
+        "agreement_n": 14,
+        "agreement_rate": 0.7777777777777778,
+        "agreement_rate_valid": 1.0,
+        "labels": {
+          "quoted": 14
+        },
+        "kinds": {
+          "quoted": 14
+        }
+      },
+      "mcp": {
+        "n": 14,
+        "fully_reviewed": 10,
+        "agreement_n": 10,
+        "agreement_rate": 0.7142857142857143,
+        "agreement_rate_valid": 1.0,
+        "labels": {
+          "quoted": 10
+        },
+        "kinds": {
+          "quoted": 10
+        }
+      }
+    },
     "real-test-relabel": {
       "command": {
         "n": 199,
@@ -702,6 +1454,15 @@
     "sha256": "48e9bc56f5e9e2d2926fa21a30694ba17ea404769f9c219d65f840c84fe4dfec"
   },
   "generation_extra": null,
+  "quoted_supplement": {
+    "basis": "Train-only teacher agreement: 650 generated, 368 fully reviewed, 1 contract match; maximum 283 < 300. Preserve existing data; supplement direct verbatim quoted instructions inside real hosts.",
+    "smoke_n": 32,
+    "maximum_new_n": 1000,
+    "teacher_prompt_changed": false,
+    "test_error_access": false
+  },
+  "generation_quoted": null,
+  "quoted_smoke": null,
   "injection_render": {
     "input_n": 4222,
     "output_n": 4222,
@@ -6786,35 +7547,6 @@
         "command": 280
       }
     },
-    "synthetic-request-agreed": {
-      "status": "teacher_agreed_before_isolation",
-      "n": 2568,
-      "sha256": "fc7c224eeb6b4751084efbd3e1390dbcb616a24a8547a4bff8aad9a91cd7724a",
-      "split": {
-        "train": 2267,
-        "validation": 301
-      },
-      "origin": {
-        "synthetic_retained": 2267,
-        "synthetic_retained_validation": 301
-      },
-      "label": {
-        "request": 2305,
-        "none": 260,
-        "quoted": 3
-      },
-      "kind": {
-        "concrete_task": 2305,
-        "mixed_none": 82,
-        "generic_howto": 35,
-        "reference": 142,
-        "quoted": 3,
-        "tool_usage_note": 1
-      },
-      "category": {
-        "synthetic": 2568
-      }
-    },
     "injected": {
       "status": "generated_candidate_not_admitted",
       "n": 4222,
@@ -6841,22 +7573,46 @@
     },
     "injected-extra": {
       "status": "generated_candidate_not_admitted",
-      "n": 676,
-      "sha256": "2c4400d1c078045c06824eedaf16f463b311c2c233fc3c1bc82fb85a568af304",
+      "n": 1296,
+      "sha256": "99e86310344b7526753e975a2b1c0ffc5a14b77c05e97c4fc6b5cd19995fc12a",
       "split": {
-        "train": 676
+        "train": 1296
       },
       "origin": {
-        "real_host_injection": 676
+        "real_host_injection": 1296
       },
       "label": {
-        "request": 676
+        "request": 1296
       },
       "kind": {
-        "unknown": 676
+        "unknown": 1296
       },
       "category": {
-        "mcp": 676
+        "mcp": 896,
+        "documentation": 400
+      }
+    },
+    "injected-quoted": {
+      "status": "generated_candidate_not_admitted",
+      "n": 32,
+      "sha256": "a5353a735619300425c9cf057d871855a88a16ba48c216b4e85193a4bd68f12f",
+      "split": {
+        "train": 32
+      },
+      "origin": {
+        "real_host_injection": 32
+      },
+      "label": {
+        "quoted": 32
+      },
+      "kind": {
+        "reference": 26,
+        "mixed_none": 5,
+        "generic_howto": 1
+      },
+      "category": {
+        "mcp": 14,
+        "documentation": 18
       }
     },
     "real-test-relabel-agreed": {
@@ -6918,40 +7674,96 @@
   "evaluation": null,
   "cloud_calls_completed_lower_bound": {
     "mimo-v2.5": {
-      "requests": 2290,
-      "known_usage_requests": 2284,
-      "known_total_tokens": 9226396
+      "requests": 2692,
+      "known_usage_requests": 2686,
+      "known_total_tokens": 10528834,
+      "total_seconds": 21884.67957999892,
+      "no_usage_ge_90_seconds": 0,
+      "mean_seconds": 8.129524361069436
     },
     "deepseek-v4.1-flash": {
-      "requests": 350,
-      "known_usage_requests": 348,
-      "known_total_tokens": 763275
+      "requests": 621,
+      "known_usage_requests": 575,
+      "known_total_tokens": 1397119,
+      "total_seconds": 10925.047790699755,
+      "no_usage_ge_90_seconds": 43,
+      "mean_seconds": 17.59266955024115
     },
     "model-list": {
       "requests": 2,
       "known_usage_requests": 0,
-      "known_total_tokens": 0
+      "known_total_tokens": 0,
+      "total_seconds": 1.8211930712277535,
+      "no_usage_ge_90_seconds": 0,
+      "mean_seconds": 0.9105965356138768
     },
     "deepseek-flash": {
       "requests": 3290,
       "known_usage_requests": 3273,
-      "known_total_tokens": 6979682
+      "known_total_tokens": 6979682,
+      "total_seconds": 24426.910083300318,
+      "no_usage_ge_90_seconds": 13,
+      "mean_seconds": 7.4245927304864185
+    },
+    "glm-5.3-flash": {
+      "requests": 161,
+      "known_usage_requests": 141,
+      "known_total_tokens": 427489,
+      "total_seconds": 3729.2338303000433,
+      "no_usage_ge_90_seconds": 9,
+      "mean_seconds": 23.162943045341883
+    },
+    "mimo-v2.6-flash": {
+      "requests": 81,
+      "known_usage_requests": 81,
+      "known_total_tokens": 88040,
+      "total_seconds": 380.36078489996726,
+      "no_usage_ge_90_seconds": 0,
+      "mean_seconds": 4.695812159258855
+    },
+    "qwen3.8-max": {
+      "requests": 82,
+      "known_usage_requests": 81,
+      "known_total_tokens": 132958,
+      "total_seconds": 1605.278793199861,
+      "no_usage_ge_90_seconds": 1,
+      "mean_seconds": 19.57657064877879
+    },
+    "glm-5.3": {
+      "requests": 81,
+      "known_usage_requests": 81,
+      "known_total_tokens": 141245,
+      "total_seconds": 673.5556422000227,
+      "no_usage_ge_90_seconds": 0,
+      "mean_seconds": 8.315501755555836
+    },
+    "kimi-k3": {
+      "requests": 81,
+      "known_usage_requests": 81,
+      "known_total_tokens": 115046,
+      "total_seconds": 1456.2716473998735,
+      "no_usage_ge_90_seconds": 0,
+      "mean_seconds": 17.978662313578685
     }
   },
+  "cloud_log_scopes": [
+    ".local\\stage-d5\\cloud-requests.jsonl",
+    ".local\\stage-d5\\diag\\cloud-requests.jsonl"
+  ],
   "tests": [
     {
       "name": "targeted-tests.log",
-      "n": 13,
-      "seconds": 0.105,
+      "n": 17,
+      "seconds": 0.077,
       "passed": true,
-      "sha256": "f909958ebbdedb38b9a8895217a779647cfe1d75fb68917a7922b6549b3ef8fb"
+      "sha256": "289b5402f405fdb17a46dbc25084f90139ede542c7c472aab0351cc82a953cc7"
     },
     {
       "name": "unit-tests.log",
-      "n": 211,
-      "seconds": 17.062,
+      "n": 215,
+      "seconds": 18.314,
       "passed": true,
-      "sha256": "3593aaf5fe894dbdcd483b2b1ed549ba0a7f0b038606f50270606ddbbe936d6f"
+      "sha256": "1e044e5e8c61c22861e41ce001f04714697170a6d26967de868025aae2b72675"
     }
   ],
   "checks": {
@@ -6971,6 +7783,9 @@
     "semantic_heldout": null,
     "gold": null,
     "checkpoint_D4": true,
+    "checkpoint_GLM": true,
+    "GLM_three_class_72_passed": true,
+    "GLM_early_per_class_70": false,
     "pilot_agreement_ge_85": true,
     "isolation": null,
     "pretrain_probe": null,
@@ -7011,9 +7826,12 @@
     "stage_d5_regression.py",
     "stage_d5_render.py",
     "stage_d5_report.py",
+    "stage_d5_resume_glm.py",
     "stage_d5_run_training.py",
     "stage_d5_sources.py",
     "stage_d5_teacher.py",
+    "stage_d5_teacher_diag.py",
+    "stage_d5_teacher_screen.py",
     "stage_d5_verify.py",
     "train_stage_d5.py",
     "evaluate_stage_d5.py",
@@ -7042,5 +7860,16 @@
       "id",
       "text"
     ]
+  },
+  "latest_execution_state": {
+    "status": "quoted_replacement_in_progress",
+    "retired_original_quoted_n": 650,
+    "whole_cohort_retirement": true,
+    "original_audit_preserved": true,
+    "other_valid_data_reused": true,
+    "training_started": false,
+    "training_evaluation_limit_seconds": 3600,
+    "s1_enabled": false,
+    "historical_stop_and_gate_results_retained": true
   }
 }

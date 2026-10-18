@@ -144,4 +144,42 @@ class RecoveryTests(unittest.TestCase):
             self.assertEqual(seen.count(('0','glm-5.3-flash')),1)
             self.assertEqual(result['agreement_n'],1)
 
+class GLMEarlyGateTests(unittest.TestCase):
+    def test_one_bad_class_stops_before_other_queues(self):
+        import tempfile
+        from pathlib import Path
+        import stage_d5_resume_glm as module
+        with tempfile.TemporaryDirectory() as tmp:
+            folder=Path(tmp)
+            rows=[{'id':str(i),'label':label,'contract_label':label,'split':'train'} for i,label in enumerate(('request','quoted','none'))]
+            for name in module.QUEUES:
+                (folder/(name+'.jsonl')).write_text(''.join(json.dumps(r)+'\n' for r in rows))
+                votes=[{'id':r['id'],'model':'deepseek-v4.1-flash','label':r['label']} for r in rows]
+                (folder/(name+'-votes.jsonl')).write_text(''.join(json.dumps(v)+'\n' for v in votes))
+            calls=[]
+            def review(name,selected,**kwargs):
+                calls.append(name)
+                with (folder/(name+'-votes.jsonl')).open('a') as stream:
+                    for r in selected:stream.write(json.dumps({'id':r['id'],'model':'glm-5.3-flash','label':'none' if r['label']=='quoted' else r['label']})+'\n')
+            with patch.object(module,'OUT',folder),patch('stage_d5_protocol.OUT',folder),patch.object(module,'review',side_effect=review),patch('builtins.print'):
+                module.main()
+            self.assertEqual(calls,['injected-quoted'])
+            stop=json.loads((folder/'stage-stop.json').read_text())
+            self.assertEqual(stop['gate']['counts']['quoted']['rate'],0)
+            self.assertFalse(stop['training_clock_started'])
+
+    def test_legacy_relabeling_is_checked_under_current_definition(self):
+        import tempfile
+        from pathlib import Path
+        import stage_d5_resume_glm as module
+        with tempfile.TemporaryDirectory() as tmp:
+            folder=Path(tmp)
+            rows=[{'id':str(i),'label':'request','contract_label':'none','split':'train'} for i in range(3)]
+            votes=[{'id':str(i),'model':m,'label':label} for i,label in enumerate(('request','quoted','none')) for m in module.MODELS]
+            (folder/'synthetic-request-votes.jsonl').write_text(''.join(json.dumps(v)+'\n' for v in votes))
+            with patch.object(module,'OUT',folder):
+                counts=module.gate_agreement('synthetic-request',rows)
+            self.assertTrue(all(v['rate']==1 for v in counts.values()))
+            self.assertTrue(all(v['teacher_agreement_n']==1 for v in counts.values()))
+
 if __name__=='__main__':unittest.main()

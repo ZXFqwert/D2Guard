@@ -62,3 +62,12 @@ def blocked_sources():
 def check_repository(repo):
     blocked,_=blocked_sources()
     if repo.lower() in blocked:raise ValueError('Frozen real test repository is prohibited')
+
+
+def active_rows(name, rows):
+    """Exclude whole retired cohorts, independent of individual teacher outcomes."""
+    manifest=OUT/'retired-quoted-cohort.json'
+    if not manifest.exists():return rows
+    retired=json.loads(manifest.read_text(encoding='utf-8'))
+    ids=set(retired['ids'])
+    return [r for r in rows if r['id'] not in ids]

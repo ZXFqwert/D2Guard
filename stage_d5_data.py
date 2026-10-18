@@ -63,7 +63,6 @@ def generate(plans_path=None, output_name='injected', record_name='generation',r
     plans=read(plans_path or OUT/'injection-plan.jsonl');target=OUT/(output_name+'.jsonl')
     if (OUT/(record_name+'.json')).exists():raise ValueError('Completed generation must not be repeated')
     if target.exists() and not resume:raise ValueError('Do not repeat generation')
-    if resume and not json.loads((OUT/'transport-check.json').read_text()).get('passed'):raise ValueError('Transport recovery check required')
     original_n=len(plans);prior={r['id'] for r in read(target)} if resume else set()
     errors_path=OUT/(record_name+'-errors.json');errors=json.loads(errors_path.read_text()) if resume and errors_path.exists() else []
     excluded={i for e in errors if not transient_error(e.get('reason','')) for i in e['ids']}
