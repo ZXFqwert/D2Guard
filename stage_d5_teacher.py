@@ -27,7 +27,9 @@ def review(name,rows,workers=12,resume=False,batch_size=8,teachers=None,finalize
     output.touch(exist_ok=resume)
     errors_path=OUT/(name+'-errors.json');errors=json.loads(errors_path.read_text()) if resume and errors_path.exists() else []
     prior={(v['id'],teacher_role(v['model'])) for v in read(output)}
-    excluded={(i,teacher_role(e['model'])) for e in errors if not transient_error(e.get('reason','')) for i in e['ids']}
+    recovered_path=OUT/'route-recoverable-failures.json'
+    recovered={(r['id'],teacher_role(r['model'])) for r in json.loads(recovered_path.read_text())['pairs']} if recovered_path.exists() else set()
+    excluded={(i,teacher_role(e['model'])) for e in errors for i in e['ids'] if not transient_error(e.get('reason','')) and not (e.get('reason')=='HTTP status 403' and (i,teacher_role(e['model'])) in recovered)}
     reserved=prior|excluded;order={r['id']:i for i,r in enumerate(rows)}
     stop=threading.Event();streak={m:0 for m in MODELS};batches=[]
     selected=MODELS if teachers is None else tuple(teachers)

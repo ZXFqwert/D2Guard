@@ -57,13 +57,15 @@ def record_identity(identity_path, model, returned):
             else:fcntl.flock(lock.fileno(),fcntl.LOCK_UN)
 
 
-def credentials():
+def credentials(model=None):
     values = {}
     for line in (ROOT / '.local/teacher.env').read_text(encoding='utf-8-sig').splitlines():
         if line.strip() and not line.lstrip().startswith('#') and '=' in line:
             key, value = line.split('=', 1)
             values[key.strip()] = value.strip().strip('\"\'')
-    base, key = values['D2_TEACHER_BASE_URL'].rstrip('/'), values['D2_TEACHER_API_KEY']
+    prefix='D2_GLM' if model=='glm-5.3-flash' else 'D2_DEEPSEEK' if model in ('deepseek-v4.1-flash','deepseek-flash') else 'D2_TEACHER'
+    prefix=prefix if prefix+'_BASE_URL' in values else 'D2_TEACHER'
+    base, key = values[prefix+'_BASE_URL'].rstrip('/'), values[prefix+'_API_KEY']
     if urlsplit(base).scheme != 'https' or not key:
         raise CloudFailure('Invalid local teacher configuration')
     return base, key
@@ -95,7 +97,7 @@ def append_request_record(path, record):
 def call(model, messages, *, max_tokens=1024, temperature=0, log_path=None, thinking=None):
     if model not in MODELS + EVALUATION_ONLY_MODELS + D5_MODELS:
         raise CloudFailure('Model is not in the preregistered allowlist')
-    base, key = credentials()
+    base, key = credentials(model)
     started = time.monotonic()
     usage = None
     try:

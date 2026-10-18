@@ -1,6 +1,106 @@
 {
   "stage": "D5",
-  "status": "D5 已停止：GLM batch and two minimal probes returned HTTP 403; response contains quota/balance error marker. Preserve all valid rows and votes; legacy synthetic early gate incomplete. No training or test evaluation started.；S1关闭",
+  "status": "D5 已停止：User-registered early per-contract agreement <70% or no paired observations for a present class；S1关闭",
+  "route_resume_summary": {
+    "completed_early_pairs": 200,
+    "valid_votes_repeated": 0,
+    "missing_glm_votes_filled": 144,
+    "model_changes": 0,
+    "data_regenerated": 0,
+    "rubric_sha256": "475571e4a12e528f8aaeba4e52b6f8481f49696e90fdcf02a7946e21a0a2e91f",
+    "teacher_names": [
+      "deepseek-v4.1-flash",
+      "glm-5.3-flash"
+    ],
+    "route_smoke": {
+      "deepseek-v4.1-flash": {
+        "labels": [
+          "request",
+          "quoted",
+          "none"
+        ],
+        "passed": true
+      },
+      "glm-5.3-flash": {
+        "labels": [
+          "request",
+          "quoted",
+          "none"
+        ],
+        "passed": true
+      }
+    },
+    "gate": {
+      "passed": false,
+      "counts": {
+        "request": {
+          "n": 67,
+          "paired_n": 67,
+          "teacher_agreement_n": 62,
+          "rate": 0.9253731343283582,
+          "teacher_pairs": {
+            "request:request": 62,
+            "request:none": 4,
+            "request:quoted": 1
+          },
+          "basis": "new-definition dual agreement; old contract retained only as provenance"
+        },
+        "quoted": {
+          "n": 67,
+          "paired_n": 67,
+          "teacher_agreement_n": 15,
+          "rate": 0.22388059701492538,
+          "teacher_pairs": {
+            "quoted:request": 36,
+            "quoted:none": 16,
+            "quoted:quoted": 15
+          },
+          "basis": "new-definition dual agreement; old contract retained only as provenance"
+        },
+        "none": {
+          "n": 66,
+          "paired_n": 66,
+          "teacher_agreement_n": 39,
+          "rate": 0.5909090909090909,
+          "teacher_pairs": {
+            "none:none": 39,
+            "none:request": 26,
+            "none:quoted": 1
+          },
+          "basis": "new-definition dual agreement; old contract retained only as provenance"
+        }
+      },
+      "coverage_passed": true,
+      "policy": "D5-latest-labels-v2"
+    },
+    "training_started": false
+  },
+  "route_switch": {
+    "model": "glm-5.3-flash",
+    "base_url": "https://api-slb.micuapi.ai/v1",
+    "credentials_location": ".local/teacher.env",
+    "valid_votes_reused": true,
+    "new_teacher": false,
+    "started_unix": 1792324702.8860624
+  },
+  "route_smoke": {
+    "deepseek-v4.1-flash": {
+      "labels": [
+        "request",
+        "quoted",
+        "none"
+      ],
+      "passed": true
+    },
+    "glm-5.3-flash": {
+      "labels": [
+        "request",
+        "quoted",
+        "none"
+      ],
+      "passed": true
+    }
+  },
   "retired_quoted_cohort": {
     "reason": "User authorized wholesale retirement of old quoted cohort, retain audit and all other valid data",
     "n": 650,
@@ -373,6 +473,49 @@
       },
       "coverage_passed": true,
       "policy": "D5-latest-labels-v2"
+    },
+    "synthetic-request": {
+      "passed": false,
+      "counts": {
+        "request": {
+          "n": 67,
+          "paired_n": 67,
+          "teacher_agreement_n": 62,
+          "rate": 0.9253731343283582,
+          "teacher_pairs": {
+            "request:request": 62,
+            "request:none": 4,
+            "request:quoted": 1
+          },
+          "basis": "new-definition dual agreement; old contract retained only as provenance"
+        },
+        "quoted": {
+          "n": 67,
+          "paired_n": 67,
+          "teacher_agreement_n": 15,
+          "rate": 0.22388059701492538,
+          "teacher_pairs": {
+            "quoted:request": 36,
+            "quoted:none": 16,
+            "quoted:quoted": 15
+          },
+          "basis": "new-definition dual agreement; old contract retained only as provenance"
+        },
+        "none": {
+          "n": 66,
+          "paired_n": 66,
+          "teacher_agreement_n": 39,
+          "rate": 0.5909090909090909,
+          "teacher_pairs": {
+            "none:none": 39,
+            "none:request": 26,
+            "none:quoted": 1
+          },
+          "basis": "new-definition dual agreement; old contract retained only as provenance"
+        }
+      },
+      "coverage_passed": true,
+      "policy": "D5-latest-labels-v2"
     }
   },
   "teacher_agreement_before": {
@@ -603,37 +746,43 @@
     "synthetic-request": {
       "request": {
         "n": 4427,
-        "paired_n": 45,
-        "three_way_n": 16,
-        "rate": 0.35555555555555557,
+        "paired_n": 161,
+        "three_way_n": 61,
+        "rate": 0.37888198757763975,
         "teacher_pairs": {
-          "request:request": 16,
-          "none:request": 8,
-          "none:none": 7,
-          "quoted:request": 9,
-          "quoted:none": 4,
-          "request:none": 1
+          "quoted:request": 30,
+          "none:none": 28,
+          "none:request": 25,
+          "request:request": 61,
+          "quoted:none": 8,
+          "quoted:quoted": 4,
+          "request:quoted": 1,
+          "request:none": 4
         }
       },
       "quoted": {
         "n": 82,
-        "paired_n": 8,
-        "three_way_n": 5,
-        "rate": 0.625,
+        "paired_n": 27,
+        "three_way_n": 11,
+        "rate": 0.4074074074074074,
         "teacher_pairs": {
-          "quoted:none": 1,
-          "quoted:quoted": 5,
-          "request:request": 1,
-          "quoted:request": 1
+          "quoted:quoted": 11,
+          "quoted:none": 7,
+          "none:none": 2,
+          "quoted:request": 6,
+          "request:request": 1
         }
       },
       "none": {
         "n": 123,
-        "paired_n": 3,
-        "three_way_n": 3,
-        "rate": 1.0,
+        "paired_n": 12,
+        "three_way_n": 9,
+        "rate": 0.75,
         "teacher_pairs": {
-          "none:none": 3
+          "none:none": 9,
+          "none:request": 1,
+          "quoted:none": 1,
+          "none:quoted": 1
         }
       }
     }
@@ -941,79 +1090,87 @@
       "glm": {
         "request": {
           "n": 161,
-          "paired_n": 45,
-          "three_way_n": 16,
-          "rate": 0.35555555555555557,
+          "paired_n": 161,
+          "three_way_n": 61,
+          "rate": 0.37888198757763975,
           "teacher_pairs": {
-            "request:request": 16,
-            "none:request": 8,
-            "none:none": 7,
-            "quoted:request": 9,
-            "quoted:none": 4,
-            "request:none": 1
+            "quoted:request": 30,
+            "none:none": 28,
+            "none:request": 25,
+            "request:request": 61,
+            "quoted:none": 8,
+            "quoted:quoted": 4,
+            "request:quoted": 1,
+            "request:none": 4
           }
         },
         "quoted": {
           "n": 27,
-          "paired_n": 8,
-          "three_way_n": 5,
-          "rate": 0.625,
+          "paired_n": 27,
+          "three_way_n": 11,
+          "rate": 0.4074074074074074,
           "teacher_pairs": {
-            "quoted:none": 1,
-            "quoted:quoted": 5,
-            "request:request": 1,
-            "quoted:request": 1
+            "quoted:quoted": 11,
+            "quoted:none": 7,
+            "none:none": 2,
+            "quoted:request": 6,
+            "request:request": 1
           }
         },
         "none": {
           "n": 12,
-          "paired_n": 3,
-          "three_way_n": 3,
-          "rate": 1.0,
+          "paired_n": 12,
+          "three_way_n": 9,
+          "rate": 0.75,
           "teacher_pairs": {
-            "none:none": 3
+            "none:none": 9,
+            "none:request": 1,
+            "quoted:none": 1,
+            "none:quoted": 1
           }
         }
       },
       "current_definition_gate": {
         "request": {
           "n": 67,
-          "paired_n": 18,
-          "teacher_agreement_n": 17,
-          "rate": 0.9444444444444444,
+          "paired_n": 67,
+          "teacher_agreement_n": 62,
+          "rate": 0.9253731343283582,
           "teacher_pairs": {
-            "request:request": 17,
-            "request:none": 1
+            "request:request": 62,
+            "request:quoted": 1,
+            "request:none": 4
           },
           "basis": "new-definition dual agreement; old contract retained only as provenance"
         },
         "quoted": {
           "n": 67,
-          "paired_n": 20,
-          "teacher_agreement_n": 5,
-          "rate": 0.25,
+          "paired_n": 67,
+          "teacher_agreement_n": 15,
+          "rate": 0.22388059701492538,
           "teacher_pairs": {
-            "quoted:request": 10,
-            "quoted:none": 5,
-            "quoted:quoted": 5
+            "quoted:request": 36,
+            "quoted:none": 16,
+            "quoted:quoted": 15
           },
           "basis": "new-definition dual agreement; old contract retained only as provenance"
         },
         "none": {
           "n": 66,
-          "paired_n": 18,
-          "teacher_agreement_n": 10,
-          "rate": 0.5555555555555556,
+          "paired_n": 66,
+          "teacher_agreement_n": 39,
+          "rate": 0.5909090909090909,
           "teacher_pairs": {
-            "none:request": 8,
-            "none:none": 10
+            "none:none": 39,
+            "none:request": 26,
+            "none:quoted": 1
           },
           "basis": "new-definition dual agreement; old contract retained only as provenance"
         }
       }
     }
   },
-  "paused_seconds_total": 5966.303997755051,
+  "paused_seconds_total": 6594.317245483398,
   "reused_teacher_cohorts": [
     "pilot",
     "native",
@@ -1050,8 +1207,8 @@
   "protocol": {
     "stage": "D5",
     "started_unix": 1792308844.3920608,
-    "data_deadline_unix": 1792329210.6960585,
-    "stage_deadline_unix": 1792336410.6960585,
+    "data_deadline_unix": 1792329838.7093062,
+    "stage_deadline_unix": 1792337038.7093062,
     "training_evaluation_limit_seconds": 3600,
     "test_reports": "aggregate_only",
     "teachers": [
@@ -1087,61 +1244,62 @@
       "resumed": 1792322834.51472,
       "pause_seconds": 1239.1235234737396,
       "reason": "用户授权：整批弃用旧 quoted，补齐新构造后继续"
+    },
+    "micu_resume_pause": {
+      "paused_from": 1792324074.8728147,
+      "resumed": 1792324702.8860624,
+      "pause_seconds": 628.0132477283478,
+      "reason": "用户授权更换 GLM 中转站并从断点继续"
     }
   },
   "stop": {
-    "error_type": "TeacherEndpointQuota403",
-    "reason": "GLM batch and two minimal probes returned HTTP 403; response contains quota/balance error marker. Preserve all valid rows and votes; legacy synthetic early gate incomplete. No training or test evaluation started.",
-    "stopped_unix": 1792324074.8728147,
+    "error_type": "TeacherEarlyAgreementGate",
+    "reason": "User-registered early per-contract agreement <70% or no paired observations for a present class",
     "queue": "synthetic-request",
-    "partial_gate_counts": {
-      "request": {
-        "n": 67,
-        "paired_n": 18,
-        "teacher_agreement_n": 17,
-        "rate": 0.9444444444444444,
-        "teacher_pairs": {
-          "request:request": 17,
-          "request:none": 1
-        },
-        "basis": "new-definition dual agreement; old contract retained only as provenance"
-      },
-      "quoted": {
-        "n": 67,
-        "paired_n": 20,
-        "teacher_agreement_n": 5,
-        "rate": 0.25,
-        "teacher_pairs": {
-          "quoted:request": 10,
-          "quoted:none": 5,
-          "quoted:quoted": 5
-        },
-        "basis": "new-definition dual agreement; old contract retained only as provenance"
-      },
-      "none": {
-        "n": 66,
-        "paired_n": 18,
-        "teacher_agreement_n": 10,
-        "rate": 0.5555555555555556,
-        "teacher_pairs": {
-          "none:request": 8,
-          "none:none": 10
-        },
-        "basis": "new-definition dual agreement; old contract retained only as provenance"
-      }
-    },
-    "partial_gate_is_acceptance": false,
+    "stopped_unix": 1792324794.2548962,
     "training_clock_started": false,
-    "endpoint_diagnostic": {
-      "status_code": 403,
-      "content_type": "application/json; charset=utf-8",
-      "error_category_matches": {
-        "quota": true,
-        "authentication": false,
-        "access_denied": false,
-        "rate_or_waf": false
+    "gate": {
+      "passed": false,
+      "counts": {
+        "request": {
+          "n": 67,
+          "paired_n": 67,
+          "teacher_agreement_n": 62,
+          "rate": 0.9253731343283582,
+          "teacher_pairs": {
+            "request:request": 62,
+            "request:none": 4,
+            "request:quoted": 1
+          },
+          "basis": "new-definition dual agreement; old contract retained only as provenance"
+        },
+        "quoted": {
+          "n": 67,
+          "paired_n": 67,
+          "teacher_agreement_n": 15,
+          "rate": 0.22388059701492538,
+          "teacher_pairs": {
+            "quoted:request": 36,
+            "quoted:none": 16,
+            "quoted:quoted": 15
+          },
+          "basis": "new-definition dual agreement; old contract retained only as provenance"
+        },
+        "none": {
+          "n": 66,
+          "paired_n": 66,
+          "teacher_agreement_n": 39,
+          "rate": 0.5909090909090909,
+          "teacher_pairs": {
+            "none:none": 39,
+            "none:request": 26,
+            "none:quoted": 1
+          },
+          "basis": "new-definition dual agreement; old contract retained only as provenance"
+        }
       },
-      "response_body_exported": false
+      "coverage_passed": true,
+      "policy": "D5-latest-labels-v2"
     }
   },
   "transport_check_after_repeated_timeout": null,
@@ -1375,8 +1533,8 @@
       }
     ]
   },
-  "elapsed_minutes": 155.24097531239192,
-  "elapsed_including_pause_minutes": 254.67937542597454,
+  "elapsed_minutes": 158.0797627568245,
+  "elapsed_including_pause_minutes": 267.9850502292315,
   "authorized_resume": {
     "resumed_unix": 1792316528.8633323,
     "authorization": "User requested resume, route deepseek-v4.1-flash, bounded transient retry, no repeated valid data; training plus evaluation remains 3600 seconds",
@@ -1593,21 +1751,22 @@
     "synthetic-request": {
       "synthetic": {
         "n": 4632,
-        "fully_reviewed": 56,
-        "agreement_n": 32,
-        "agreement_rate": 0.0069084628670120895,
-        "agreement_rate_valid": 0.5714285714285714,
+        "fully_reviewed": 200,
+        "agreement_n": 116,
+        "agreement_rate": 0.025043177892918825,
+        "agreement_rate_valid": 0.58,
         "labels": {
-          "request": 17,
-          "none": 10,
-          "quoted": 5
+          "none": 39,
+          "request": 62,
+          "quoted": 15
         },
         "kinds": {
-          "concrete_task": 17,
-          "generic_howto": 6,
-          "reference": 3,
-          "quoted": 5,
-          "mixed_none": 1
+          "generic_howto": 13,
+          "concrete_task": 62,
+          "mixed_none": 7,
+          "reference": 18,
+          "quoted": 15,
+          "tool_usage_note": 1
         }
       }
     },
@@ -7986,12 +8145,12 @@
       "mean_seconds": 8.129524361069436
     },
     "deepseek-v4.1-flash": {
-      "requests": 764,
-      "known_usage_requests": 718,
-      "known_total_tokens": 1879756,
-      "total_seconds": 12280.979323699692,
+      "requests": 765,
+      "known_usage_requests": 719,
+      "known_total_tokens": 1880617,
+      "total_seconds": 12284.865802099695,
       "no_usage_ge_90_seconds": 43,
-      "mean_seconds": 16.074580266622633
+      "mean_seconds": 16.058648107319865
     },
     "model-list": {
       "requests": 2,
@@ -8010,12 +8169,12 @@
       "mean_seconds": 7.4245927304864185
     },
     "glm-5.3-flash": {
-      "requests": 283,
-      "known_usage_requests": 230,
-      "known_total_tokens": 936929,
-      "total_seconds": 9753.934299500019,
+      "requests": 302,
+      "known_usage_requests": 249,
+      "known_total_tokens": 979692,
+      "total_seconds": 9978.845953500073,
       "no_usage_ge_90_seconds": 34,
-      "mean_seconds": 34.46619893816261
+      "mean_seconds": 33.04253626986779
     },
     "mimo-v2.6-flash": {
       "requests": 81,
@@ -8057,17 +8216,17 @@
   "tests": [
     {
       "name": "targeted-tests.log",
-      "n": 19,
-      "seconds": 0.084,
+      "n": 21,
+      "seconds": 0.105,
       "passed": true,
-      "sha256": "a12d0cd2915eba9833291a8fad9fb0c8e3a1a1073f6d79890429db0289d8d834"
+      "sha256": "64e01f6d80ac40d6cf5a86dbfee4d64fe00daf70c263f1c099482eed8375ec43"
     },
     {
       "name": "unit-tests.log",
-      "n": 217,
-      "seconds": 39.032,
+      "n": 219,
+      "seconds": 19.351,
       "passed": true,
-      "sha256": "edc589d57424054d7c5ac809043e8d0e67c61e19b299ecb647a33760b2b78cf1"
+      "sha256": "9807bbd899a644802ab4d3a2b09e41a684ecc38cd85295fb3b7b9c373217f327"
     }
   ],
   "checks": {
@@ -8089,7 +8248,7 @@
     "checkpoint_D4": true,
     "checkpoint_GLM": true,
     "GLM_three_class_72_passed": true,
-    "GLM_early_per_class_70": null,
+    "GLM_early_per_class_70": false,
     "pilot_agreement_ge_85": true,
     "isolation": null,
     "pretrain_probe": null,

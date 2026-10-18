@@ -6,11 +6,11 @@ from stage_d5_protocol import ROOT,OUT,read,sha,save,blocked_sources
 
 def main():
     from stage_d2_cloud import credentials
-    _,key=credentials()
+    keys={credentials()[1],credentials('glm-5.3-flash')[1]}
     paths=[*ROOT.glob('stage_d5_*.py'),ROOT/'train_stage_d5.py',ROOT/'evaluate_stage_d5.py',ROOT/'stage_d2_cloud.py',ROOT/'src/d2v2/request_model.py',ROOT/'src/d2v2/core.py',ROOT/'lab.py',ROOT/'tests/test_stage_d5.py',ROOT/'docs/24-stage-d5-report.md',ROOT/'docs/stage-d5-results.json',ROOT/'docs/stage-d5-verification.md',ROOT/'docs/03-status.md',ROOT/'docs/整体设计文档.md',ROOT/'docs/12-codex-execution-plan.md']
-    hits=[str(p.relative_to(ROOT)) for p in paths if p.exists() and key in p.read_text(encoding='utf-8',errors='replace')]
+    hits=[str(p.relative_to(ROOT)) for p in paths if p.exists() and any(key in p.read_text(encoding='utf-8',errors='replace') for key in keys)]
     logs=read(OUT/'cloud-requests.jsonl');fields=all(set(r)=={'model','seconds','tokens'} for r in logs)
-    if key in (OUT/'cloud-requests.jsonl').read_text(encoding='utf-8'):hits.append('private cloud request log')
+    if any(key in (OUT/'cloud-requests.jsonl').read_text(encoding='utf-8') for key in keys):hits.append('private cloud request log')
     snapshot_path=OUT/'pre-flash-switch/stop-snapshot.json'
     snapshot=json.loads(snapshot_path.read_text());unchanged=all(sha(ROOT/path)==expected for path,expected in snapshot['frozen_sha256'].items())
     d3=json.loads((ROOT/'.local/stage-d3/admission.json').read_text());retained=sha(ROOT/'.local/stage-d3/admitted.jsonl')==d3['admitted_sha256']

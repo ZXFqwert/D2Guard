@@ -204,4 +204,38 @@ class RetiredCohortTests(unittest.TestCase):
             self.assertEqual([r['id'] for r in actual],['valid_request','new_quoted'])
             self.assertEqual(len(rows),4)
 
+class TeacherRouteTests(unittest.TestCase):
+    def test_route_recovery_retries_only_failed_403_not_valid_or_schema_votes(self):
+        import tempfile
+        from pathlib import Path
+        import stage_d5_teacher as module
+        with tempfile.TemporaryDirectory() as tmp:
+            folder=Path(tmp);rows=[{'id':str(i),'raw_text':'reference','source_type':'LOCAL_FILE'} for i in range(3)]
+            votes=[{'id':str(i),'model':module.MODELS[0],'label':'none','kind':'reference'} for i in range(3)]
+            votes.append({'id':'0','model':module.MODELS[1],'label':'none','kind':'reference'})
+            (folder/'x-votes.jsonl').write_text(''.join(json.dumps(v)+'\n' for v in votes))
+            (folder/'x-errors.json').write_text(json.dumps([{'ids':['1'],'model':module.MODELS[1],'reason':'HTTP status 403'},{'ids':['2'],'model':module.MODELS[1],'reason':'Teacher coverage schema'}]))
+            (folder/'route-recoverable-failures.json').write_text(json.dumps({'pairs':[{'id':i,'model':module.MODELS[1]} for i in ('1','2')]}))
+            seen=[]
+            def judge(model,batch):
+                seen.extend((r['id'],model) for r in batch)
+                return [{'id':r['id'],'model':model,'label':'none','kind':'reference'} for r in batch]
+            with patch.object(module,'OUT',folder),patch('stage_d5_protocol.OUT',folder),patch.object(module,'judge',side_effect=judge),patch('builtins.print'):
+                agreed,result=module.review('x',rows,workers=1,resume=True)
+            self.assertEqual(seen,[('1',module.MODELS[1])])
+            self.assertEqual({r['id'] for r in agreed},{'0','1'})
+            self.assertEqual(result['missing_n'],1)
+
+    def test_model_routes_use_local_environment_file_only(self):
+        import tempfile
+        from pathlib import Path
+        import stage_d2_cloud as cloud
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);(root/'.local').mkdir()
+            (root/'.local/teacher.env').write_text('D2_TEACHER_BASE_URL=https://original.example/v1\nD2_TEACHER_API_KEY=original-dummy\nD2_GLM_BASE_URL=https://alternate.example/v1\nD2_GLM_API_KEY=alternate-dummy\n')
+            with patch.object(cloud,'ROOT',root):
+                self.assertEqual(cloud.credentials('glm-5.3-flash'),('https://alternate.example/v1','alternate-dummy'))
+                self.assertEqual(cloud.credentials('deepseek-v4.1-flash'),('https://original.example/v1','original-dummy'))
+                self.assertEqual(cloud.credentials(),('https://original.example/v1','original-dummy'))
+
 if __name__=='__main__':unittest.main()

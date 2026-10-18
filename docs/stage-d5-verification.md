@@ -1,6 +1,6 @@
 # 阶段D5核验摘要
 
-D5 已停止：GLM batch and two minimal probes returned HTTP 403; response contains quota/balance error marker. Preserve all valid rows and votes; legacy synthetic early gate incomplete. No training or test evaluation started.；S1关闭。
+D5 已停止：User-registered early per-contract agreement <70% or no paired observations for a present class；S1关闭。
 
 | 项 | 状态 |
 |---|---|
@@ -22,7 +22,7 @@ D5 已停止：GLM batch and two minimal probes returned HTTP 403; response cont
 | checkpoint_D4 | True |
 | checkpoint_GLM | True |
 | GLM_three_class_72_passed | True |
-| GLM_early_per_class_70 | None |
+| GLM_early_per_class_70 | False |
 | pilot_agreement_ge_85 | True |
 | isolation | None |
 | pretrain_probe | None |
@@ -34,9 +34,9 @@ D5 已停止：GLM batch and two minimal probes returned HTTP 403; response cont
 | S1_enabled | False |
 | stage_E_started | False |
 
-机读结果SHA-256：`46c6ca56dd1cd2384f3c172c4bf1be2d1014ae8ec81d9d7d9e549e6a03f6c018`
+机读结果SHA-256：`b5b62f951e3a0b388b6a4b3a51728d595b999579f348c8774cbbe6dd25a9d6f6`
 
-报告SHA-256：`9b408e9888e56f06aa6ecbf811fce24cf72f62ed572a596d2d57ca33ac092555`
+报告SHA-256：`233d95abaf131febdf20e906f56c24a7b093e061f5b67fa273945d5944b1b8f6`
 
 安全/冻结校验：`{"passed": true, "secret_hits": [], "request_log_fields_valid": true, "snapshot_files_unchanged": true, "D3_training_unchanged": true, "D3_validation_unchanged": true, "heldout_unchanged": true, "gold_unchanged": true, "D4_real_test_unchanged": true, "test_repository_overlap": [], "local_tracked": false, "teacher_env_ignored": true, "production_config_absent": true, "training_clock_absent": true}`
 
