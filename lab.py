@@ -135,8 +135,21 @@ def evaluate(folder, scenario, canary, returncode, timed_out):
     return result
 
 
+def s1_configuration(environment, root=ROOT):
+    # Only a fully accepted D4 production proof enables the project default.
+    # An explicit off control remains available for paired experiments.
+    requested_s1 = environment.get('D2_S1_CONFIG')
+    accepted_s1 = root / '.local/stage-d4/s1-enabled-config.json'
+    if environment.get('D2_S1_DISABLE') == '1':
+        return None
+    elif not requested_s1 and accepted_s1.exists():
+        requested_s1 = str(accepted_s1)
+    return requested_s1
+
+
 def run(args, canary=None, batch_id=None):
     cfg = load(ROOT / '.local' / 'provider.json')
+    requested_s1 = s1_configuration(os.environ)
     node, pi_cli, version = pi_installation()
     scenario = load(ROOT / 'scenarios' / (args.scenario + '.json'))
     canary = canary or 'd2-test-' + secrets.token_hex(16)
@@ -175,10 +188,13 @@ def run(args, canary=None, batch_id=None):
     # The host path and private provenance are never passed to the Agent.
     env.pop('D2_MEMORY_ROOT', None)
     service_env = {**env, 'D2_CORE_PROVIDER': json.dumps(cfg), 'D2_MEMORY_ROOT': str(memory_root),
-                   'D2_APPROVAL_CREDENTIAL': secrets.token_hex(32)}
+                   'D2_APPROVAL_CREDENTIAL': secrets.token_hex(32),
+                   'PYTHONPATH': os.pathsep.join([str(ROOT),str(ROOT/'src'),os.environ.get('PYTHONPATH','')])}
     # Domain model configuration is host-only, including in child sessions.
     env.pop('D2_S1_CONFIG',None)
-    if os.environ.get('D2_S1_CONFIG'):service_env['D2_S1_CONFIG']=os.environ['D2_S1_CONFIG']
+    env.pop('D2_S1_DISABLE',None)
+    service_env.pop('D2_S1_CONFIG',None)
+    if requested_s1:service_env['D2_S1_CONFIG']=requested_s1
     source_paths = [ROOT / 'lab.py', *sorted((ROOT / 'src').glob('*.py')), *sorted((ROOT / 'src').glob('*.mjs')), ROOT / 'extensions' / 'lab.ts']
     source_paths += sorted(p for p in (ROOT / 'src/d2core').rglob('*') if p.is_file() and p.suffix in ('.py', '.json', '.yaml'))
     source_paths += sorted(p for p in (ROOT / 'src/d2v2').iterdir() if p.suffix in ('.py','.yaml'))
@@ -203,8 +219,8 @@ def run(args, canary=None, batch_id=None):
         'initial_files': file_hashes(workspace),
         'timeout_seconds': args.timeout,'child_timeout_seconds':180}
     save(folder / 'manifest.json', manifest)
-    if os.environ.get('D2_S1_CONFIG'):
-        domain_path=Path(os.environ['D2_S1_CONFIG'])
+    if requested_s1:
+        domain_path=Path(requested_s1)
         manifest['content_model']=load(domain_path)
         manifest['content_model_config_sha256']=hashlib.sha256(domain_path.read_bytes()).hexdigest()
         save(folder / 'manifest.json',manifest)

@@ -18,7 +18,7 @@ def metrics(rows,key):
             'true_positive':tp,'false_positive':predicted-tp,'false_negative':positives-tp}
 
 
-def reclassify(root,stage):
+def reclassify(root,stage,s1_sources=None):
     baseline=json.loads((root/('docs/stage-'+stage+'-gold/system-vs-gold.json')).read_text(encoding='utf-8'))
     cache={};result=[]
     d0_before={r['item_id']:r['after'] for r in json.loads((root/'docs/stage-c2-system-vs-gold.json').read_text(encoding='utf8'))['actions']} if stage=='c' else {}
@@ -61,6 +61,11 @@ def reclassify(root,stage):
             low_risk=low and not delta['sensitive_target'],high_risk=not low or delta['sensitive_target'],
             hard_policy=hard['rule_id'] if hard else None,hard_reason=hard['reason'] if hard else None,
             soft_policy=soft['rule_id'] if soft else facts.get('soft_policy'),network_granted=name=='net.fetch' and scope)
+        if s1_sources:
+            # D4 supplies only sources observed before this action, with the same
+            # incomplete-relation condition as the runtime. No rule facts removed.
+            active=s1_sources.get(rid,set()).intersection(ctx['integrity'])
+            if active:facts['unknowns']=True
         invalid_memory=name.startswith('memory.') and (not isinstance(args.get('key'),str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,64}',args['key']))
         if invalid_memory:verdict,rule,risk='ALLOW','TOOL-ARGUMENT-INVALID','R0'
         else:verdict,rule,risk,_=decide(facts,{})
