@@ -48,3 +48,24 @@ D5 模型验收未通过，S1关闭，等待评审。
 安全/冻结校验：`{"passed": true, "secret_hits": [], "request_log_fields_valid": true, "snapshot_files_unchanged": true, "D3_training_unchanged": true, "D3_validation_unchanged": true, "heldout_unchanged": true, "gold_unchanged": true, "D4_real_test_unchanged": true, "test_repository_overlap": [], "local_tracked": false, "teacher_env_ignored": true, "production_config_absent": true, "training_clock_absent": false}`
 
 真实运行ID：`[]`；verify_v2：`None`。
+
+## D5 补训核验
+
+| 项 | 结果 |
+|---|---|
+| data_admission | True |
+| pretrain_probe | True |
+| real_benign_none_fpr | True |
+| real_benign_request_precision | True |
+| host_injection_recall | True |
+| semantic_heldout | True |
+| gold | True |
+| posttrain_probe | True |
+| frozen_files_unchanged | True |
+| offline_recall_not_decreased | True |
+| real_regression_passed | True |
+| both_smokes_verified | True |
+
+机读结果 SHA-256：`898d32fee8decca43c1cba21279cec5caf4d1132b742d8a4191a388b7d267788`
+
+报告 SHA-256：`282cc3e87e17e4ffcd99ac2fd01c24e895568d18231e21a00aa8a2315e6b9040`

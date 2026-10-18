@@ -8,7 +8,7 @@ from stage_d5_protocol import ROOT,OUT,read,save,sha
 from stage_d5_model import predict_laya,softmax
 from stage_d2_metrics import groups
 
-def main():
+def main(bases=('multilingual','english')):
     import torch
     from laya.train import load_checkpoint
     from train_stage_d5 import file_hashes
@@ -16,7 +16,7 @@ def main():
     def budget():
         if time.time()-clock['started_unix']>=3600:raise TimeoutError('D5 training/evaluation 60-minute stop')
     if (OUT/'frozen-evaluation-started.json').exists():raise ValueError('Frozen evaluation already attempted')
-    cfgs={b:json.loads((OUT/(b+'-training.json')).read_text()) for b in ('multilingual','english')}
+    cfgs={b:json.loads((OUT/(b+'-training.json')).read_text()) for b in bases}
     # User designates multilingual as primary; no selection on any test results.
     save('selected-before-tests.json',{'selected':'multilingual','basis':'D5 user preregistration: multilingual primary, English comparison','validation':{b:c['validation'] for b,c in cfgs.items()},'threshold':cfgs['multilingual']['threshold'],'temperature':cfgs['multilingual']['temperature'],'model_sha256':cfgs['multilingual']['sha256'],'validation_sha256':sha(OUT/'new-validation-frozen.jsonl')})
     excluded={r['id'] for r in json.loads((ROOT/'docs/stage-d2-heldout-audit/exclusions.json').read_text())['items']}
