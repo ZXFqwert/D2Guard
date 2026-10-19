@@ -95,7 +95,7 @@ def accepted_d4(config):
 
 def accepted_d5(config):
     """Concrete-task model: every data, numeric, offline and real-run gate is required."""
-    if config.get('decision_mode')!='add_risk' or config.get('selected')!='multilingual':
+    if config.get('decision_mode') not in {'add_risk','taint_gate'} or config.get('selected')!='multilingual':
         raise ValueError('D5 requires the preregistered multilingual risk-addition model')
     selection=read_proof(config,'selection');trained=read_proof(config,'training')
     admission=read_proof(config,'admission');probe=read_proof(config,'probe')
@@ -189,15 +189,20 @@ class RequestContentModel:
         # The placeholder label only satisfies Laya item construction; it is not
         # fed into the model sequence or used to select probabilities.
         names=(route_base(text),'modernbert') if self.selected=='ensemble' else (self.selected,)
-        probabilities=[];windows=0
+        probabilities=[];windows=0;expected_windows=0
         for name in names:
             model,tok,temperature=self.loaded[name]
             predictor=predict_baseline if name=='modernbert' else predict_laya
             z,_,counts=predictor(model,tok,[row],self.device)
+            if self.metadata.get('schema')=='d5-request-v1':
+                from stage_d5_model import views_for
+                expected_windows+=len(views_for(tok,row))
             probabilities.append(softmax(z/temperature)[0]);windows+=sum(counts)
         p=sum(probabilities)/len(probabilities);labels=('request','quoted','none')
         index=0 if p[0]>=self.threshold else 1+int(p[1:].argmax())
         return {'label':labels[index],'probabilities':dict(zip(labels,map(float,p))),
                 'calibrated':True,'threshold_passed':bool(p[0]>=self.threshold),'windows':windows,
+                'expected_windows':expected_windows,'coverage_complete':windows==expected_windows and windows>0,
+                'source_sha256':hashlib.sha256(text.encode()).hexdigest(),'request_threshold':self.threshold,
                 'latency_ms':(time.perf_counter()-start)*1000,'model':('D5-' if self.metadata.get('schema')=='d5-request-v1' else 'D3-')+self.selected,
                 'checkpoint_sha256':{name:self.metadata['models'][name]['sha256'] for name in names},'s2':{}}

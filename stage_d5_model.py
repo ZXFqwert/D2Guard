@@ -38,6 +38,7 @@ def predict_laya(model,tok,rows,device):
     from laya.train import calibration_records
     start=time.monotonic();items,mapping=items_for(tok,rows)
     records=calibration_records(model,tok,items,device,512,192,batch_size=16)
+    if len(records)!=len(items):raise ValueError("Incomplete S1 window predictions")
     wp=softmax(np.array([r[1] for r in records]))
     z=np.array([np.log(np.maximum(wp[a:b].mean(0),1e-12)) for a,b in mapping])
     return z,(time.monotonic()-start)*1000/len(rows),[b-a for a,b in mapping]

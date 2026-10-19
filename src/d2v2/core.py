@@ -27,7 +27,7 @@ from .memory import MemoryStore
 
 
 class CoreV2:
-    def __init__(self, enabled, folder, provider, emit, fast=None, memory_root=None, content_fast=None):
+    def __init__(self, enabled, folder, provider, emit, fast=None, memory_root=None, content_fast=None, decision_mode='add_risk'):
         self.enabled=enabled;self.folder=Path(folder);self._emit_raw=emit;self.provider=provider
         self.lock=threading.RLock();self.store=EvidenceStore(self.folder)
         self.ledger=FingerprintLedger(self.store)
@@ -36,16 +36,24 @@ class CoreV2:
         self.initial_sources={canonical(p.relative_to(self.folder/'workspace').as_posix()) for p in (self.folder/'workspace').rglob('*') if p.is_file() and p.suffix.lower() in source_extensions}
         self.fast=fast or OriginalLaya(Path(__file__).resolve().parents[2]/'.local/laya.json')
         self.content_fast=content_fast
+        self.decision_mode=decision_mode
         # No environment/configuration means no S1. Loaded models observe only
         # until a separately reviewed acceptance explicitly enables additions.
         self.content_add_risk=False
         if self.content_fast is None and fast is None and os.environ.get('D2_S1_CONFIG'):
             config_path=os.environ['D2_S1_CONFIG']
             config=json.loads(Path(config_path).read_text(encoding='utf-8'))
-            if config.get('schema') in {'d3-request-v1','d4-request-v1','d5-request-v1'}:
+            self.decision_mode=config.get('decision_mode','add_risk')
+            if self.decision_mode=='rules_gate':
+                if config.get('schema')!='e-rules-v1':raise ValueError('Rules ablation requires explicit E config')
+            elif config.get('schema') in {'d3-request-v1','d4-request-v1','d5-request-v1'}:
                 from .request_model import RequestContentModel
-                self.content_fast=RequestContentModel(config_path)
-                self.content_add_risk=self.content_fast.add_risk_enabled
+                try:
+                    self.content_fast=RequestContentModel(config_path)
+                    self.content_add_risk=self.content_fast.add_risk_enabled
+                except Exception:
+                    if self.decision_mode!='taint_gate':raise
+                    self.content_fast=None
             else:
                 from .content_model import ContentModel
                 self.content_fast=ContentModel(config_path)
@@ -62,7 +70,7 @@ class CoreV2:
         self.reviews=queue.Queue(maxsize=8)
         threading.Thread(target=self._slow_worker,daemon=True,name='d2v2-evidence-review').start()
         emit('decisions.jsonl',{'type':'core_started','engine':'d2v2','protection':enabled,
-            'content_model':getattr(self.content_fast,'metadata',None),
+            'content_model':getattr(self.content_fast,'metadata',None),'decision_mode':self.decision_mode,
             'fast_model':getattr(self.fast,'metadata',{'backend':'test_injected'}),
             'compression':'bounded-rule-extractor-v2 operation-target relations; not universal semantic extraction',
             'limits':{'hot_taints':8,'recent_steps':8,'view_tokens':320,'fast_tokens':512}})
@@ -251,7 +259,7 @@ class CoreV2:
                             unknowns.append({'evidence_ref':{**ref,'char_span':[0,len(raw)]},
                                        'reason':'Calibrated S1 operation request without complete extracted relation',
                                        'signal':'model:D2Guard-Laya:S1','s1':s1})
-                except (RuntimeError,ValueError) as exc:
+                except Exception as exc:
                     s1={'model_used':False,'error_type':type(exc).__name__,'fallback':'rule:DIRECTIVE'}
             for item in directives:
                 item.update(source_type=source,source_uri=uri,source_id=sid)
@@ -325,6 +333,15 @@ class CoreV2:
             'sensitive':delta['sensitive_target'],'directive':bool(candidates),'tainted':bool(ctx['integrity']),
             'low_risk':low and not delta['sensitive_target'],'high_risk':not low or delta['sensitive_target'],
             'unknowns':bool(unknowns)}
+        if self.decision_mode in {'taint_gate','rules_gate'}:
+            from .request_taint import context_request_taint
+            sources=[]
+            for sid in ctx['integrity']:
+                row=self.store.db.execute('SELECT a.data,s.sha FROM sources s LEFT JOIN source_analysis a ON a.source_id=s.id WHERE s.id=?',(sid,)).fetchone()
+                sources.append((sid,json.loads(row[0]) if row and row[0] else None,row[1] if row else None))
+            request_tainted,taint_evidence=context_request_taint(sources,self.decision_mode)
+            facts.update(decision_mode=self.decision_mode,request_tainted=request_tainted)
+            delta.update(request_tainted=request_tainted,request_taint_evidence=taint_evidence)
         delta.update(in_user_granted_scope=scope,matches_untrusted_taint=candidates,
                      secret_exposure=hits[:8],carries_secret=bool(hits),unknowns=unknowns)
         return delta,candidates,domain,groups,facts,matches
@@ -414,7 +431,7 @@ class CoreV2:
                     'evidence_refs':[self.anchor.get('evidence_ref'),*[x['evidence_ref'] for x in candidates[:3]],*[x['evidence_ref'] for x in delta['unknowns'][:2]],ref],
                     'security_delta':delta},'approval_status':'pending' if verdict=='ASK' else 'not_required',
                 'slow':{'triggered':False,'role':'advisory_only','synchronous_wait_ms':0}}
-            result['decision_basis']='calibrated_model_and_facts' if policy in {'DT-4c','DT-4d'} or policy=='DT-4b' and would=='ALLOW' else 'deterministic_security_facts'
+            result['decision_basis']='calibrated_model_and_facts' if policy in {'DT-4c','DT-4c-S1','DT-4d'} or policy=='DT-4b' and would=='ALLOW' else 'deterministic_security_facts'
             result['decision_facts']=facts
             result['execution_allowed']=not argument_error and verdict=='ALLOW'
             result['argument_error']='invalid_memory_key' if argument_error else None

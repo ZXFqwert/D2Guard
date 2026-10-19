@@ -21,6 +21,8 @@ def required_questions(facts):
         return ()
     if facts.get('sensitive') or facts.get('low_risk'):
         return ('A1',)
+    if facts.get('decision_mode') in {'taint_gate','rules_gate'} and facts.get('high_risk'):
+        return ()
     if facts.get('high_risk') and facts.get('tainted'):
         return ('A1', 'A2')
     return ()
@@ -46,6 +48,10 @@ def decide(facts, model_answers):
             return 'ALLOW', 'DT-4b', 'R1', 'A1 经校准确认动作是任务直接需要。'
         return 'ASK', 'DT-4b', 'R2', '未授权敏感动作缺少经校准的直接任务需要证据。'
     if facts.get('high_risk') and facts.get('tainted'):
+        if facts.get('decision_mode') in {'taint_gate','rules_gate'}:
+            if facts.get('request_tainted',True):
+                return 'ASK','DT-4c','R2','上下文存在请求污染或未可靠覆盖的来源。'
+            return 'ALLOW','DT-4c-S1' if facts['decision_mode']=='taint_gate' else 'DT-4c-RULE','R1','上下文来源未命中请求污染；保留完整integrity溯源。'
         if a2 == 'external' or a1 == 'unrelated':
             return 'ASK', 'DT-4c', 'R2', '经校准语义结果表明高风险动作偏离任务或由外部要求驱动。'
         if a1 in {'direct', 'ancillary'} and a2 == 'user':

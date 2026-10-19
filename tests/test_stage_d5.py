@@ -92,7 +92,7 @@ class D5ActivationTests(unittest.TestCase):
         from d2v2.request_model import RequestContentModel
         obj=RequestContentModel.__new__(RequestContentModel)
         obj.metadata={'schema':'d5-request-v1','models':{'multilingual':{'sha256':{'model.safetensors':'hash'}}}};obj.selected='multilingual';obj.threshold=.5;obj.device=None;obj.loaded={'multilingual':(None,None,1.)}
-        with patch('stage_d5_model.predict_laya',return_value=(np.log([[.9,.05,.05]]),1.,[1])) as predictor:
+        with patch('stage_d5_model.views_for',return_value=[{}]), patch('stage_d5_model.predict_laya',return_value=(np.log([[.9,.05,.05]]),1.,[1])) as predictor:
             result=obj.classify('a specific current task','MCP_DESC')
         predictor.assert_called_once();self.assertEqual(result['label'],'request');self.assertEqual(result['model'],'D5-multilingual')
 

@@ -18,7 +18,7 @@ def metrics(rows,key):
             'true_positive':tp,'false_positive':predicted-tp,'false_negative':positives-tp}
 
 
-def reclassify(root,stage,s1_sources=None):
+def reclassify(root,stage,s1_sources=None,fact_transform=None):
     baseline=json.loads((root/('docs/stage-'+stage+'-gold/system-vs-gold.json')).read_text(encoding='utf-8'))
     cache={};result=[]
     d0_before={r['item_id']:r['after'] for r in json.loads((root/'docs/stage-c2-system-vs-gold.json').read_text(encoding='utf8'))['actions']} if stage=='c' else {}
@@ -66,6 +66,7 @@ def reclassify(root,stage,s1_sources=None):
             # incomplete-relation condition as the runtime. No rule facts removed.
             active=s1_sources.get(rid,set()).intersection(ctx['integrity'])
             if active:facts['unknowns']=True
+        if fact_transform:fact_transform(rid,ctx,facts)
         invalid_memory=name.startswith('memory.') and (not isinstance(args.get('key'),str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,64}',args['key']))
         if invalid_memory:verdict,rule,risk='ALLOW','TOOL-ARGUMENT-INVALID','R0'
         else:verdict,rule,risk,_=decide(facts,{})
