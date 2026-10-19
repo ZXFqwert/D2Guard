@@ -158,8 +158,8 @@ def run(args, canary=None, batch_id=None):
     requested_s1 = s1_configuration(os.environ)
     node, pi_cli, version = pi_installation()
     scenario = load(ROOT / 'scenarios' / (args.scenario + '.json'))
-    if scenario.get('requires_os_sandbox') and (os.environ.get('D2_OS_SANDBOX')!='1' or not Path('/.dockerenv').exists()):
-        raise RuntimeError('This scenario requires the stage G container deployment')
+    if scenario.get('requires_host_exec') and os.environ.get('D2_HOST_EXEC')!='1':
+        raise RuntimeError('This scenario requires the explicit host workspace executor')
     canary = canary or 'd2-test-' + secrets.token_hex(16)
     run_id = time.strftime('%Y%m%d-%H%M%S') + '-' + secrets.token_hex(3)
     folder = ROOT / 'runs' / run_id
@@ -218,7 +218,7 @@ def run(args, canary=None, batch_id=None):
         'memory_namespace': 'explicit_shared' if args.memory_root else 'isolated_run',
         'memory_initial_sha256': {p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(memory_root.glob('*.json'))},
         'model': cfg['main_model'], 'api_style': cfg['api_style'], 'base_url': cfg['base_url'],
-        'scope': 'Docker internal network plus bubblewrap workspace-only exec' if os.environ.get('D2_OS_SANDBOX')=='1' else 'confined file and loopback HTTP tools; no arbitrary shell; not an OS sandbox',
+        'scope': 'Host per-run cwd, cleared environment, local lab network targets and per-run bare Git remote; application limits, not OS sandbox' if os.environ.get('D2_HOST_EXEC')=='1' else 'confined file and loopback HTTP tools; no arbitrary shell; not an OS sandbox',
         'cost_accounting': 'unknown: custom provider prices are not configured; zero price fields do not imply free use',
         'task_sha256': hashlib.sha256((args.task or scenario['task']).encode()).hexdigest(),
         'user_input_sha256': hashlib.sha256(prompt.encode()).hexdigest(),
@@ -256,7 +256,7 @@ def run(args, canary=None, batch_id=None):
     try:
         with (folder / 'services.log').open('w', encoding='utf-8') as log:
             service = subprocess.Popen([sys.executable, str(ROOT / 'src' / 'services.py'), '--run-dir', str(folder),
-                '--protect', args.protect, '--engine', args.engine], env=service_env, stdout=log, stderr=log)
+                '--protect', args.protect, '--engine', args.engine], env=service_env, stdout=log, stderr=log,start_new_session=os.name!='nt')
         deadline = time.monotonic() + (180 if args.engine == 'd2v2' else 10)
         while not (folder / 'service.json').exists():
             if service.poll() is not None or time.monotonic() > deadline:
@@ -306,7 +306,8 @@ def run(args, canary=None, batch_id=None):
         drain_elapsed = time.monotonic() - drain_start
     finally:
         if service and service.poll() is None:
-            service.terminate()
+            if os.name=='nt':service.terminate()
+            else:os.killpg(service.pid,signal.SIGTERM)
             service.wait(timeout=10)
     result = evaluate(folder, scenario, canary, code, timeout)
     result['completed_user_turns']=sum(e.get('type')=='user_turn_completed' for e in jsonl(folder/'conversation.jsonl'))

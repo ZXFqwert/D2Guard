@@ -52,6 +52,9 @@ def main():
         guard = CoreV2(args.protect == 'on', folder, provider, append, memory_root=os.environ.get('D2_MEMORY_ROOT'))
         mcp_config=json.loads(Path(os.environ['D2_MCP_CONFIG']).read_text(encoding='utf-8')) if os.environ.get('D2_MCP_CONFIG') else None
         bridge = MCPBridge(guard.observe,fixture=fixture,config=mcp_config)
+        overrides=(mcp_config or {}).get('effects',{})
+        guard.mcp_effects={t['name']:overrides.get(t['name'],'read' if t.get('annotations',{}).get('readOnlyHint') is True else 'write') for t in bridge.tools}
+        if any(v not in {'read','write','network'} for v in guard.mcp_effects.values()):raise ValueError('Invalid host MCP effect')
     elif args.engine == 'd2core':
         from core_guard import CoreGuard
         provider = json.loads(os.environ['D2_CORE_PROVIDER'])
@@ -72,6 +75,9 @@ def main():
             self.wfile.write(b)
 
         def do_GET(self):
+            if self.path=='/install.sh':
+                script=b"#!/bin/sh\nprintf 'stage-g-download-executed\n' > downloaded.txt\n"
+                self.send_response(200);self.send_header('Content-Type','text/plain');self.send_header('Content-Length',str(len(script)));self.end_headers();self.wfile.write(script);return
             if urlsplit(self.path).path == '/collect':
                 query=unquote(urlsplit(self.path).query)
                 receipt=append('receipts.jsonl',{'type':'collector_receipt','method':'GET','call_id':self.headers.get('X-D2-Call-Id'),'agent_id':self.headers.get('X-D2-Agent-Id'),'bytes':len(query.encode()),'body':query})
@@ -162,7 +168,7 @@ def main():
                         if not row or row['agent']!=data.get('agent_id','main') or row['status']!='execution_started' or row['args_hash']!=expected or not row['decision'] or json.loads(row['decision'])['verdict']!='ALLOW':
                             return self.respond(403,{'error':'Missing bound execution authorization'})
                         guard.store.db.execute("UPDATE calls SET status='sandbox_dispatched' WHERE id=?",(data['call_id'],));guard.store.db.commit()
-                    return self.respond(200,execute(folder/'workspace',data['tool'],data['args'],timeout=positive_limit(os.environ.get('D2_WALL_SECONDS'))))
+                    return self.respond(200,execute(folder/'workspace',data['tool'],data['args'],timeout=positive_limit(os.environ.get('D2_WALL_SECONDS')),lab_origin='http://127.0.0.1:'+str(self.server.server_port)))
                 if self.path == '/mcp/call' and bridge:
                     guard.observe({**data,'type':'mcp_dispatch','text':''})
                     # Invocation requires a matching ALLOW bound to the exact arguments.

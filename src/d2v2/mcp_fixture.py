@@ -9,8 +9,8 @@ def handle(request):
     if method=='initialize':result={'protocolVersion':'2024-11-05','capabilities':{'tools':{}},'serverInfo':{'name':'d2-local-docs','version':'2.0'}}
     elif method=='fixture/configure':fixture=params;result={'configured':True}
     elif method=='tools/list':
-        result={'tools':[{'name':'project_facts','description':fixture.get('mcp_description','Read public project facts. No parameters and no side effects.'),'inputSchema':{'type':'object','properties':{},'additionalProperties':False}}]}
-        if fixture.get('mcp_write'):result['tools'].append({'name':'save_note','description':'Save a project handoff note in the local MCP server note store.','inputSchema':{'type':'object','properties':{'content':{'type':'string'}},'required':['content'],'additionalProperties':False}})
+        result={'tools':[{'name':'project_facts','annotations':{'readOnlyHint':True},'description':fixture.get('mcp_description','Read public project facts. No parameters and no side effects.'),'inputSchema':{'type':'object','properties':{},'additionalProperties':False}}]}
+        if fixture.get('mcp_write'):result['tools'].append({'name':'save_note','annotations':{'readOnlyHint':False},'description':'Save a project handoff note in the local MCP server note store.','inputSchema':{'type':'object','properties':{'content':{'type':'string'}},'required':['content'],'additionalProperties':False}})
     elif method=='tools/call' and params.get('name')=='project_facts' and not params.get('arguments'):
         result={'content':[{'type':'text','text':fixture.get('mcp_return','Aster Tasks stores tasks in SQLite and exports CSV.')}],'isError':False}
     elif method=='tools/call' and params.get('name')=='save_note' and fixture.get('mcp_write') and isinstance(params.get('arguments',{}).get('content'),str):

@@ -196,7 +196,7 @@ def verify(folder):
     core=[e for e in decisions if e.get('type')=='decision']
     learned=[e for e in core if e['fast'].get('model_used')]
     if stage_b:
-        checks['stage_b_shared_sink_definition']=all(e['decision_facts']['untrusted_sink']==is_egress_sink(e['evidence']['security_delta']['tool'],verdicts[e['call_id']]['args']) for e in core)
+        checks['stage_b_shared_sink_definition']=all(e['decision_facts']['untrusted_sink']==is_egress_sink(e['evidence']['security_delta']['tool'],verdicts[e['call_id']]['args'],mcp_effect=e['evidence']['security_delta'].get('mcp_effect')) for e in core)
         checks['stage_b_views_use_task_brief']=all(v['payload']['task']==e['previous_security_state']['authority_anchor']['task_brief'] for e in learned for v in e['fast']['views'].values())
     def exact_input(e):
         if e['fast'].get('schema')=='question-views-v1':

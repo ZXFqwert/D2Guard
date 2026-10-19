@@ -69,13 +69,13 @@ rules:
   - id: POL-EXEC-RESTRICT
     match: {tool: [exec]}
     when:
-      any: [cmd.ast.pipe_to_interpreter, cmd.ast.decode_then_exec, cmd.ast.remote_download_exec, cmd.reads_sensitive_env, cmd.ast.unverifiable]
+      any: [cmd.ast.pipe_to_interpreter, cmd.ast.decode_then_exec, cmd.ast.remote_download_exec, cmd.reads_sensitive_env]
     risk: {base: R3}
     verdict: {R3: BLOCK}
-    explain: 命令包含受禁止的执行链、敏感环境访问或不可审计的 AST。
+    explain: 命令包含受禁止的下载、管道或解码执行链，或访问敏感环境变量。
   - id: POL-SUBAGENT-SECRET-LEAK
     match: {tool: [spawn_subagent]}
-    when: {any: [args.contains_secret_fingerprint, args.references_secret_asset]}
-    risk: {base: R3, downgrade: [{if: not args.contains_secret_fingerprint, to: R2}]}
-    verdict: {R3: BLOCK, R2: ASK}
-    explain: 子任务携带机密或引用敏感资产，需要在派发前控制。
+    when: args.contains_secret_fingerprint
+    risk: {base: R3}
+    verdict: {R3: BLOCK}
+    explain: 子任务参数携带已登记机密；仅引用路径由子 Agent 的实际动作另行裁决。

@@ -67,6 +67,10 @@ def payload_for(previous_security_state, security_delta):
 
 
 class OriginalLaya:
+    # Design §4.2: A1/A2 were not trained or calibrated. They cannot grant
+    # authority; the decision table consumes unclear without an inference call.
+    calibrated_questions = frozenset()
+
     def token_offsets(self, text):
         return self.agent.tok(text,add_special_tokens=False,return_offsets_mapping=True)['offset_mapping']
 

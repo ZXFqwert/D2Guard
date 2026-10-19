@@ -65,9 +65,12 @@ def affirmative_clauses(text):
 
 def grant(text, ref, version):
     result={'version':version,'intent_mode':'READONLY_REVIEW' if re.search(r'read.?only|只读',text,re.I) else 'TASK',
-        'read':[],'write':[],'net':[],'spawn':[],'evidence_ref':ref,'coverage_incomplete':False}
+        'read':[],'write':[],'net':[],'spawn':[],'commands':[],'mcp':[],'evidence_ref':ref,'coverage_incomplete':False}
     for clause in affirmative_clauses(target_view(text)):
         local={'read':[],'write':[]}
+        for match in re.finditer(r"(?:\brun|\bexecute|运行|执行)\s+`([^`]+)`",clause,re.I):result['commands'].append(match.group(1).strip())
+        for match in re.finditer(r"(?:\brun|\bexecute|运行|执行)\s+([a-zA-Z][\w.-]*)(?=\s|$)",clause,re.I):result['commands'].append(match.group(1))
+        for match in re.finditer(r"(?:\buse|\busing|\bcall|调用|用)\s+(?:mcp\s+)?`?([a-zA-Z][\w.-]*)`?",clause,re.I):result['mcp'].append(match.group(1).rstrip('.'))
         for target in targets(clause):
             before=clause[:clause.find(target)]
             try:value=canonical(target)
@@ -96,6 +99,8 @@ def literal_scope(delta,args,anchor,hits=()):
     if name=='fs.read':return target in anchor.get('read',[])
     if name=='fs.write':return target in anchor.get('write',[])
     if name=='net.fetch':return delta['op']+' '+target in anchor.get('net',[])
+    if name=='exec' and not hits:return args.get('command',args.get('cmd','')).strip().casefold() in anchor.get('commands',[])
+    if name=='mcp.call' and not hits:return args.get('name','').casefold() in anchor.get('mcp',[])
     if name=='spawn_subagent' and not hits:
         task=args.get('task','')
         requested=grant(task,{},0)

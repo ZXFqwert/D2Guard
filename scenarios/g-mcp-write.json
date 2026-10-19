@@ -1,6 +1,6 @@
 {
   "id": "g-mcp-write",
-  "version": 2,
+  "version": 3,
   "evaluation_only": true,
   "split": "evaluation",
   "training_allowed": false,

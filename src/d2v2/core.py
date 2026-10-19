@@ -37,6 +37,8 @@ class CoreV2:
         self.initial_sources={canonical(p.relative_to(self.folder/'workspace').as_posix()) for p in (self.folder/'workspace').rglob('*') if p.is_file() and p.suffix.lower() in source_extensions}
         self.fast=fast or OriginalLaya(Path(__file__).resolve().parents[2]/'.local/laya.json')
         self.content_fast=content_fast
+        self.content_model_error=None
+        self.mcp_effects={'project_facts':'read'}
         self.decision_mode=decision_mode
         # No environment/configuration means no S1. Loaded models observe only
         # until a separately reviewed acceptance explicitly enables additions.
@@ -52,7 +54,8 @@ class CoreV2:
                 try:
                     self.content_fast=RequestContentModel(config_path)
                     self.content_add_risk=self.content_fast.add_risk_enabled
-                except Exception:
+                except Exception as exc:
+                    self.content_model_error=type(exc).__name__
                     if self.decision_mode!='taint_gate':raise
                     self.content_fast=None
             else:
@@ -71,7 +74,7 @@ class CoreV2:
         self.reviews=queue.Queue(maxsize=8)
         threading.Thread(target=self._slow_worker,daemon=True,name='d2v2-evidence-review').start()
         emit('decisions.jsonl',{'type':'core_started','engine':'d2v2','protection':enabled,
-            'content_model':getattr(self.content_fast,'metadata',None),'decision_mode':self.decision_mode,
+            'content_model_error':self.content_model_error,'content_model':getattr(self.content_fast,'metadata',None),'decision_mode':self.decision_mode,
             'fast_model':getattr(self.fast,'metadata',{'backend':'test_injected'}),
             'compression':'bounded-rule-extractor-v2 operation-target relations; not universal semantic extraction',
             'limits':{'hot_taints':8,'recent_steps':8,'view_tokens':320,'fast_tokens':512}})
@@ -97,11 +100,13 @@ class CoreV2:
         with self.lock:self._emit_raw(filename,self._security(item))
 
     def state(self):
-        return self._security({'authority_anchor':self.anchor,'active_taints':list(self.taints),
-            'secret_exposure':self.ledger.summary(),'recent_steps':self.store.recent(),
-            'coverage_incomplete':self.integrity_fault,
-            'contexts':{r[0]:self.store.context(r[0]) for r in self.store.db.execute('SELECT agent FROM contexts')},
-            'unknown_count':self.store.db.execute('SELECT count(*) FROM unknowns').fetchone()[0]})
+        # Snapshot reads share the connection with the asynchronous reviewer.
+        with self.lock:
+            return self._security({'authority_anchor':self.anchor,'active_taints':list(self.taints),
+                'secret_exposure':self.ledger.summary(),'recent_steps':self.store.recent(),
+                'coverage_incomplete':self.integrity_fault,
+                'contexts':{r[0]:self.store.context(r[0]) for r in self.store.db.execute('SELECT agent FROM contexts')},
+                'unknown_count':self.store.db.execute('SELECT count(*) FROM unknowns').fetchone()[0]})
 
     def _sequence(self,event):
         if 'producer_seq' not in event:return
@@ -308,6 +313,15 @@ class CoreV2:
                 from .normalization import target_view
                 target=target_view(args.get('path','')).replace('\\','/')
                 delta.update(target=target,valid_target=True)
+        command=None
+        if name=='exec':
+            from .command_effects import command_effects
+            command=command_effects(args.get('command',args.get('cmd','')))
+            delta['command_effects']=command
+            delta['sensitive_target']=any(self.hard.sensitive_read(p) for p in command['read_paths'])
+            delta['op']=command['git_action'] or ('fs.write' if command['write_paths'] else 'net.fetch' if command['network_targets'] else 'fs.read')
+            op=delta['op']
+        if name=='mcp.call':delta['mcp_effect']=self.mcp_effects.get(args.get('name'),'write')
         candidates=self.store.matching_directives(name+':'+op if name=='net.fetch' else name,target)
         domain=(urlsplit(target).hostname or '') if name=='net.fetch' else ''
         hits,groups=self.ledger.match(args,domain)
@@ -323,9 +337,13 @@ class CoreV2:
             hard={'rule_id':'POL-FS-WRITE-SENSITIVE','reason':'写入敏感资产或违反只读授权。'}
         elif hits and name in {'fs.write','memory.write'}:
             hard={'rule_id':'POL-SECRET-DISCLOSURE','reason':'禁止将已登记机密写入业务或记忆产物。'}
-        readonly_mcp=name=='mcp.call' and args=={'name':'project_facts'}
-        sink=is_egress_sink(name,args,self.anchor.get('net',[]))
-        low=name in {'fs.read','memory.read'} or readonly_mcp or name=='net.fetch' and not sink
+        readonly_mcp=name=='mcp.call' and delta.get('mcp_effect')=='read'
+        sink=is_egress_sink(name,args,self.anchor.get('net',[]),delta.get('mcp_effect'))
+        low=name in {'fs.read','memory.read','spawn_subagent'} or (command is not None and command['kind']=='read' and command['parsed']) or readonly_mcp or name=='net.fetch' and not sink
+        if command and command['unknown_effect'] and not scope and not soft:
+            soft={'rule_id':'POL-EXEC-EFFECT-UNKNOWN','reason':'命令可解析，但效果尚未登记且没有用户字面授权。'}
+        if command and self.anchor.get('intent_mode')=='READONLY_REVIEW' and any(p in self.initial_sources for p in command['write_paths']):
+            hard={'rule_id':'POL-FS-WRITE-SENSITIVE','reason':'只读审查禁止改写既有源码。'}
         unknowns=self.store.relevant_unknowns(agent)
         facts={'hard_policy':hard['rule_id'] if hard else None,'hard_reason':hard['reason'] if hard else None,
             'soft_policy':soft['rule_id'] if soft else None,'soft_reason':soft['reason'] if soft else None,
@@ -403,6 +421,10 @@ class CoreV2:
                 verdict,policy,risk,reason='ASK','POL-INCOMPLETE-EVIDENCE','R2','事件链或安全提取不完整，不能可靠确认本次操作。'
             else:
                 questions=required_questions(facts)
+                calibrated=getattr(self.fast,'calibrated_questions',None)
+                if calibrated is not None:
+                    questions=tuple(q for q in questions if q in calibrated)
+                    if not questions:trace={'model_used':False,'reason':'uncalibrated_questions_are_unclear'}
                 try:
                     if questions:
                         task=self.anchor.get('task_brief','')

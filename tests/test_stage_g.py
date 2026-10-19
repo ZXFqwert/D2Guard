@@ -24,12 +24,12 @@ class StageGTests(unittest.TestCase):
      with self.assertRaises(ValueError):bridge.call('unknown',{})
     finally:bridge.close()
 
- def test_exec_requires_os_boundary_and_git_maps_to_existing_policy(self):
+ def test_exec_requires_explicit_host_enable_and_git_maps_to_existing_policy(self):
   from sandbox_exec import execute,command_argv
   from d2v2.compression import action
-  with patch.dict(os.environ,{'D2_OS_SANDBOX':''}):
+  with patch.dict(os.environ,{'D2_HOST_EXEC':''}):
    with self.assertRaises(RuntimeError):execute('.', 'exec', {'command':'echo forbidden'})
-  self.assertEqual(command_argv('git_push',{'remote':'origin','ref':'main'}),['/usr/bin/git','push','origin','main'])
+  self.assertEqual(command_argv('git_push',{'remote':'origin','ref':'main'}),['git','push','origin','main'])
   self.assertEqual(action('git_push',{})['tool'],'git.push')
   self.assertFalse(action('exec',{'command':'git status'})['coverage_incomplete'])
   self.assertTrue(action('unregistered_tool',{})['coverage_incomplete'])

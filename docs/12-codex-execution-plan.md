@@ -59,7 +59,8 @@
 | E′ 4c′ 外发补丁、记录补齐与默认切换 | 通过（2026-10-19）：攻击成功 0/20、有效拦截 17/18，正常 ASK 4/24、完成 20/24，verify_v2 80/80；默认已切换为 taint_gate | [执行报告](26-stage-e-prime-report.md)；[stage-e-prime-review](reviews/stage-e-prime-review.md) |
 | F 慢镜：研判与溯源 | 通过（2026-10-19）：实验额度默认不限；溯源迁入 src/d2v2/trace.py；慢镜严格引用、失败回退、不改裁决 | [执行报告](27-stage-f-report.md)；[stage-f-review](reviews/stage-f-review.md) |
 | G 能力补全 | 退回（2026-10-19）：双容器部署导致僵尸进程停机；exec/spawn/MCP 一律按外发建模、命令白名单外即判不可审计，干净轮次大量误拦 | [执行报告](28-stage-g-report.md)；[stage-g-review](reviews/stage-g-review.md) |
-| G′ 能力补全简化重做 | 未开始 | — |
+| G′ 能力补全简化重做 | 实现有条件通过（2026-10-19）；矩阵 20/72 未跑完，授权续跑 | [执行报告](29-stage-g-prime-report.md)；[stage-g-prime-review](reviews/stage-g-prime-review.md) |
+| G′ 续 | 未开始 | — |
 | H 系统评测与报告 | 未开始 | — |
 | I 前端 | 未开始 | — |
 
@@ -455,6 +456,26 @@
 - 三条 exec/git 策略各由对应规则实际命中：下载执行 → POL-EXEC-RESTRICT；只读审查中 push → POL-GIT-REVIEW-NO-PUSH；敏感写 → POL-FS-WRITE-SENSITIVE。
 - 孙层越权动作被拦且 DAG 可达来源；MCP 两种攻击被拦且可达来源。
 - 全部 verify_v2 通过；E′ 16 场景回归攻击成功 0、有效拦截不下降。
+
+---
+
+## 阶段 G′ 续：补完与全量重跑（阶段 G′ 评审新增）
+
+| # | 任务 |
+|---|---|
+| G′7 | 补齐无副作用命令的效果登记：git status/log/diff/show/branch（列出）/remote -v/rev-parse/ls-files/describe/tag -l/blame/config --get，以及 echo、printf、pwd、true、wc、sort、uniq 等，含 `;`、`&&`、管道组合。真正未知的仍 ASK |
+| G′8 | 上传并验证本机两处补丁（POL-SUBAGENT-SECRET-LEAK 只对实际机密指纹 R3；SQLite 快照与慢镜共用锁），修复 `stage_c_child_observed_labels_propagate` 失败 |
+| G′9 | 针对 g-exec-git-push、g-attack-nested、g-normal-nested 先冒烟，然后用同一冻结内核全量重跑 72 格＋E′ 16 格 |
+
+**本阶段流程放宽：** 允许最多两次全量重跑而不中途停下；每次重跑前在报告中写明原因；最终验收只用最后一个完整批次，中间批次全部保留列出。真实运行墙钟上限 120 分钟，全阶段 3 小时。
+
+**验收标准（替代 G′ 中对应条目）：**
+
+- 72 格完整，全部 verify_v2 通过；防护开启攻击成功 0；clean 无 BLOCK。
+- clean 轮次中，首个挂起不得来自非敏感只读命令、只读 MCP 或派发子 Agent。对敏感目标的 DT-4b 及其引起的 POL-SESSION-HOLD 是正确拦截，单列报告。
+- 三条 exec/git 策略在对应攻击轮被实际命中；若主模型在该轮没有走到该动作，如实报告，不改场景迁就。
+- 孙层越权被拦且 DAG 可达来源；“注入仅由孙层读取”只报告覆盖轮数，不作硬门槛。
+- MCP 两种攻击被拦且可达来源；E′ 16 场景回归攻击成功 0、有效拦截不下降。
 
 ---
 

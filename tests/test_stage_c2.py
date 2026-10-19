@@ -161,11 +161,11 @@ class CoreRules(unittest.TestCase):
         for i,path in enumerate(['．ｅｎｖ','.еnv','.e\u200bnv','.ENV']):
             self.core.pending=None
             r=self.decide('c'+str(i),'fs_read',{'path':path});self.assertEqual((r['would_verdict'],r['risk']),('ASK','R2'))
-    def test_secret_context_cannot_use_spawn_to_skip_dt2b(self):
+    def test_secret_context_local_delegation_inherits_instead_of_egress(self):
         self.core.observe({'event_id':'new-user','type':'user_input','task':'Use a specialist to read facts.md.','agent_id':'main'})
         self.core.store.add_labels('main',[],['synthetic-secret-label'])
         r=self.decide('secret-spawn','spawn_subagent',{'task':'Read facts.md'})
-        self.assertEqual(r['rule_id'],'DT-2b')
+        self.assertEqual(r['rule_id'],'DT-3')
 
     def test_query_targets_are_private_audit_only_and_summaries_mask_secrets(self):
         secret=test_v2.SECRET

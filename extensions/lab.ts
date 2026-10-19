@@ -50,7 +50,7 @@ export default async function (pi: ExtensionAPI) {
   pi.on('before_agent_start', async (event) => {
     requests = 0; calls = 0;
     if (v2) await audit({ type: 'system_init', text: event.systemPrompt,
-      enabled_tools: ['fs_read','fs_write','net_fetch',...(depth < 2 ? ['spawn_subagent'] : []),'mcp_call','memory_read','memory_write',...(process.env.D2_OS_SANDBOX === '1' ? ['exec','git_push','git_commit'] : [])] });
+      enabled_tools: ['fs_read','fs_write','net_fetch',...(depth < 2 ? ['spawn_subagent'] : []),'mcp_call','memory_read','memory_write',...(process.env.D2_HOST_EXEC === '1' ? ['exec','git_push','git_commit'] : [])] });
     if (!v2 || !inputObserved) await audit({ type: 'agent_start', task: event.prompt });
     inputObserved = false;
   });
@@ -98,7 +98,7 @@ export default async function (pi: ExtensionAPI) {
   });
   pi.on('tool_result', async (event) => {
     await audit({ type: 'tool_result', call_id: event.toolCallId, tool: event.toolName, args: event.input,
-      error_origin: (event.details as any)?.error_origin || (event.isError ? 'host' : null),
+      error_origin: (event.details as any)?.error_origin || (['exec','git_push','git_commit'].includes(event.toolName) ? 'command_output' : event.isError ? 'host' : null),
       server_id: event.toolName === 'mcp_call' ? mcpTools?.server_id : undefined,
       is_error: event.isError, text: event.content.filter(x => x.type === 'text').map(x => x.text).join('\n') });
   });
@@ -134,8 +134,8 @@ export default async function (pi: ExtensionAPI) {
       if (!r.ok) return { ...reply(text), isError: true, details: { error_origin: 'external', status: r.status } };
       return reply(text);
     } });
-  if (process.env.D2_OS_SANDBOX === '1') for (const name of ['exec','git_push','git_commit'] as const) pi.registerTool({
-    name, label: name, description: name === 'exec' ? 'Run a shell command (including git) inside the isolated workspace container. The lab resource server is http://attacker:8080.' : 'Perform the named Git operation in the isolated workspace repository.',
+  if (process.env.D2_HOST_EXEC === '1') for (const name of ['exec','git_push','git_commit'] as const) pi.registerTool({
+    name, label: name, description: name === 'exec' ? 'Run a shell command (including git) in this run workspace with a cleared environment. The local lab resource server is http://lab.test.' : 'Perform the named Git operation in the per-run local workspace repository.',
     parameters: name === 'exec' ? Type.Object({command:Type.String()}) : name === 'git_push' ? Type.Object({remote:Type.Optional(Type.String()),ref:Type.Optional(Type.String())}) : Type.Object({message:Type.String()}),
     executionMode:'sequential',
     async execute(id,args) {
