@@ -61,7 +61,7 @@
 | G 能力补全 | 退回（2026-10-19）：双容器部署导致僵尸进程停机；exec/spawn/MCP 一律按外发建模、命令白名单外即判不可审计，干净轮次大量误拦 | [执行报告](28-stage-g-report.md)；[stage-g-review](reviews/stage-g-review.md) |
 | G′ 能力补全简化重做 | 实现有条件通过（2026-10-19）；矩阵 20/72 未跑完，授权续跑 | [执行报告](29-stage-g-prime-report.md)；[stage-g-prime-review](reviews/stage-g-prime-review.md) |
 | G′ 续 | 通过（2026-10-19）：72 格 verify 72/72，攻击成功全 0，clean 仅 DT-4b 正确挂起；5 项自检失败只对应 1 轮上游超时和评审方过严的“指定策略命中”条目 | [执行报告](30-stage-g-prime2-report.md)；[stage-g-prime2-review](reviews/stage-g-prime2-review.md) |
-| H 系统评测与报告 | 未开始 | — |
+| H 系统评测与报告 | 通过（2026-10-19）：996 格全部执行，开启防护攻击成功 0/68，条件防护率 52/53，干净完成 92.4%，裁决 p50 8 ms；评审循环结束，转交付整理 | [执行报告](31-stage-h-report.md)；[stage-h-review](reviews/stage-h-review.md) |
 | I 前端 | 未开始 | — |
 
 ---
@@ -506,6 +506,43 @@
 - H1 矩阵执行率 ≥95%；所有非模型失败的轮次 verify_v2 通过。
 - H1–H5 的数字全部给出，每个数字都写明来源（run_id 范围、脚本、批次）。
 - 失败样本、攻击未触发、模型失败的样本放在附录中列出。
+
+## 交付整理（阶段 H 评审后，一轮，不再走阶段评审）
+
+| # | 任务 |
+|---|---|
+| T0 | 把阶段 H 的改动（含 `src/d2v2/trace.py` 展示修复和 H 脚本）提交为检查点 |
+| T1 | **慢镜 JSON 回退修复。** H 中 50.9% 的研判回退为模板（JSONDecodeError 49 次、ValidationError 34 次）。<br>修法：<br>① 输出上限 800 → 2000 token；<br>② 稳健抽取 JSON：去掉代码围栏，取最外层 `{…}`；<br>③ 解析或校验失败时，把错误类型和原因追加到对话里重试一次，仍失败才回退模板；<br>④ 上游支持时启用 JSON 输出模式。<br>不改裁决逻辑，补单测。用 H 中发生过回退的攻击场景真跑 10 轮 on，报告回退率前后对比 |
+| T2 | **源码导出。** 写 `tools/export_delivery.py`，生成干净副本到 `../交付件/03-程序源码/`，场景复制到 `../交付件/04-测试样例/scenarios/`。详见下方“导出要求” |
+| T3 | **从导出副本验证。** 在算力机上用导出副本新建虚拟环境：<br>① 跑单元测试；<br>② 跑 `c-indirect-readme` 的 attack/on 和 clean/on 各 1 轮；<br>③ 跑 verify_v2，全部通过 |
+| T4 | 写 `docs/32-delivery-report.md`：导出清单、权重路径与哈希、各入口命令、T1 前后对比、T3 运行 ID。不改交付件中的四份文档，路径和命令由评审方填写 |
+
+**导出要求：**
+
+- **防护主线：**
+  - 包含 `src/`（去掉 `__pycache__`）、`extensions/`、`lab.py`、`verify_v2.py`、`policies.yaml`、`package.json`、`runtime-lock.json`、`requirements-*.txt`、`deploy/host-exec.md`、`scenarios/`，以及对应的单元测试。
+  - 只保留运行时代码能导入的测试，不带依赖 `stage_*` 脚本的测试。
+- **S1 运行时依赖：**
+  - 目前运行时会导入根目录的 `stage_d3_model` 和外部的 `laya.train`。
+  - 把运行时需要的函数收进 `src/`，或者作为 `s1/` 子包随源码一起交付。导出副本运行时不得依赖 `stage_*` 脚本。
+- **训练代码：**
+  - 放进 `training/`，包含最终 D5 的训练、数据构造和评测入口，附 README 说明数据来源和复现命令。
+  - 数据集只带 schema 和少量样例，不带教师原始输出。
+- **评测入口：** 提供 `run_evaluation.py`，封装 H 的四格矩阵、核验和统计，支持 `--repeats --workers`。另外保证 `lab.py run` 和 `lab.py matrix` 可用。
+- **权重：**
+  - 把冻结的 S1（`model.safetensors` SHA-256 `7e96b8c5…fb1`，温度 1.2114818，阈值 0.5）复制到 `weights/D2Guard-multilingual/`，附 `SHA256SUMS`。
+  - 附 `s1-config.example.json`，用相对路径指向权重，通过 `D2_S1_CONFIG` 启用，默认 taint_gate。
+  - 体积在报告中写明。
+- **控制台：** 从 `../d2guard-console/` 导出到 `03-程序源码/console/`，包含 `server.py`、`d2trace.py`、`static/`，不带 `app.js` 和 `.cache/`。
+- **排除：**
+  - `.local/`、`runs/`、`docs/`（开发文档）、全部 `stage_*` 脚本、`archive/`；
+  - 任何上游密钥、算力机地址和用户名、私钥文件名。
+- **密钥扫描：** 导出后扫描 `sk-`、`Bearer `、`api_key`、IP 地址和 `teacher.env` 内容，结果写进报告。`d2-test-` 合成凭据允许出现。
+- **说明文件：** `03-程序源码/README.md` 写清目录结构和快速开始。
+
+**快速执行规则：** 同阶段 H。只在环境跑不起来或密钥扫描命中时停下；其他问题记录后继续。
+
+---
 
 ## 阶段 I：前端（Web → Electron）
 

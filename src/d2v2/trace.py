@@ -237,7 +237,7 @@ def build_trace(folder):
     for ev_id, ev in events.items():
         if ev_id in sources or ev.get('source') in (None, 'MODEL_GENERATED', 'TRUSTED_USER', 'HOST_CONFIGURATION'):
             continue
-        if ev.get('kind') in ('mcp_description', 'user_quote', 'memory_entry', 'tool_result'):
+        if ev.get('kind') in ('mcp_description', 'user_quote', 'memory_entry', 'tool_result') or (ev.get('kind') == 'CONTENT_IN' and ev.get('source') == 'USER_QUOTED'):
             sources[ev_id] = {'event_id': ev_id, 'type': ev['source'], 'kind': SOURCE_KIND.get(ev['source'], ev['source']),
                               'uri': mask(ev.get('uri')), 'agent': ev.get('agent') or 'main', 'via_call': None,
                               'text': mask(ev.get('raw') or ''), 't_ms': None}
