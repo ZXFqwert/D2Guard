@@ -135,6 +135,7 @@ def main():
                     ids=journal.cancel(data.get('cancel_agent_id',data.get('agent_id','main')))
                     return self.respond(200,{'cancelled_requests':ids})
                 if self.path == '/finalize':
+                    if args.engine=='d2v2' and data.get('agents_stopped') is True:guard.finalize_subagents()
                     return self.respond(200, guard.drain() if args.engine in ('d2core','d2v2') else {'pending_reviews': 0})
                 if self.path == '/approve' and args.engine=='d2v2':
                     return self.respond(200,guard.approve(data['token'],data['call_id'],data['tool'],data['args'],data.get('agent_id','main')))

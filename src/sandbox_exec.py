@@ -18,7 +18,7 @@ def execute(workspace,tool,args,timeout=None,lab_origin=None):
  root=Path(workspace).resolve(strict=True);home=root/'.home';home.mkdir(exist_ok=True)
  env={'PATH':os.defpath,'HOME':str(home),'LANG':'C.UTF-8'}
  command=args.get('command','') if tool=='exec' else 'git '+('push '+args.get('remote','origin')+' '+args.get('ref','HEAD') if tool=='git_push' else 'commit')
- effects=command_effects(command)
+ effects=command_effects(command,root)
  if not effects['parsed']:raise ValueError('Dynamic shell syntax is not supported by this application executor')
  for value in effects['read_paths']+effects['write_paths']:
   if value in ('/dev/null',):continue

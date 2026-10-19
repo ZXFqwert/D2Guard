@@ -293,9 +293,13 @@ def run(args, canary=None, batch_id=None):
                 else:
                     os.killpg(child.pid,signal.SIGTERM)
                 code = child.wait()
+        # Reap any descendant left by an interrupted parent before host lifecycle closure.
+        if os.name!='nt':
+            try:os.killpg(child.pid,signal.SIGKILL)
+            except ProcessLookupError:pass
         agent_elapsed = time.monotonic() - agent_started
         drain_start = time.monotonic()
-        request = urllib.request.Request(env['D2_SERVICE_ORIGIN'] + '/finalize', data=b'{}', method='POST',
+        request = urllib.request.Request(env['D2_SERVICE_ORIGIN'] + '/finalize', data=b'{"agents_stopped":true}', method='POST',
             headers={'Authorization': 'Bearer ' + env['D2_CONTROL_TOKEN'], 'Content-Type': 'application/json'})
         try:
             from d2v2.review import review_timeout_seconds

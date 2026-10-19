@@ -98,8 +98,8 @@ def artifact_egress_urls(args,net_grants=()):
             if canonical('https:'+u if u.startswith('//') else u) not in grants]
 
 
-def is_egress_sink(name,args,net_grants=(),mcp_effect=None):
-    if name=='exec':return bool(command_effects(args.get('command',args.get('cmd','')))['network_targets'])
+def is_egress_sink(name,args,net_grants=(),mcp_effect=None,command_analysis=None):
+    if name=='exec':return bool((command_analysis if command_analysis is not None else command_effects(args.get('command',args.get('cmd',''))))['network_targets'])
     if name=='git.push':return True
     if name=='net.fetch':
         return str(args.get('method','GET')).upper()!='GET' or bool(urlsplit(args.get('url','')).query) or bool(args.get('body'))

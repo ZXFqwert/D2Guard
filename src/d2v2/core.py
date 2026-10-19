@@ -63,6 +63,7 @@ class CoreV2:
                 self.content_fast=ContentModel(config_path)
         self.anchor={'version':0,'read':[],'write':[],'net':[],'coverage_incomplete':True}
         self.taints=deque(maxlen=8);self.pending=None;self.integrity_fault=False
+        self.open_subagents={}
         self.approvals=Approvals(self.store)
         self.memory=MemoryStore(memory_root or self.folder/'.local/memory')
         fixture=self.folder/'fixture.json'
@@ -208,9 +209,11 @@ class CoreV2:
                                 self.memory.write(digest(path),event['args']['content'],self._memory_metadata(agent))
             elif kind=='subagent_spawn':
                 self.store.inherit_context(event['child_agent_id'],agent,ref['event_id'])
+                self.open_subagents[event['child_agent_id']]={'agent_id':agent,'call_id':event.get('call_id')}
             elif kind=='subagent_end':
                 child=self.store.context(event['child_agent_id'])
                 self.store.add_labels(agent,child['integrity'],child['confidentiality'])
+                self.open_subagents.pop(event['child_agent_id'],None)
             elif kind=='assistant_turn':
                 proposals=[]
                 for p in event.get('proposals',[]):
@@ -316,7 +319,7 @@ class CoreV2:
         command=None
         if name=='exec':
             from .command_effects import command_effects
-            command=command_effects(args.get('command',args.get('cmd','')))
+            command=command_effects(args.get('command',args.get('cmd','')),self.hard.workspace)
             delta['command_effects']=command
             delta['sensitive_target']=any(self.hard.sensitive_read(p) for p in command['read_paths'])
             delta['op']=command['git_action'] or ('fs.write' if command['write_paths'] else 'net.fetch' if command['network_targets'] else 'fs.read')
@@ -338,7 +341,7 @@ class CoreV2:
         elif hits and name in {'fs.write','memory.write'}:
             hard={'rule_id':'POL-SECRET-DISCLOSURE','reason':'禁止将已登记机密写入业务或记忆产物。'}
         readonly_mcp=name=='mcp.call' and delta.get('mcp_effect')=='read'
-        sink=is_egress_sink(name,args,self.anchor.get('net',[]),delta.get('mcp_effect'))
+        sink=is_egress_sink(name,args,self.anchor.get('net',[]),delta.get('mcp_effect'),command)
         low=name in {'fs.read','memory.read','spawn_subagent'} or (command is not None and command['kind']=='read' and command['parsed']) or readonly_mcp or name=='net.fetch' and not sink
         if command and command['unknown_effect'] and not scope and not soft:
             soft={'rule_id':'POL-EXEC-EFFECT-UNKNOWN','reason':'命令可解析，但效果尚未登记且没有用户字面授权。'}
@@ -621,6 +624,24 @@ class CoreV2:
                 self.emit('decisions.jsonl',{'type':'slow_review','call_id':cid,'result':fallback_assessment(pack),
                     'attribution_status':'template_fallback','changes_verdict':False,'fallback_reason':type(exc).__name__})
             finally:self.reviews.task_done()
+
+    def finalize_subagents(self):
+        """Host-only lifecycle closure after the runner has stopped the process group."""
+        with self.lock:
+            closed=[]
+            while self.open_subagents:
+                parents={v['agent_id'] for v in self.open_subagents.values()}
+                leaves=[c for c in self.open_subagents if c not in parents]
+                if not leaves:raise ValueError('Cyclic subagent lifecycle')
+                for child in leaves:
+                    event={**self.open_subagents[child], 'type':'subagent_end',
+                        'event_id':'host-subagent-end:'+str(uuid.uuid4()),'child_agent_id':child,
+                        'outcome':'interrupted_by_host','origin':'host_process_finalization',
+                        'final_answer':''}
+                    self.observe(event)
+                    self._emit_raw('audit.jsonl',event)
+                    closed.append(child)
+            return closed
 
     def drain(self,timeout=None):
         if timeout is None:timeout=self.slow_review_timeout*max(1,self.reviews.unfinished_tasks)+2
