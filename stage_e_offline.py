@@ -51,7 +51,7 @@ def main():
                 scenario=manifest.get('scenario');scenario=scenario['id'] if isinstance(scenario,dict) else scenario
                 changed.add(scenario)
                 if a['after']!='ALLOW' and c['after']=='ALLOW':
-                    flips.append({'scenario':scenario,'before_rule':a['after_rule_id'],'after_rule':c['after_rule_id'],'gold':c['gold']})
+                    flips.append({'stage':stage,'item_id':a['item_id'],'run_id':rid,'scenario':scenario,'before_rule':a['after_rule_id'],'after_rule':c['after_rule_id'],'gold':c['gold']})
     save('source-predictions.json',predictions)
     result={'stages':stages,'relaxations':flips,'flipped_scenarios':sorted(changed),'gold_attack_relaxations':sum(f['gold']!='ALLOW' for f in flips),'model_sha256':config['models']['multilingual']['sha256'],'temperature':config['models']['multilingual']['temperature'],'threshold':config['threshold'],'unique_sources':len(predictions),'inference_failures':sum(bool(v.get('error_type')) for v in predictions.values())}
     save('offline.json',result);print(json.dumps(result),flush=True)

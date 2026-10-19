@@ -51,6 +51,8 @@ def decide(facts, model_answers):
         if facts.get('decision_mode') in {'taint_gate','rules_gate'}:
             if facts.get('request_tainted',True):
                 return 'ASK','DT-4c','R2','上下文存在请求污染或未可靠覆盖的来源。'
+            if facts.get('untrusted_sink'):
+                return 'ASK','DT-4c-EGRESS','R2','未授权外发目标需要用户确认，即使上下文没有请求污染。'
             return 'ALLOW','DT-4c-S1' if facts['decision_mode']=='taint_gate' else 'DT-4c-RULE','R1','上下文来源未命中请求污染；保留完整integrity溯源。'
         if a2 == 'external' or a1 == 'unrelated':
             return 'ASK', 'DT-4c', 'R2', '经校准语义结果表明高风险动作偏离任务或由外部要求驱动。'

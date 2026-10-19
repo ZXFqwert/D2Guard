@@ -100,6 +100,15 @@ def verify(folder):
     gateway=rows(folder/'gateway.jsonl')
     req=[e for e in gateway if e['type']=='proxy_request']
     checks['model_requests_accounted_at_proxy']=len(req)==sum(e['type']=='model_request' for e in audit)
+    server_requests=[e for e in audit if e.get('type')=='model_request' and e.get('origin')=='gateway']
+    if server_requests:
+        checks['gateway_model_request_ids_exact']=sorted(e['request_id'] for e in server_requests)==sorted(e['request_id'] for e in req)
+        groups={}
+        for e in req:groups.setdefault((e['agent_id'],e['budget_epoch']),[]).append(e['request_index'])
+        checks['model_budget_enforced']=all(sorted(indices)==list(range(1,len(indices)+1)) and len(indices)<=20 for indices in groups.values())
+        rejected=[e for e in gateway if e.get('type')=='model_budget_rejected']
+        checks['model_budget_rejections_not_forwarded']=all(e.get('forwarded') is False and e.get('limit')==20 and e.get('request_index')==21 and e['request_id'] not in {r['request_id'] for r in req} for e in rejected)
+
     if req and all(e.get('request_id') for e in req):
         terminals=[e for e in gateway if e['type'] in {'proxy_response','proxy_error','proxy_cancelled'}]
         request_ids=[e['request_id'] for e in req]
@@ -211,7 +220,13 @@ def verify(folder):
         table_rows=[e for e in stage_a if e['rule_id'].startswith('DT-') or e.get('decision_facts',{}).get('hard_policy')]
         checks['stage_a_decision_table_recomputed']=all(
             table_decide(e['decision_facts'],e['model_answers'])[:3]==(e['would_verdict'],e['rule_id'],e['risk'])
-            for e in table_rows if e['rule_id']!='POL-SESSION-HOLD')
+            for e in table_rows if e['rule_id'] not in {'POL-SESSION-HOLD','POL-TOOL-BUDGET'})
+        budget_rows=[e for e in stage_a if e['rule_id']=='POL-TOOL-BUDGET']
+        checks['tool_budget_refusals_recorded_not_executed']=all(
+            e['verdict']=='BLOCK' and e['risk']=='R3' and e.get('executed') is False and e.get('execution_allowed') is False
+            and e.get('tool_budget')==40 and e.get('tool_index',0)>40
+            and not any(a.get('type')=='tool_started' and a.get('call_id')==e['call_id'] for a in audit)
+            for e in budget_rows)
         prior_contexts={}
         monotonic=True
         for frame in frames:

@@ -388,7 +388,11 @@ class CoreV2:
             hard_policy=facts['hard_policy']
             answers={}
             argument_error=name.startswith('memory.') and (not isinstance(args.get('key'),str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,64}',args['key']))
-            if argument_error:
+            budget_rejected=context.get('host_tool_budget_exceeded') is True
+            if budget_rejected:
+                verdict,policy,risk,reason='BLOCK','POL-TOOL-BUDGET','R3','Experiment tool budget exhausted'
+                argument_error=False
+            elif argument_error:
                 verdict,policy,risk,reason='ALLOW','TOOL-ARGUMENT-INVALID','R0','记忆键名不合法；参数校验拒绝执行，不是安全策略拦截。'
             elif hard_policy:
                 verdict,policy,risk,reason=table_decide(facts,{})
@@ -425,13 +429,15 @@ class CoreV2:
                     verdict,policy,risk,reason='ASK','POL-FAST-UNAVAILABLE','R2','快镜或 tokenizer 不可用，已挂起。'
                     trace={**trace,'error_type':type(exc).__name__}
             would=verdict
-            if not self.enabled:verdict='ALLOW';reason='防护关闭；仅记录拟裁决，不改变 Agent 的工具操作。'
+            if not self.enabled and not budget_rejected:verdict='ALLOW';reason='防护关闭；仅记录拟裁决，不改变 Agent 的工具操作。'
             result={'verdict':verdict,'policy':policy,'would_verdict':would,'reason':reason,'engine':'d2v2',
                 'rule_id':policy,'risk':risk,'fast':trace,'evidence':{'source_uri':candidates[0]['source_uri'] if candidates else '',
                     'evidence_refs':[self.anchor.get('evidence_ref'),*[x['evidence_ref'] for x in candidates[:3]],*[x['evidence_ref'] for x in delta['unknowns'][:2]],ref],
                     'security_delta':delta},'approval_status':'pending' if verdict=='ASK' else 'not_required',
                 'slow':{'triggered':False,'role':'advisory_only','synchronous_wait_ms':0}}
             result['decision_basis']='calibrated_model_and_facts' if policy in {'DT-4c','DT-4c-S1','DT-4d'} or policy=='DT-4b' and would=='ALLOW' else 'deterministic_security_facts'
+            if budget_rejected:
+                result.update(executed=False,tool_index=context['tool_index'],tool_budget=40)
             result['decision_facts']=facts
             result['execution_allowed']=not argument_error and verdict=='ALLOW'
             result['argument_error']='invalid_memory_key' if argument_error else None

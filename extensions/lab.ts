@@ -44,17 +44,24 @@ export default async function (pi: ExtensionAPI) {
     if (!v2 || !inputObserved) await audit({ type: 'agent_start', task: event.prompt });
     inputObserved = false;
   });
-  pi.on('before_provider_request', async () => {
+  pi.on('before_provider_request', async (_event, ctx) => {
     requests++;
-    if (requests > 20) throw new Error('Experiment model request budget exhausted');
-    await audit({ type: 'model_request', request_index: requests });
+    if (requests > 20) {
+      await audit({ type: 'model_budget_stop', request_index: requests, limit: 20 });
+      ctx.abort();
+      return;
+    }
+    await audit({ type: v2 ? 'model_request_intent' : 'model_request', request_index: requests });
   });
   pi.on('after_provider_response', async (event) => { await audit({ type: 'model_response', status: event.status }); });
   pi.on('tool_call', async (event) => {
     calls++;
     await audit({ type: 'tool_proposed', call_id: event.toolCallId, tool: event.toolName, args: event.input });
-    if (pendingAsk) return { block: true, reason: 'Session has stopped for a pending D2Guard approval. No further tools may execute.' };
-    if (calls > 40) return { block: true, reason: 'Experiment tool budget exhausted' };
+    if (calls > 40) {
+      await control('/tool-budget', { call_id: event.toolCallId, tool: event.toolName, args: event.input, tool_index: calls });
+      return { block: true, reason: 'Experiment tool budget exhausted' };
+    }
+    if (pendingAsk && !v2) return { block: true, reason: 'Session has stopped for a pending D2Guard approval. No further tools may execute.' };
     const decision = await control('/decision', { call_id: event.toolCallId, tool: event.toolName, args: event.input });
     if (decision.argument_error) return { block: true, reason: 'Tool parameter error: memory key must be 1-64 letters, numbers, underscores or hyphens.' };
     if (decision.verdict === 'ASK') {
