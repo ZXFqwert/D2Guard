@@ -11,6 +11,7 @@ from proxy_stream import forward, TransportJournal
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from guard import Guard
+from experiment_budget import environment_limits
 
 
 def main():
@@ -28,6 +29,8 @@ def main():
         raise ValueError('An independent host approval credential is required')
     lock = threading.RLock()
     sequence = 0
+    limits = environment_limits()
+    model_limit, tool_limit = limits["model_requests"], limits["tool_calls"]
     model_counts = {}
     model_epochs = {}
 
@@ -103,19 +106,19 @@ def main():
                         count = model_counts.get(agent,0)
                         epoch = model_epochs.get(agent,0)
                         request_id = str(uuid.uuid4())
-                        if count >= 20:
+                        if model_limit is not None and count >= model_limit:
                             rejection = {'type':'model_budget_rejected','request_id':request_id,'agent_id':agent,
-                                'budget_epoch':epoch,'request_index':count+1,'limit':20,'forwarded':False,'status':400}
+                                'budget_epoch':epoch,'request_index':count+1,'limit':model_limit,'forwarded':False,'status':400}
                             append('audit.jsonl',rejection)
                             append('gateway.jsonl',rejection)
                             return self.respond(400,{'error':{'type':'model_request_budget_exhausted',
                                 'code':'POL-MODEL-BUDGET','message':'Experiment model request budget exhausted'}})
                         model_counts[agent] = count+1
                         append('audit.jsonl',{'type':'model_request','origin':'gateway','request_id':request_id,
-                            'agent_id':agent,'budget_epoch':epoch,'request_index':count+1,'limit':20})
+                            'agent_id':agent,'budget_epoch':epoch,'request_index':count+1,'limit':model_limit})
                     data,dlp=guard.gateway_payload(data)
                     body=json.dumps(data,ensure_ascii=False).encode() if dlp['changed'] else raw
-                    journal.start({'type':'proxy_request','request_id':request_id,'agent_id':self.headers.get('X-D2-Agent-Id','main'),'path':proxy_path,'budget_epoch':epoch,'request_index':count+1,'limit':20,'input_bytes':len(raw),
+                    journal.start({'type':'proxy_request','request_id':request_id,'agent_id':self.headers.get('X-D2-Agent-Id','main'),'path':proxy_path,'budget_epoch':epoch,'request_index':count+1,'limit':model_limit,'input_bytes':len(raw),
                         'input_sha256':hashlib.sha256(raw).hexdigest(),'output_sha256':hashlib.sha256(body).hexdigest(),**dlp})
                     forward(self,provider,proxy_path,body,journal.append,request_id,journal)
                     return
@@ -133,7 +136,13 @@ def main():
                         return self.respond(200,{'token':guard.approvals.host_token(data['call_id'])})
                 if self.path == '/memory/call' and args.engine=='d2v2':
                     guard.observe({**data,'type':'memory_dispatch','text':''})
-                    return self.respond(200,guard.dispatch_memory(data['tool'],data['args'],data['call_id'],data.get('agent_id','main')))
+                    try:
+                        result=guard.dispatch_memory(data['tool'],data['args'],data['call_id'],data.get('agent_id','main'))
+                    except FileNotFoundError:
+                        result={'text':'Memory entry not found: '+str(data['args'].get('key','')), 'is_error':True, 'error_code':'MEMORY_NOT_FOUND'}
+                    except OSError:
+                        result={'text':'Memory storage is unavailable', 'is_error':True, 'error_code':'MEMORY_IO_ERROR'}
+                    return self.respond(200,result)
                 if self.path == '/trace' and args.engine=='d2v2':
                     with guard.lock:trace=guard.store.trace()
                     return self.respond(200,trace)
@@ -166,15 +175,17 @@ def main():
                     return self.respond(200, {'ok': True})
                 if self.path in ('/decision','/decide','/tool-budget'):
                     data.pop('host_tool_budget_exceeded',None)
+                    data.pop('host_tool_budget_limit',None)
                     if self.path=='/tool-budget':
-                        if type(data.get('tool_index')) is not int or data['tool_index']<=40:
+                        if tool_limit is None or type(data.get('tool_index')) is not int or data['tool_index']<=tool_limit:
                             raise ValueError('Tool budget not exceeded')
                         data['host_tool_budget_exceeded']=True
+                        data['host_tool_budget_limit']=tool_limit
                     start = time.perf_counter_ns()
                     result = (guard.decide(data['tool'], data['args'], data) if args.engine in ('d2core','d2v2')
                               else guard.decide(data['tool'], data['args']))
                     if self.path=='/tool-budget' and args.engine!='d2v2':
-                        result.update(verdict='BLOCK',would_verdict='BLOCK',policy='POL-TOOL-BUDGET',rule_id='POL-TOOL-BUDGET',risk='R3',executed=False,execution_allowed=False,reason='Experiment tool budget exhausted',tool_index=data['tool_index'],tool_budget=40)
+                        result.update(verdict='BLOCK',would_verdict='BLOCK',policy='POL-TOOL-BUDGET',rule_id='POL-TOOL-BUDGET',risk='R3',executed=False,execution_allowed=False,reason='Experiment tool budget exhausted',tool_index=data['tool_index'],tool_budget=tool_limit)
                     result['latency_ms'] = (time.perf_counter_ns() - start) / 1e6
                     append('audit.jsonl', {**data, 'type': 'guard_decision', **result})
                     return self.respond(200, result)

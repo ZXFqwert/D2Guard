@@ -13,6 +13,16 @@ export default async function (pi: ExtensionAPI) {
   const agentId = process.env.D2_AGENT_ID || 'main';
   const parentCallId = process.env.D2_PARENT_CALL_ID || null;
   const depth = Number(process.env.D2_DEPTH || 0);
+  const limit = (name: string) => {
+    const raw = process.env[name];
+    if (!raw) return null;
+    const n = Number(raw);
+    if (!Number.isSafeInteger(n) || n <= 0) throw new Error('Invalid experiment limit: ' + name);
+    return n;
+  };
+  const modelLimit = limit('D2_MODEL_REQUEST_LIMIT');
+  const toolLimit = limit('D2_TOOL_CALL_LIMIT');
+  const wallSeconds = limit('D2_WALL_SECONDS');
   let calls = 0;
   let requests = 0;
   let pendingAsk: string | null = null;
@@ -46,8 +56,8 @@ export default async function (pi: ExtensionAPI) {
   });
   pi.on('before_provider_request', async (_event, ctx) => {
     requests++;
-    if (requests > 20) {
-      await audit({ type: 'model_budget_stop', request_index: requests, limit: 20 });
+    if (modelLimit !== null && requests > modelLimit) {
+      await audit({ type: 'model_budget_stop', request_index: requests, limit: modelLimit });
       ctx.abort();
       return;
     }
@@ -56,8 +66,8 @@ export default async function (pi: ExtensionAPI) {
   pi.on('after_provider_response', async (event) => { await audit({ type: 'model_response', status: event.status }); });
   pi.on('tool_call', async (event) => {
     calls++;
-    await audit({ type: 'tool_proposed', call_id: event.toolCallId, tool: event.toolName, args: event.input });
-    if (calls > 40) {
+    await audit({ type: 'tool_proposed', call_id: event.toolCallId, tool: event.toolName, args: event.input, tool_index: calls, limit: toolLimit });
+    if (toolLimit !== null && calls > toolLimit) {
       await control('/tool-budget', { call_id: event.toolCallId, tool: event.toolName, args: event.input, tool_index: calls });
       return { block: true, reason: 'Experiment tool budget exhausted' };
     }
@@ -141,7 +151,7 @@ export default async function (pi: ExtensionAPI) {
       const abort = () => child.kill();
       signal?.addEventListener('abort', abort, { once: true });
       let budgetCancelled = false;
-      const timeout = setTimeout(async () => { budgetCancelled = true; try { await control('/budget-cancel', { cancel_agent_id: childId }); } finally { abort(); } }, 180000);
+      const timeout = wallSeconds === null ? undefined : setTimeout(async () => { budgetCancelled = true; try { await control('/budget-cancel', { cancel_agent_id: childId }); } finally { abort(); } }, wallSeconds * 1000);
       const code = await new Promise<number | null>((resolve, reject) => { child.on('error', reject); child.on('close', resolve); });
       clearTimeout(timeout);
       signal?.removeEventListener('abort', abort);
@@ -171,6 +181,8 @@ export default async function (pi: ExtensionAPI) {
     async execute(id, args) {
       await audit({ type: 'tool_started', call_id: id });
       const result = await control('/memory/call', { call_id: id, tool: name, args });
+      // Pi derives tool-result isError from execute() throwing, not a result property.
+      if (result.is_error) throw new Error(`${result.error_code}: ${result.text}`);
       return reply(result.text);
     }
   });

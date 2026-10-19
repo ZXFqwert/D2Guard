@@ -35,7 +35,7 @@ def run_scenario(sid, suite, repeats, stop, condition_workers=1):
     lab.save(path,batch)
     def execute(environment,protect,repeat,task=None,memory=None,phase='evaluation'):
         args=SimpleNamespace(scenario=sid,environment=environment,protect=protect,engine='d2v2',
-                             timeout=1800,task=task,memory_root=str(memory) if memory else None,phase=phase)
+                             timeout=1800,model_request_limit=20,tool_call_limit=40,task=task,memory_root=str(memory) if memory else None,phase=phase)
         result=lab.run(args,canary,batch_id)
         bucket='setup_runs' if phase=='setup' else 'results'
         with batch_lock:

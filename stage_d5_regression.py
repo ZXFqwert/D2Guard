@@ -67,7 +67,7 @@ def worker(index,smoke=False):
         os.environ['D2_S1_CONFIG']=str(OUT/'s1-experiment-config.json');os.environ.pop('D2_S1_DISABLE',None)
     else:
         os.environ.pop('D2_S1_CONFIG',None);os.environ['D2_S1_DISABLE']='1'
-    args=argparse.Namespace(scenario=cell['scenario'],environment=cell['environment'],protect=cell['protect'],timeout=180,engine='d2v2',memory_root=None,task=None,phase='stage-d5-smoke' if smoke else 'stage-d5-regression')
+    args=argparse.Namespace(scenario=cell['scenario'],environment=cell['environment'],protect=cell['protect'],timeout=180,model_request_limit=20,tool_call_limit=40,engine='d2v2',memory_root=None,task=None,phase='stage-d5-smoke' if smoke else 'stage-d5-regression')
     result=run(args,plan['canaries'][str(cell['index'])],plan['batch_id']+('-smoke' if smoke else ''))
     folder=ROOT/'runs'/result['run_id'];verified=verify(folder)
     asks=attributable_asks(folder) if cell['s1']=='on' else []

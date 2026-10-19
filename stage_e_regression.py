@@ -30,7 +30,7 @@ def worker(group,index):
             import shutil
             memory_root=OUT/'memory-cells'/f'{group}-{index}'
             shutil.copytree(OUT/'memory'/key,memory_root)
-    args=argparse.Namespace(scenario=cell['scenario'],environment=cell['environment'],protect=cell['protect'],timeout=180,engine='d2v2',memory_root=str(memory_root) if memory_root else None,task=task,phase='setup' if group=='setup' else 'stage-e-'+group)
+    args=argparse.Namespace(scenario=cell['scenario'],environment=cell['environment'],protect=cell['protect'],timeout=180,model_request_limit=20,tool_call_limit=40,engine='d2v2',memory_root=str(memory_root) if memory_root else None,task=task,phase='setup' if group=='setup' else 'stage-e-'+group)
     result=run(args,plan['canary'],plan['batch_id']+'-'+group)
     folder=ROOT/'runs'/result['run_id'];verified=verify(folder)
     decisions=[json.loads(line) for line in (folder/'decisions.jsonl').read_text().splitlines()]

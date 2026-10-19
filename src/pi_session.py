@@ -11,14 +11,14 @@ def conversation(process,messages,out,record,timeout,stop_requested=None):
             except ValueError:incoming.put({'type':'invalid_native_json'})
         incoming.put({'type':'process_eof'})
     threading.Thread(target=read,daemon=True).start()
-    deadline=time.monotonic()+timeout
     for i,text in enumerate(messages):
+        deadline=time.monotonic()+timeout if timeout is not None else None
         command={'id':'user-'+str(i),'type':'prompt','message':text}
         process.stdin.write((json.dumps(command,ensure_ascii=False)+'\n').encode());process.stdin.flush()
         record({'type':'user_turn_submitted','index':i,'text':text})
         while True:
-            remaining=deadline-time.monotonic()
-            if remaining<=0:raise subprocess.TimeoutExpired(process.args,timeout)
+            remaining=deadline-time.monotonic() if deadline is not None else None
+            if remaining is not None and remaining<=0:raise subprocess.TimeoutExpired(process.args,timeout)
             try:event=incoming.get(timeout=remaining)
             except queue.Empty:raise subprocess.TimeoutExpired(process.args,timeout)
             if event.get('type')=='agent_end':

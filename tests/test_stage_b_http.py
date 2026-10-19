@@ -25,7 +25,7 @@ class ApprovalHTTPTest(unittest.TestCase):
             def run():
                 try:services.main()
                 except BaseException as exc:errors.append(type(exc).__name__)
-            with patch('d2v2.core.CoreV2',core_factory),patch('services.ThreadingHTTPServer',server_factory),patch.dict(os.environ,{'D2_CONTROL_TOKEN':'unit-control','D2_APPROVAL_CREDENTIAL':'unit-host','D2_CORE_PROVIDER':'{"api_key":""}','D2_MEMORY_ROOT':str(Path(directory)/'.local/memory')}),patch('sys.argv',['services.py','--run-dir',directory,'--protect','on','--engine','d2v2']):
+            with patch('d2v2.core.CoreV2',core_factory),patch('services.ThreadingHTTPServer',server_factory),patch.dict(os.environ,{'D2_MODEL_REQUEST_LIMIT':'20','D2_TOOL_CALL_LIMIT':'40','D2_CONTROL_TOKEN':'unit-control','D2_APPROVAL_CREDENTIAL':'unit-host','D2_CORE_PROVIDER':'{"api_key":""}','D2_MEMORY_ROOT':str(Path(directory)/'.local/memory')}),patch('sys.argv',['services.py','--run-dir',directory,'--protect','on','--engine','d2v2']):
                 thread=threading.Thread(target=run,daemon=True);thread.start()
                 try:
                     deadline=time.monotonic()+10

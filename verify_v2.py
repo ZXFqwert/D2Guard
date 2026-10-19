@@ -50,6 +50,9 @@ def rows(path):
 
 def verify(folder):
     audit=rows(folder/'audit.jsonl');decisions=rows(folder/'decisions.jsonl')
+    manifest=json.loads((folder/'manifest.json').read_text(encoding='utf-8'))
+    limits=manifest.get('experiment_limits',{'model_requests':20,'tool_calls':40})
+    model_limit,tool_limit=limits['model_requests'],limits['tool_calls']
     native=[];root_native=[];native_parse_errors=[]
     for p in [folder/'pi-events.jsonl',*folder.glob('child-*.jsonl')]:
         if not p.exists():continue
@@ -105,9 +108,10 @@ def verify(folder):
         checks['gateway_model_request_ids_exact']=sorted(e['request_id'] for e in server_requests)==sorted(e['request_id'] for e in req)
         groups={}
         for e in req:groups.setdefault((e['agent_id'],e['budget_epoch']),[]).append(e['request_index'])
-        checks['model_budget_enforced']=all(sorted(indices)==list(range(1,len(indices)+1)) and len(indices)<=20 for indices in groups.values())
+        checks['model_budget_enforced']=all(sorted(indices)==list(range(1,len(indices)+1)) and (model_limit is None or len(indices)<=model_limit) for indices in groups.values())
+        checks['request_limits_match_manifest']=all(e.get('limit')==model_limit for e in req+server_requests)
         rejected=[e for e in gateway if e.get('type')=='model_budget_rejected']
-        checks['model_budget_rejections_not_forwarded']=all(e.get('forwarded') is False and e.get('limit')==20 and e.get('request_index')==21 and e['request_id'] not in {r['request_id'] for r in req} for e in rejected)
+        checks['model_budget_rejections_not_forwarded']=all(e.get('forwarded') is False and model_limit is not None and e.get('limit')==model_limit and e.get('request_index')==model_limit+1 and e['request_id'] not in {r['request_id'] for r in req} for e in rejected)
 
     if req and all(e.get('request_id') for e in req):
         terminals=[e for e in gateway if e['type'] in {'proxy_response','proxy_error','proxy_cancelled'}]
@@ -224,7 +228,7 @@ def verify(folder):
         budget_rows=[e for e in stage_a if e['rule_id']=='POL-TOOL-BUDGET']
         checks['tool_budget_refusals_recorded_not_executed']=all(
             e['verdict']=='BLOCK' and e['risk']=='R3' and e.get('executed') is False and e.get('execution_allowed') is False
-            and e.get('tool_budget')==40 and e.get('tool_index',0)>40
+            and tool_limit is not None and e.get('tool_budget')==tool_limit and e.get('tool_index',0)>tool_limit
             and not any(a.get('type')=='tool_started' and a.get('call_id')==e['call_id'] for a in audit)
             for e in budget_rows)
         prior_contexts={}
