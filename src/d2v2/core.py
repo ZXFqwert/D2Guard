@@ -16,7 +16,7 @@ from .compression import action, canonical, clauses, grant, sensitive, unknown_c
 from .ledger import FingerprintLedger
 from .store import EvidenceStore, digest, encode
 from .policy import HardPolicies, is_egress_sink
-from .review import validate_cited_assessment, fallback_assessment
+from .review import validate_cited_assessment, fallback_assessment, review_timeout_seconds
 from .decision import decide as table_decide, required_questions
 from .views import build_view, InputBudgetExceeded
 from .user_message import split_user_message
@@ -28,6 +28,7 @@ from .memory import MemoryStore
 
 class CoreV2:
     def __init__(self, enabled, folder, provider, emit, fast=None, memory_root=None, content_fast=None, decision_mode='add_risk'):
+        self.slow_review_timeout=review_timeout_seconds()
         self.enabled=enabled;self.folder=Path(folder);self._emit_raw=emit;self.provider=provider
         self.lock=threading.RLock();self.store=EvidenceStore(self.folder)
         self.ledger=FingerprintLedger(self.store)
@@ -578,7 +579,8 @@ class CoreV2:
                 payload={'model':provider['main_model'],'input' if responses else 'messages':messages,
                     'max_output_tokens' if responses else 'max_tokens':800}
                 if responses:payload.update(store=False,reasoning={'effort':'none'})
-                with httpx.Client(timeout=30,trust_env=False) as client:
+                transport=httpx.HTTPTransport(uds=os.environ['D2_UPSTREAM_UDS']) if os.environ.get('D2_UPSTREAM_UDS') else None
+                with httpx.Client(timeout=self.slow_review_timeout,trust_env=False,transport=transport) as client:
                     response=client.post(provider['base_url'].rstrip('/')+('/responses' if responses else '/chat/completions'),
                         headers={'Authorization':'Bearer '+provider['api_key']},json=payload)
                     response.raise_for_status();body=response.json()
@@ -598,7 +600,8 @@ class CoreV2:
                     'attribution_status':'template_fallback','changes_verdict':False,'fallback_reason':type(exc).__name__})
             finally:self.reviews.task_done()
 
-    def drain(self,timeout=32):
+    def drain(self,timeout=None):
+        if timeout is None:timeout=self.slow_review_timeout*max(1,self.reviews.unfinished_tasks)+2
         end=time.monotonic()+timeout
         while self.reviews.unfinished_tasks and time.monotonic()<end:time.sleep(.05)
         return {'pending_reviews':self.reviews.unfinished_tasks}

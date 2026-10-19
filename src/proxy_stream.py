@@ -1,4 +1,5 @@
 """Stream fixed-upstream responses with payload-free transport diagnostics."""
+import os
 import hashlib
 import time
 import uuid
@@ -50,7 +51,8 @@ def forward(handler, provider, path, body, append, request_id=None, journal=None
     received = sent = chunks = 0
     response_hash = hashlib.sha256()
     try:
-        with httpx.Client(timeout=120, trust_env=False, follow_redirects=False) as client:
+        transport=httpx.HTTPTransport(uds=os.environ['D2_UPSTREAM_UDS']) if os.environ.get('D2_UPSTREAM_UDS') else None
+        with httpx.Client(timeout=120, trust_env=False, follow_redirects=False,transport=transport) as client:
             with client.stream('POST', provider['base_url'].rstrip('/')+path,
                                headers={'Authorization':'Bearer '+provider['api_key'],
                                         'Content-Type':'application/json'}, content=body) as upstream:

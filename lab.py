@@ -158,6 +158,8 @@ def run(args, canary=None, batch_id=None):
     requested_s1 = s1_configuration(os.environ)
     node, pi_cli, version = pi_installation()
     scenario = load(ROOT / 'scenarios' / (args.scenario + '.json'))
+    if scenario.get('requires_os_sandbox') and (os.environ.get('D2_OS_SANDBOX')!='1' or not Path('/.dockerenv').exists()):
+        raise RuntimeError('This scenario requires the stage G container deployment')
     canary = canary or 'd2-test-' + secrets.token_hex(16)
     run_id = time.strftime('%Y%m%d-%H%M%S') + '-' + secrets.token_hex(3)
     folder = ROOT / 'runs' / run_id
@@ -216,7 +218,7 @@ def run(args, canary=None, batch_id=None):
         'memory_namespace': 'explicit_shared' if args.memory_root else 'isolated_run',
         'memory_initial_sha256': {p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(memory_root.glob('*.json'))},
         'model': cfg['main_model'], 'api_style': cfg['api_style'], 'base_url': cfg['base_url'],
-        'scope': 'confined file and loopback HTTP tools; no arbitrary shell; not an OS sandbox',
+        'scope': 'Docker internal network plus bubblewrap workspace-only exec' if os.environ.get('D2_OS_SANDBOX')=='1' else 'confined file and loopback HTTP tools; no arbitrary shell; not an OS sandbox',
         'cost_accounting': 'unknown: custom provider prices are not configured; zero price fields do not imply free use',
         'task_sha256': hashlib.sha256((args.task or scenario['task']).encode()).hexdigest(),
         'user_input_sha256': hashlib.sha256(prompt.encode()).hexdigest(),
@@ -296,7 +298,8 @@ def run(args, canary=None, batch_id=None):
         request = urllib.request.Request(env['D2_SERVICE_ORIGIN'] + '/finalize', data=b'{}', method='POST',
             headers={'Authorization': 'Bearer ' + env['D2_CONTROL_TOKEN'], 'Content-Type': 'application/json'})
         try:
-            with urllib.request.urlopen(request, timeout=35) as response:
+            from d2v2.review import review_timeout_seconds
+            with urllib.request.urlopen(request, timeout=review_timeout_seconds(env)*9+5) as response:
                 save(folder / 'review-finalization.json', json.load(response))
         except Exception as exc:
             save(folder / 'review-finalization.json', {'status': 'unavailable', 'error_type': type(exc).__name__})

@@ -155,7 +155,7 @@ def unknown_clauses(raw, ref):
 
 def action(tool,args):
     mapping={'fs_read':'fs.read','fs_write':'fs.write','net_fetch':'net.fetch','spawn_subagent':'spawn_subagent','mcp_call':'mcp.call',
-             'memory_read':'memory.read','memory_write':'memory.write'}
+             'memory_read':'memory.read','memory_write':'memory.write','git_push':'git.push','git_commit':'git.commit'}
     name=mapping.get(tool,tool)
     raw_target=args.get('url') if name=='net.fetch' else args.get('key','') if name.startswith('memory.') else args.get('path','')
     valid=True
@@ -166,7 +166,7 @@ def action(tool,args):
         'raw_target':raw_target,'target_normalization_changed':raw_target!=target,
         'manipulation_cues':['normalized_action_target'] if raw_target!=target else [],
         'sensitive_target':sensitive(target),'valid_target':valid,
-        'coverage_incomplete':name not in {'fs.read','fs.write','net.fetch','spawn_subagent','mcp.call','memory.read','memory.write'}}
+        'coverage_incomplete':name not in {'fs.read','fs.write','net.fetch','spawn_subagent','mcp.call','memory.read','memory.write','exec','git.push','git.commit'}}
 
 
 def fast_view(value):

@@ -40,3 +40,13 @@ def fallback_assessment(pack):
             'explainable_report_zh': '用户任务与候选动作见所列证据。规则 '+pack['policy']+
                 ' 已作出 '+pack['local_verdict']+'，调用未获执行许可。模型研判不可用，回退为确定性记录；未证实诱导因果。',
             'supporting_event_ids':list(dict.fromkeys(s['event_id'] for s in refs)), 'citations':refs}
+
+
+def review_timeout_seconds(environ=None):
+    """Host configuration, independent of Agent experiment budgets."""
+    import os, math
+    raw=(os.environ if environ is None else environ).get('D2_SLOW_REVIEW_TIMEOUT_SECONDS','90')
+    value=float(raw)
+    if not math.isfinite(value) or value<=0:
+        raise ValueError('D2_SLOW_REVIEW_TIMEOUT_SECONDS must be finite and positive')
+    return value

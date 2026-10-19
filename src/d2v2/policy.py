@@ -98,6 +98,9 @@ def artifact_egress_urls(args,net_grants=()):
 
 
 def is_egress_sink(name,args,net_grants=()):
+    # Newly exposed generic execution may launch a network-capable program.
+    # Without a narrower proven effect descriptor, never treat it as a local-only sink.
+    if name in {'exec','git.push'}:return True
     if name=='net.fetch':
         return str(args.get('method','GET')).upper()!='GET' or bool(urlsplit(args.get('url','')).query) or bool(args.get('body'))
     if name=='spawn_subagent':return True

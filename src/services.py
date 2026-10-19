@@ -50,7 +50,8 @@ def main():
         from d2v2.mcp_bridge import MCPBridge
         provider = json.loads(os.environ['D2_CORE_PROVIDER'])
         guard = CoreV2(args.protect == 'on', folder, provider, append, memory_root=os.environ.get('D2_MEMORY_ROOT'))
-        bridge = MCPBridge(guard.observe,fixture=fixture)
+        mcp_config=json.loads(Path(os.environ['D2_MCP_CONFIG']).read_text(encoding='utf-8')) if os.environ.get('D2_MCP_CONFIG') else None
+        bridge = MCPBridge(guard.observe,fixture=fixture,config=mcp_config)
     elif args.engine == 'd2core':
         from core_guard import CoreGuard
         provider = json.loads(os.environ['D2_CORE_PROVIDER'])
@@ -150,20 +151,40 @@ def main():
                     with guard.lock:
                         item=guard.store.backtrack(data['reference']);item['excerpt']=guard.ledger.redact(item['excerpt'])
                     return self.respond(200,item)
+                if self.path == '/sandbox/exec' and args.engine=='d2v2':
+                    from sandbox_exec import execute
+                    from experiment_budget import positive_limit
+                    from d2v2.store import digest,encode
+                    guard.observe({**data,'type':'sandbox_dispatch','text':''})
+                    with guard.lock:
+                        row=guard.store.db.execute('SELECT * FROM calls WHERE id=?',(data['call_id'],)).fetchone()
+                        expected=digest(encode({'tool':data['tool'],'args':data['args']}))
+                        if not row or row['agent']!=data.get('agent_id','main') or row['status']!='execution_started' or row['args_hash']!=expected or not row['decision'] or json.loads(row['decision'])['verdict']!='ALLOW':
+                            return self.respond(403,{'error':'Missing bound execution authorization'})
+                        guard.store.db.execute("UPDATE calls SET status='sandbox_dispatched' WHERE id=?",(data['call_id'],));guard.store.db.commit()
+                    return self.respond(200,execute(folder/'workspace',data['tool'],data['args'],timeout=positive_limit(os.environ.get('D2_WALL_SECONDS'))))
                 if self.path == '/mcp/call' and bridge:
                     guard.observe({**data,'type':'mcp_dispatch','text':''})
                     # Invocation requires a matching ALLOW bound to the exact arguments.
                     from d2v2.store import digest,encode
                     with guard.lock:
                         row=guard.store.db.execute('SELECT args_hash,decision FROM calls WHERE id=?',(data['call_id'],)).fetchone()
-                    expected=digest(encode({'tool':'mcp_call','args':{'name':data['name']}}))
-                    if not row or row['args_hash']!=expected or json.loads(row['decision'])['verdict']!='ALLOW':
-                        return self.respond(403,{'error':'Missing bound MCP authorization'})
-                    return self.respond(200,bridge.call(data['name'],{}))
+                    bound_args={'name':data['name']}
+                    if 'arguments' in data:bound_args['arguments']=data['arguments']
+                    expected=digest(encode({'tool':'mcp_call','args':bound_args}))
+                    with guard.lock:
+                        row=guard.store.db.execute('SELECT * FROM calls WHERE id=?',(data['call_id'],)).fetchone()
+                        if not row or row['agent']!=data.get('agent_id','main') or row['status']!='execution_started' or row['args_hash']!=expected or not row['decision'] or json.loads(row['decision'])['verdict']!='ALLOW':
+                            return self.respond(403,{'error':'Missing bound MCP authorization'})
+                        guard.store.db.execute("UPDATE calls SET status='mcp_dispatched' WHERE id=?",(data['call_id'],));guard.store.db.commit()
+                    return self.respond(200,bridge.call(data['name'],data.get('arguments',{})))
                 if self.path == '/mcp/tools' and bridge:
-                    guard.observe({**data,'type':'mcp_description','server_id':'local-docs',
-                                   'tool_name':'project_facts','text':json.dumps(bridge.tools,ensure_ascii=False)})
-                    return self.respond(200,{'tools':bridge.tools})
+                    guard.observe({**data,'type':'mcp_discovery','text':''})
+                    for index,tool in enumerate(bridge.tools):
+                        guard.observe({'event_id':data['event_id']+':tool:'+str(index),'agent_id':data.get('agent_id','main'),
+                                       'parent_call_id':data.get('parent_call_id'),'type':'mcp_description','server_id':bridge.server_id,
+                                       'tool_name':tool['name'],'text':json.dumps(tool,ensure_ascii=False)})
+                    return self.respond(200,{'tools':bridge.tools,'server_id':bridge.server_id})
                 if self.path in ('/audit','/ingest'):
                     if args.engine=='d2v2' and data.get('type')=='system_init':
                         with lock:

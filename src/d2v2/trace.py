@@ -386,6 +386,13 @@ def build_graph(task, agents, calls, sources):
         node(sid, 0, 'source', f"{s['kind']}：{s['uri']}", source_type=s['type'],evidence_ref=s.get('evidence_ref'),
              s1=(s.get('s1') or {}).get('label') if isinstance(s.get('s1'), dict) else None)
         edges.append({'from': sid, 'to': 'agent:' + (s['agent'] or 'main'), 'kind': 'ingest'})
+        if s['type'] in {'MCP_DESC','MCP_RET'} and str(s['uri']).startswith('mcp://'):
+            from urllib.parse import urlsplit
+            uri=urlsplit(s['uri']);server='mcp-server:'+uri.netloc;tool='mcp-tool:'+uri.netloc+uri.path
+            node(server,0,'mcp_server',uri.netloc)
+            node(tool,0,'mcp_tool',uri.path.lstrip('/'))
+            edges.extend([{'from':server,'to':tool,'kind':'provides'}, {'from':tool,'to':sid,'kind':'mcp_observation'}])
+
     for c in calls.values():
         cid = 'call:' + c['call_id']
         node(cid, 2, 'call', f"{c['op']} {short(c['target'], 48)}", verdict=c.get('verdict'),
@@ -530,3 +537,15 @@ def enrich_graph(graph, timeline, events, calls):
         if edge['kind'].startswith('induce_'):edge['causal_strength']='association'
     graph['acyclic']=is_acyclic(ids,edges)
     graph['causality_note']='关联不等于诱导证实；未执行反事实重放。'
+
+
+def upstream_sources(graph,call_id):
+    """Reverse evidence reachability; association is not a causal claim."""
+    reverse={}
+    for edge in graph['edges']:reverse.setdefault(edge['to'],[]).append(edge['from'])
+    todo=['call:'+call_id];seen=set()
+    while todo:
+        node=todo.pop()
+        if node in seen:continue
+        seen.add(node);todo.extend(reverse.get(node,[]))
+    return sorted(node[4:] for node in seen if node.startswith('src:'))
