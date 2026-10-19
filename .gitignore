@@ -5,3 +5,14 @@ __pycache__/
 node_modules/
 .env
 *.sqlite3*
+
+# Local environments, model artifacts and training outputs
+.venv/
+weights/
+training/work/
+*.safetensors
+*.pt
+*.pth
+*.onnx
+*.ckpt
+.cache/

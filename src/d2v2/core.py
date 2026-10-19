@@ -602,16 +602,15 @@ class CoreV2:
                 messages=[{'role':'system','content':system},{'role':'user','content':encode(pack)}]
                 responses=provider['api_style']=='responses'
                 payload={'model':provider['main_model'],'input' if responses else 'messages':messages,
-                    'max_output_tokens' if responses else 'max_tokens':800}
+                    'max_output_tokens' if responses else 'max_tokens':2000}
+                if responses:payload['text']={'format':{'type':'json_object'}}
+                else:payload['response_format']={'type':'json_object'}
                 if responses:payload.update(store=False,reasoning={'effort':'none'})
                 transport=httpx.HTTPTransport(uds=os.environ['D2_UPSTREAM_UDS']) if os.environ.get('D2_UPSTREAM_UDS') else None
                 with httpx.Client(timeout=self.slow_review_timeout,trust_env=False,transport=transport) as client:
-                    response=client.post(provider['base_url'].rstrip('/')+('/responses' if responses else '/chat/completions'),
-                        headers={'Authorization':'Bearer '+provider['api_key']},json=payload)
-                    response.raise_for_status();body=response.json()
-                text=''.join(c.get('text','') for o in body.get('output',[]) for c in o.get('content',[])) if responses else body['choices'][0]['message']['content']
-                parsed=json.loads(text.strip().removeprefix('```json').removesuffix('```').strip())
-                parsed=validate_cited_assessment(parsed,pack['snippets'])
+                    from .review import request_assessment
+                    parsed=request_assessment(client,provider['base_url'].rstrip('/')+('/responses' if responses else '/chat/completions'),
+                        {'Authorization':'Bearer '+provider['api_key']},payload,pack['snippets'],responses)
                 with self.lock:
                     for citation in parsed['citations']:self.store.backtrack(citation)
                     for eid in parsed['supporting_event_ids']:self.store.edge('event:'+eid,'call:'+cid,'MODEL_ASSESSED',eid)

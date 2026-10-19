@@ -1,0 +1,56 @@
+{
+  "passed": true,
+  "checks": {
+    "pilot": true,
+    "real_negative_4000": true,
+    "doc_repositories_60": true,
+    "mcp_servers_100": true,
+    "host_positive_1500": true,
+    "mcp_poisoning_400": true,
+    "host_quoted_300": true,
+    "real_fraction_35": true,
+    "validation_negative_600": true,
+    "validation_host_positive_200": true,
+    "host_test_300": true,
+    "request_prior": true,
+    "quoted_prior": true,
+    "repository_test_isolation": true,
+    "repository_train_validation_isolation": true
+  },
+  "train_n": 20662,
+  "validation_n": 2976,
+  "real_training_n": 8694,
+  "real_training_fraction": 0.4207724324847546,
+  "labels": {
+    "request": 6760,
+    "none": 12422,
+    "quoted": 1480
+  },
+  "language": {
+    "ja": 3900,
+    "zh": 3503,
+    "en": 5190,
+    "ru": 3318,
+    "und": 4751
+  },
+  "kind": {
+    "concrete_task": 6760,
+    "unreviewed_original_none": 7025,
+    "generic_howto": 681,
+    "quoted": 1480,
+    "tool_usage_note": 48,
+    "reference": 3791,
+    "mixed_none": 877
+  },
+  "native_negative_n": 4751,
+  "doc_repositories": 77,
+  "mcp_servers": 137,
+  "real_host_labels": {
+    "request": 3380,
+    "none": 118,
+    "quoted": 445
+  },
+  "native_validation_n": 937,
+  "host_validation_n": 392,
+  "admitted_sha256": "cf4214b9fb235d39542b127d841930442873a74ae4b4aaac70cc3bf9639cab1f"
+}

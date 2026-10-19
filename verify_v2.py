@@ -260,8 +260,11 @@ def verify(folder):
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('batch',type=Path);parser.add_argument('--output',type=Path)
-    args=parser.parse_args();batch=json.loads(args.batch.read_text(encoding='utf-8'))
-    results=[verify(args.batch.parent/r['run_id']) for r in batch['results']]
+    args=parser.parse_args()
+    if args.batch.is_dir():results=[verify(args.batch)]
+    else:
+        batch=json.loads(args.batch.read_text(encoding='utf-8'))
+        results=[verify(args.batch.parent/r['run_id']) for r in batch['results']]
     report={'kind':'v2-native-evidence-validation','batch':args.batch.name,'results':results,
         'evidence_checks_passed':all(r['evidence_checks_passed'] for r in results),
         'runtime_runs_ok':all(r['outcome']['model_run_ok'] for r in results),

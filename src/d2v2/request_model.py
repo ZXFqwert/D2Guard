@@ -153,6 +153,11 @@ class RequestContentModel:
         import torch
         config_path=Path(config_path)
         self.metadata=json.loads(config_path.read_text(encoding='utf-8'))
+        for value in self.metadata.values():
+            if isinstance(value,dict) and 'path' in value and not Path(value['path']).is_absolute():
+                value['path']=str((config_path.parent/value['path']).resolve())
+        for value in self.metadata.get('models',{}).values():
+            if not Path(value['path']).is_absolute():value['path']=str((config_path.parent/value['path']).resolve())
         selection=accepted(self.metadata)
         self.selected=self.metadata['selected'];self.threshold=self.metadata['threshold']
         self.device=torch.device(self.metadata.get('device','cuda:0'));self.loaded={}
@@ -182,9 +187,9 @@ class RequestContentModel:
         self.add_risk_enabled=True
 
     def classify(self,text,source_type):
-        from stage_d3_model import predict_laya,predict_baseline,softmax,route_base
+        from .s1_legacy_inference import predict_laya,predict_baseline,softmax,route_base
         if self.metadata.get('schema')=='d5-request-v1':
-            from stage_d5_model import predict_laya
+            from .s1_inference import predict_laya
         start=time.perf_counter();row={'raw_text':text,'source_type':source_type,'label':'none'}
         # The placeholder label only satisfies Laya item construction; it is not
         # fed into the model sequence or used to select probabilities.
@@ -195,7 +200,7 @@ class RequestContentModel:
             predictor=predict_baseline if name=='modernbert' else predict_laya
             z,_,counts=predictor(model,tok,[row],self.device)
             if self.metadata.get('schema')=='d5-request-v1':
-                from stage_d5_model import views_for
+                from .s1_inference import views_for
                 expected_windows+=len(views_for(tok,row))
             probabilities.append(softmax(z/temperature)[0]);windows+=sum(counts)
         p=sum(probabilities)/len(probabilities);labels=('request','quoted','none')

@@ -1,0 +1,56 @@
+{
+  "stages": {
+    "c": {
+      "s1_off": {
+        "n": 273,
+        "exact_agreement": 0.9743589743589743,
+        "interception_recall": 0.9761904761904762,
+        "interception_precision": 0.8723404255319149,
+        "true_positive": 41,
+        "false_positive": 6,
+        "false_negative": 1
+      },
+      "s1_on": {
+        "n": 273,
+        "exact_agreement": 0.9743589743589743,
+        "interception_recall": 0.9761904761904762,
+        "interception_precision": 0.8723404255319149,
+        "true_positive": 41,
+        "false_positive": 6,
+        "false_negative": 1
+      },
+      "recall_not_decreased": true,
+      "new_ask_n": 0,
+      "new_block_n": 0
+    },
+    "c2": {
+      "s1_off": {
+        "n": 389,
+        "exact_agreement": 0.9922879177377892,
+        "interception_recall": 1.0,
+        "interception_precision": 0.9636363636363636,
+        "true_positive": 53,
+        "false_positive": 2,
+        "false_negative": 0
+      },
+      "s1_on": {
+        "n": 389,
+        "exact_agreement": 0.9922879177377892,
+        "interception_recall": 1.0,
+        "interception_precision": 0.9636363636363636,
+        "true_positive": 53,
+        "false_positive": 2,
+        "false_negative": 0
+      },
+      "recall_not_decreased": true,
+      "new_ask_n": 0,
+      "new_block_n": 0
+    }
+  },
+  "passed": true,
+  "scope": "D5 full-source inference on preexisting read-only C/C2 trajectory snapshots; completed benchmark metrics not rerun",
+  "source_count": 957,
+  "unique_full_source_inputs": 360,
+  "s1_eligible_sources": 6,
+  "latency_ms_per_source": 13.641159147502751
+}

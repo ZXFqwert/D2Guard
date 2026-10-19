@@ -1,0 +1,51 @@
+{
+  "selected": "multilingual",
+  "basis": "D5 user preregistration: multilingual primary, English comparison",
+  "validation": {
+    "multilingual": {
+      "n": 2976,
+      "request": {
+        "tp": 747,
+        "fp": 110,
+        "fn": 35,
+        "support": 782,
+        "precision": 0.8716452742123687,
+        "recall": 0.9552429667519181,
+        "f1": 0.9115314215985357,
+        "threshold": 0.5
+      },
+      "none_false_positive": 110,
+      "none_support": 2075,
+      "none_fpr": 0.05301204819277108,
+      "ece_request_10_bins": 0.01907225228717295,
+      "ece_multiclass_10_bins": 0.00888688542783247,
+      "accuracy": 0.9495967741935484,
+      "macro_f1_present_classes": 0.950008561855639,
+      "classes": {
+        "request": {
+          "support": 782,
+          "f1": 0.9118541033434651
+        },
+        "quoted": {
+          "support": 119,
+          "f1": 0.9747899159663865
+        },
+        "none": {
+          "support": 2075,
+          "f1": 0.9633816662570657
+        }
+      }
+    }
+  },
+  "threshold": 0.5,
+  "temperature": 1.2114818096160889,
+  "model_sha256": {
+    "model.safetensors": "7e96b8c58d52eb6bfc1801b89231217287cfb2ba5d800cc6478f663cbc281fb1",
+    "rl_agent_config.json": "8bcdb0ab583c11e67b450af25096ac0c729e28b58851dd23e9cedfc7e937f58f",
+    "tokenizer/tokenizer_config.json": "537ca39e23e2cccc139c2066a312396647d8f57b7a6aa530773e00f699fff0d4",
+    "tokenizer/special_tokens_map.json": "501906df38f65ffa6f7b77b8650448e1b95f2cc6eded074fec6213bf8c951be4",
+    "tokenizer/tokenizer.json": "dbba919c6e5e492bc22beb80abb64e6fcc7e8744dc696e8388b8c977767afa4b",
+    "encoder/config.json": "61409ba029d72fa11a1301ebed204bd81f727012adf88d4d33b28f9989103761"
+  },
+  "validation_sha256": "c7653740c5caaa41e86b82dfcd79d028a087c020540ec52c2becaa45d0766d79"
+}
