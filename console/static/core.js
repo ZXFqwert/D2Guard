@@ -31,7 +31,7 @@ const PROTECT_ZH = { on: '防护开启', off: '防护关闭' };
 const CAT_ZH = { attack: '攻击场景', normal: '正常场景' };
 
 function outcomeLabel(run) {
-  if (!run.complete && run.outcome !== 'runtime_error') return OUTCOME.running;
+  if (!run.complete && !run.agent_finished && run.outcome !== 'runtime_error') return OUTCOME.running;
   if (run.environment === 'clean' && run.task_completed && ['no_attack_observed', 'guard_blocked'].includes(run.outcome) && !run.attack_succeeded) return ['正常完成', 'solid-green'];
   if (run.environment === 'clean' && run.outcome === 'no_attack_observed') return [run.task_completed ? '正常完成' : '任务未完成', run.task_completed ? 'solid-green' : 'gray'];
   return OUTCOME[run.outcome] || [run.outcome || '未知', 'gray'];
@@ -260,7 +260,8 @@ const pendingApprovals = (job) => (job && job.status === 'running' ? job.approva
 const approvalFor = (runId, callId) => pendingApprovals(app.job).find((a) => a.run_id === runId && a.call_id === callId);
 const approvalButtons = (a) => `<div class="approval-buttons">
     <button class="btn primary" data-approval="approve" data-run="${esc(a.run_id)}" data-call="${esc(a.call_id)}" ${a.approvable ? '' : 'disabled data-locked'}>✓ 批准本次并继续</button>
-    <button class="btn" data-approval="reject" data-run="${esc(a.run_id)}" data-call="${esc(a.call_id)}">✕ 拒绝本次并继续</button></div>
+    <button class="btn" data-approval="reject" data-run="${esc(a.run_id)}" data-call="${esc(a.call_id)}">✕ 拒绝本次并继续</button>
+    <button class="btn" data-approval="reject_stop" data-run="${esc(a.run_id)}" data-call="${esc(a.call_id)}">■ 拒绝并结束任务</button></div>
     ${a.channel_error ? `<div class="small c-off">${esc(app.job?.approval_error || '审批通道连接失败')}；按钮可能无法生效。</div>` : ''}`;
 function renderApprovals(job) {
   let box = document.getElementById('approval-panel');
@@ -277,7 +278,7 @@ function renderApprovals(job) {
   approvalView = key; box.hidden = !pending.length || inline;
   box.innerHTML = pending.map((a) => `<div>
     <h3>⏸ D²Guard 拦下了一个操作，等你决定</h3>
-    <p>Agent 已暂停在这一步，操作<b>尚未执行</b>。批准只放行下面这一次调用；拒绝后 Agent 跳过它，继续原任务。</p>
+    <p>Agent 已暂停在这一步，操作<b>尚未执行</b>。批准只放行下面这一次调用；拒绝后 Agent 跳过它，继续原任务；也可以拒绝并直接结束本次任务。</p>
     <p><b>${esc(a.tool)}</b> · ${a.agent_id === 'main' ? '主 Agent' : esc(a.agent_id)} · <span class="mono">${esc(a.rule_id)}</span></p>
     <pre class="code">${esc(JSON.stringify(a.args, null, 2))}</pre><p>${esc(a.reason)}</p>
     <small>${a.expires ? '请在 ' + new Date(a.expires * 1000).toLocaleTimeString() + ' 前处理，超时按拒绝处理' : '超时按拒绝处理'}</small>
@@ -292,7 +293,8 @@ document.addEventListener('click', async (e) => {
   twins.forEach((b) => { b.disabled = true; });
   try {
     await send('/api/jobs/' + app.job.id + '/approval', 'POST', { run_id: button.dataset.run, call_id: button.dataset.call, choice });
-    toast(choice === 'approve' ? '已批准本次调用，Agent 继续执行' : '已拒绝本次调用，Agent 跳过它继续原任务');
+    toast({ approve: '已批准本次调用，Agent 继续执行', reject: '已拒绝本次调用，Agent 跳过它继续原任务',
+      reject_stop: '已拒绝本次调用并结束任务' }[choice]);
   } catch (error) {
     toast(error.message, true);
     twins.forEach((b) => { b.disabled = b.dataset.approval === 'approve' && b.hasAttribute('data-locked'); });

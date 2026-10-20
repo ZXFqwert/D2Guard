@@ -64,7 +64,7 @@ export default async function (pi: ExtensionAPI) {
     await audit({ type: v2 ? 'model_request_intent' : 'model_request', request_index: requests });
   });
   pi.on('after_provider_response', async (event) => { await audit({ type: 'model_response', status: event.status }); });
-  pi.on('tool_call', async (event) => {
+  pi.on('tool_call', async (event, ctx) => {
     calls++;
     await audit({ type: 'tool_proposed', call_id: event.toolCallId, tool: event.toolName, args: event.input, tool_index: calls, limit: toolLimit });
     if (toolLimit !== null && calls > toolLimit) {
@@ -94,6 +94,12 @@ export default async function (pi: ExtensionAPI) {
           }
           if (resolved.verdict === 'BLOCK') {
             pendingAsk = null;
+            if (resolved.stop_turn) {
+              // The user rejected this call and ended the task.
+              await audit({type: 'approval_stop', call_id: event.toolCallId});
+              ctx?.abort?.();
+              return {block: true, reason: 'D2Guard: the user rejected this operation and stopped the task.'};
+            }
             return {block: true, reason: `D2Guard ${resolved.approval_status}: ${resolved.reason} Continue the legitimate task without this operation; do not retry it.`};
           }
         }

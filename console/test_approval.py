@@ -60,3 +60,33 @@ class ApprovalTests(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+
+class AgentFinishedTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp=tempfile.TemporaryDirectory()
+        with patch.object(server,'HERE',Path(self.tmp.name)):
+            self.console=server.Console(self.tmp.name,'python')
+
+    def tearDown(self):self.tmp.cleanup()
+
+    def test_reject_and_stop_is_forwarded(self):
+        pending={'status':'running','approvals':[{'run_id':'run','call_id':'call','tool':'fs_read','args':{'path':'.env'}}]}
+        with patch.object(self.console,'job',return_value=pending),patch.object(self.console,'_host_control',return_value={'approval_status':'rejected'}) as host:
+            self.assertEqual(self.console.resolve_approval('job',{'run_id':'run','call_id':'call','choice':'reject_stop'})[0],200)
+        host.assert_called_once_with('run','/resolve-approval',{'call_id':'call','choice':'reject_stop'})
+
+    def test_lane_shows_agent_result_before_evidence_review_ends(self):
+        run=Path(self.tmp.name)/'runs'/'20261020-120000-000002';run.mkdir(parents=True)
+        (run/'manifest.json').write_text(json.dumps({'scenario':'s','environment':'attack','protection':'on','guard_engine':'d2v2'}))
+        (run/'agent-finished.json').write_text(json.dumps({'agent_elapsed_seconds':21.5,
+            'preliminary':{'outcome':'guard_blocked','attack_succeeded':False,'received_bytes':0,'task_completed':True}}))
+        row=self.console._summary(run,{})
+        self.assertFalse(row['complete']);self.assertTrue(row['agent_finished'])
+        self.assertEqual(row['outcome'],'guard_blocked');self.assertEqual(row['agent_elapsed_seconds'],21.5)
+        self.console.jobs['j']={'id':'j','status':'running','mode':'arena','_log':Path(self.tmp.name)/'j.log',
+            'steps':[{'protect':'on','status':'running','run_id':run.name}],'started':0}
+        with patch.object(self.console,'_host_control',side_effect=ValueError('closed')):
+            job=self.console.job('j')
+        self.assertTrue(job['agents_finished'])
+        self.assertEqual(job['steps'][0]['agent_finished']['agent_elapsed_seconds'],21.5)

@@ -102,6 +102,8 @@ def build_trace(folder):
     folder = Path(folder)
     manifest = load_json(folder / 'manifest.json')
     result = load_json(folder / 'result.json')
+    finished = {} if result else load_json(folder / 'agent-finished.json')
+    shown = result or finished.get('preliminary') or {}
     audit = jsonl(folder / 'audit.jsonl')
     decisions = jsonl(folder / 'decisions.jsonl')
     task = (folder / 'task.txt').read_text(encoding='utf-8') if (folder / 'task.txt').exists() else ''
@@ -334,10 +336,13 @@ def build_trace(folder):
         'protection': manifest.get('protection'), 'model': manifest.get('model'), 'pi_version': manifest.get('pi_version'),
         'decision_mode': core.get('decision_mode') or (manifest.get('content_model') or {}).get('decision_mode') or 'unknown',
         'engine': manifest.get('guard_engine'), 'batch_id': manifest.get('batch_id'), 'task': mask(task),
-        'outcome': result.get('outcome'), 'attack_succeeded': result.get('attack_succeeded'),
-        'received_bytes': result.get('received_bytes'), 'task_completed': result.get('task_completed'),
-        'approved_calls':result.get('approved_calls',[]),'rejected_calls':result.get('rejected_calls',[]),
+        'outcome': shown.get('outcome'), 'attack_succeeded': shown.get('attack_succeeded'),
+        'received_bytes': shown.get('received_bytes'), 'task_completed': shown.get('task_completed'),
+        'approved_calls':shown.get('approved_calls',[]),'rejected_calls':shown.get('rejected_calls',[]),
         'elapsed_seconds': result.get('elapsed_seconds'), 'complete': bool(result),
+        'agent_elapsed_seconds': result.get('agent_elapsed_seconds', finished.get('agent_elapsed_seconds')),
+        'review_wait_seconds': result.get('post_agent_evidence_wait_seconds'),
+        'agent_finished': bool(result or finished),
         'fast_model': (core.get('content_model') or core.get('fast_model') or {}).get('backend')
         if isinstance(core.get('content_model') or core.get('fast_model'), dict) else None,
     }

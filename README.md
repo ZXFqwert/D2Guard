@@ -2,7 +2,7 @@
 
 2026-10-20 同步版本：包含 Pi 原生连续会话、自由输入、常驻快镜、Windows 与 Linux 运行、审批续跑、直接注入识别及真实配对补测。最新测试、部署与文档核查见 [补测记录](docs/36-direct-input-and-live-web-20261020.md)；按赛题拆分的三份 Word 文档见 [submission](submission/)。`docs/` 中较早的阶段报告保留历史结果。
 
-同学可在[自由对话](https://agent.li33.art/safe/preview/#/chat)直接输入任务、附带文本并连续追问，或在[攻防竞技场](https://agent.li33.art/safe/preview/#/arena)选择场景进行双路对照。两者都由算力机上的真实 Pi 执行。ASK 可在网页审批，运行后可查看溯源。共享控制台同时接收一个执行任务，已结束会话的研判归档在后台继续；模型连接由部署端维护。新增 `di-*` 场景覆盖中英文直接输入和相近正常表述。
+启动控制台后，可在自由对话（http://127.0.0.1:8768/#/chat）直接输入任务、附带文本并连续追问，或在攻防竞技场（#/arena）选择场景进行双路对照，两者都由真实 Pi 执行。ASK 可在网页审批，运行后可查看溯源。共享控制台同时接收一个执行任务，已结束会话的研判归档在后台继续；模型连接由部署端维护。新增 `di-*` 场景覆盖中英文直接输入和相近正常表述。
 
 Git 仓库不含权重与运行原始数据；完整程序包的文件名、大小及 SHA256 见 [交付清单](submission/manifest.json)。下方安装步骤针对含权重的完整程序包。
 
@@ -36,5 +36,5 @@ Git 仓库不含权重与运行原始数据；完整程序包的文件名、大�
 - 快镜使用 `weights/D2Guard-multilingual`，温度 1.2114818，判定阈值 0.5，判定模式 `taint_gate`；加载时校验 `SHA256SUMS`。
 - 无 CUDA 时快镜自动使用 CPU 推理。
 - 控制台启动时一次加载模型，各会话独立维护安全状态。用 `python tools/verify_delivery_sources.py` 核对本机、算力机和提交包的公共运行源码。
-- 当前公网 Responses 模型支持显式思考控制，部署配置设为 `reasoning_capable: true`。Pi 的 `--thinking off` 会由此发送 `reasoning.effort=none`，避免服务端默认开启思考。其他接口应确认支持后再启用；每轮清单记录此配置。
+- 当前 Responses 模型支持显式思考控制，部署配置设为 `reasoning_capable: true`。Pi 的 `--thinking off` 会由此发送 `reasoning.effort=none`，避免服务端默认开启思考。其他接口应确认支持后再启用；每轮清单记录此配置。
 - 生成程序包请运行 `build-submission.bat` 或 `sh build-submission.sh`，不要直接压缩含本地配置与虚拟环境的目录。

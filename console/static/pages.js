@@ -322,7 +322,7 @@ PAGES.arena = async (el, [sid]) => {
   }
   const busy = app.job?.status === 'running';
   $('#a-go').disabled = busy;
-  $('#a-go').textContent = busy ? '⏳ 对决进行中…' : '⚔ 开始双路对决';
+  $('#a-go').textContent = !busy ? '⚔ 开始双路对决' : app.job.agents_finished ? '⏳ 两路已结束，慢镜生成研判报告中…' : '⏳ 对决进行中…';
 
   const job = app.job && app.job.mode === 'arena' && app.job.scenario === arena.scenario && app.job.environment === arena.env ? app.job : null;
   let ids = {};
@@ -366,6 +366,8 @@ function renderLane(box, protect, t, step) {
   const [label, cls] = outcomeLabel(r);
   const { unmatched } = laneApprovals(r.id, t.calls);
   const progress = step?.progress;
+  const reviewing = r.agent_finished && !r.complete;
+  const secs = r.agent_elapsed_seconds ?? r.elapsed_seconds;
   const progressText = progress ? `${{ thinking: '模型正在推理', generating: '模型正在生成响应', waiting: '等待模型响应' }[progress.phase] || '等待模型响应'} · 当前请求 ${Math.round(progress.request_seconds)} 秒${progress.last_update_seconds == null ? '' : ` · 最近更新 ${Math.round(progress.last_update_seconds)} 秒前`}` : '';
   const steps = t.calls.map((c, i) => {
     const w = effectiveVerdict(c);
@@ -381,19 +383,21 @@ function renderLane(box, protect, t, step) {
   setHTML(box, `
     <div class="lane-h"><b>${head[0]}</b><small>${head[1]}</small></div>
     ${progressText ? `<div class="lane-tip">${esc(progressText)}</div>` : ''}
+    ${reviewing ? '<div class="lane-tip">Agent 已结束，以下为本轮结果；慢镜正在后台生成研判报告，不影响裁决。</div>' : ''}
     ${unmatched.map((a) => `<div class="lane-tip">⏸ Agent 暂停在 <b>${esc(a.tool)}</b>，等你决定。${approvalButtons(a)}</div>`).join('')}
     <div class="lane-result"><span class="big badge ${cls}">${esc(label)}</span>
       <a class="link" href="#/trace/${esc(r.id)}">溯源 →</a></div>
     <div class="lane-kpi"><div><b>${t.calls.length}</b>工具调用</div><div><b class="c-warn">${t.calls.filter((c) => c.verdict === 'ASK' && !c.executed).length}</b>挂起</div>
       <div><b class="c-off">${t.calls.filter((c) => c.verdict === 'BLOCK').length}</b>阻断</div><div><b class="${r.received_bytes ? 'c-off' : ''}">${r.received_bytes ?? 0}</b>外发字节</div>
-      <div><b>${r.elapsed_seconds != null ? r.elapsed_seconds.toFixed(0) + 's' : '…'}</b>耗时</div></div>
+      <div><b>${secs != null ? secs.toFixed(0) + 's' : '…'}</b>Agent 耗时</div></div>
     <div class="steps">${steps || '<div class="lane-empty">等待 Agent 提出第一次工具调用…</div>'}</div>
-    <div class="muted small lane-id">${runTime(r.id)} · ${esc(r.id)} · ${esc(r.decision_mode || 'unknown')}${r.complete ? '' : ' · 运行中'}</div>`);
+    <div class="muted small lane-id">${runTime(r.id)} · ${esc(r.id)} · ${esc(r.decision_mode || 'unknown')}${r.complete ? (r.review_wait_seconds ? ` · 慢镜研判 ${r.review_wait_seconds.toFixed(0)}s（后台）` : '') : reviewing ? ' · 慢镜研判中' : ' · 运行中'}</div>`);
 }
 
 function renderArenaVerdict(tr, job) {
   const off = tr.off?.run, on = tr.on?.run;
-  if (!off || !on || !off.complete || !on.complete) { setHTML($('#a-verdict'), ''); return; }
+  const done = (x) => x && (x.complete || x.agent_finished);
+  if (!done(off) || !done(on)) { setHTML($('#a-verdict'), ''); return; }
   const offTxt = off.attack_succeeded ? `攻击成功${off.received_bytes ? `，接收端收到 ${off.received_bytes} 字节` : ''}` : outcomeLabel(off)[0];
   const onTxt = on.attack_succeeded ? '攻击成功' : `${outcomeLabel(on)[0]}${on.received_bytes ? '' : '，接收端 0 字节'}`;
   const good = off.attack_succeeded && !on.attack_succeeded;
@@ -563,7 +567,7 @@ PAGES.runs = async (el) => {
         <td>${badge(ENV_ZH[r.environment] || r.environment, r.environment)}</td><td>${badge(PROTECT_ZH[r.protection] || r.protection, r.protection)}</td>
         <td>${badge(...outcomeLabel(r))}</td>
         <td><span class="c-good">${v.ALLOW || 0}</span> / <span class="c-warn">${v.ASK || 0}</span> / <span class="c-off">${v.BLOCK || 0}</span></td>
-        <td class="${r.received_bytes ? 'c-off strong' : ''}">${r.received_bytes ?? 0}</td><td>${r.elapsed_seconds != null ? r.elapsed_seconds.toFixed(0) + 's' : '—'}</td></tr>`;
+        <td class="${r.received_bytes ? 'c-off strong' : ''}">${r.received_bytes ?? 0}</td><td>${(r.agent_elapsed_seconds ?? r.elapsed_seconds) != null ? (r.agent_elapsed_seconds ?? r.elapsed_seconds).toFixed(0) + 's' : '—'}</td></tr>`;
       }).join('')}</table>
       ${d.total > d.runs.length ? '<button class="btn" id="r-more">显示更多</button>' : ''}`;
     $$('#r-table [data-go]').forEach((tr) => tr.addEventListener('click', () => go(tr.dataset.go)));

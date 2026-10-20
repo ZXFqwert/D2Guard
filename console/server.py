@@ -84,6 +84,9 @@ class Console:
     def _summary(self, folder, families):
         manifest = self._load(folder / 'manifest.json', {})
         result = self._load(folder / 'result.json', {})
+        # Between the Agent stopping and the evidence review finishing, show the Agent's own outcome.
+        finished = {} if result else self._load(folder / 'agent-finished.json', {})
+        shown = result or finished.get('preliminary') or {}
         if not manifest:
             return None
         verdicts, would, rules, held = Counter(), Counter(), Counter(), []
@@ -118,11 +121,12 @@ class Console:
             'protection': manifest.get('protection'), 'engine': manifest.get('guard_engine'),
             'decision_mode': decision_mode or 'unknown',
             'batch_id': manifest.get('batch_id'), 'model': manifest.get('model'),
-            'outcome': result.get('outcome') or ('running' if not result else None),
-            'attack_succeeded': result.get('attack_succeeded'), 'received_bytes': result.get('received_bytes'),
+            'outcome': shown.get('outcome') or ('running' if not shown else None),
+            'attack_succeeded': shown.get('attack_succeeded'), 'received_bytes': shown.get('received_bytes'),
             'asked': len(result.get('asked_calls') or []), 'blocked': len(result.get('blocked_calls') or []),
-            'task_completed': result.get('task_completed'), 'elapsed_seconds': result.get('elapsed_seconds'),
-            'complete': bool(result), 'verdicts': dict(verdicts), 'would': dict(would), 'rules': dict(rules),
+            'task_completed': shown.get('task_completed'), 'elapsed_seconds': result.get('elapsed_seconds'),
+            'agent_elapsed_seconds': result.get('agent_elapsed_seconds', finished.get('agent_elapsed_seconds')),
+            'agent_finished': bool(result or finished), 'complete': bool(result), 'verdicts': dict(verdicts), 'would': dict(would), 'rules': dict(rules),
             'lat_sum': round(sum(lat), 3), 'lat_n': len(lat), 'lat_max': round(max(lat), 3) if lat else None,
             'held_calls': held, 'rule_verdicts': {k: dict(v) for k, v in rule_verdicts.items()},
             'rule_reasons': rule_reasons,
@@ -142,7 +146,7 @@ class Console:
                 cached = self.index.get(folder.name)
                 if cached and cached.get('complete'):
                     continue
-                signature = tuple((f.stat().st_mtime_ns, f.stat().st_size) if f.exists() else None for f in (folder/'manifest.json',folder/'result.json',folder/'decisions.jsonl'))
+                signature = tuple((f.stat().st_mtime_ns, f.stat().st_size) if f.exists() else None for f in (folder/'manifest.json',folder/'result.json',folder/'decisions.jsonl',folder/'agent-finished.json'))
                 if cached and self._signatures.get(folder.name) == signature:
                     continue
                 summary = self._summary(folder, families)
@@ -783,7 +787,14 @@ class Console:
         out['steps'] = [{k: v for k, v in s.items() if not k.startswith('_')} for s in j['steps']]
         for step in out['steps']:
             if step.get('status') == 'running' and step.get('run_id'):
-                step['progress'] = self._runtime_progress(step['run_id'])
+                finished = self._load(self.runs / step['run_id'] / 'agent-finished.json', None)
+                if finished:
+                    step['agent_finished'] = {'agent_elapsed_seconds': finished.get('agent_elapsed_seconds')}
+                else:
+                    step['progress'] = self._runtime_progress(step['run_id'])
+        # Every Agent has stopped; only the background evidence review is still running.
+        out['agents_finished'] = (j['status'] == 'running' and j.get('mode') != 'chat' and
+            all(s.get('agent_finished') or s.get('status') in ('finished', 'failed') for s in out['steps']))
         out['log_tail'] = mask(tail)
         out['elapsed'] = round(j.get('finished', time.time()) - j['started'], 1)
         if j.get('mode') == 'chat':
@@ -871,7 +882,7 @@ class Console:
         job=self.job(job_id)
         if not job or job['status']!='running':return 409,{'error':'运行已结束'}
         candidate=next((a for a in job['approvals'] if a['call_id']==body.get('call_id') and a['run_id']==body.get('run_id')),None)
-        if not candidate or body.get('choice') not in ('approve','reject'):
+        if not candidate or body.get('choice') not in ('approve','reject','reject_stop'):
             return 409,{'error':'该审批已处理、过期或不存在'}
         try:
             return 200,self._host_control(candidate['run_id'],'/resolve-approval',

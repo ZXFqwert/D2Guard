@@ -124,9 +124,13 @@ def main():
                             if data['choice']=='approve':
                                 result=guard.approve(guard.approvals.host_token(cid),cid,
                                     action['tool'],action['args'],row['agent'])
-                            elif data['choice']=='reject':result=guard.reject(cid)
+                            elif data['choice'] in ('reject','reject_stop'):result=guard.reject(cid)
                             else:raise ValueError('Unknown approval choice')
                             record_resolution(cid,row,action,result)
+                            if data['choice']=='reject_stop':
+                                # Ending the task also rejects any other held call; the hook then aborts the turn.
+                                turn_cancelled = True
+                                append('audit.jsonl', {'type':'host_turn_cancelled','origin':'approval_reject_stop','call_id':cid})
                             return self.respond(200,{'call_id':cid,'approval_status':result['approval_status']})
                         pending=guard.store.db.execute("SELECT id FROM calls WHERE status='ASK'").fetchall()
                         items=[]
@@ -143,7 +147,7 @@ def main():
                         if self.path=='/approvals':return self.respond(200,{'pending':items})
                         row,action=guard.approval_action(data['call_id'])
                         if row['agent']!=data.get('agent_id','main'):raise ValueError('Wrong actor')
-                        return self.respond(200,json.loads(row['decision']))
+                        return self.respond(200,{**json.loads(row['decision']),'stop_turn':turn_cancelled})
                 if is_proxy:
                     agent = self.headers.get('X-D2-Agent-Id','main')
                     with lock:
