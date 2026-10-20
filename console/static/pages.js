@@ -24,11 +24,11 @@ PAGES.overview = async (el) => {
   el.innerHTML = `
     <section class="card arena-ctl">
       ${['batch_id','decision_mode'].map(k => `<label>${k==='batch_id'?'批次':'决策模式'}<select data-overview-filter="${k}"><option value="">全部历史</option>${d.filters[k].map(v=>`<option value="${esc(v)}" ${overviewFilters[k]===v?'selected':''}>${esc(v)}</option>`).join('')}</select></label>`).join('')}
-      <span class="muted small">历史描述性统计；攻击成功率排除正常场景及未判定结果，最终指标以正式配对评测为准。阶段 E 可按批次与 add_risk / rules_gate / taint_gate 分开查看。</span>
+      <span class="muted small">历史描述性统计；攻击成功率排除正常场景及未判定结果，最终指标以正式配对评测为准。可按批次与决策模式（add_risk / rules_gate / taint_gate）分开查看。</span>
     </section>
     <section class="hero">
       <div>
-        <div class="hero-k">所选历史范围 · 可能包含不同阶段与配置</div>
+        <div class="hero-k">所选历史范围 · 可能包含不同批次与配置</div>
         <div class="hero-big"><span class="c-off">${fmtPct(k.off_rate)}</span><span class="arrow">→</span><span class="c-on">${fmtPct(k.on_rate)}</span></div>
         <div class="hero-sub">攻击成功率：防护关闭 ${k.off_success}/${k.off_attack} 轮 → 防护开启 ${k.on_success}/${k.on_attack} 轮</div>
       </div>
@@ -69,14 +69,14 @@ PAGES.overview = async (el) => {
 
     <section class="grid-2-1">
       <div class="card">
-        <div class="card-h"><h3>攻击成功率走势（按运行时间顺序分段）</h3>${legend([['防护关闭', C.off], ['防护开启', C.on], ['该段运行轮次', '#c9d4e8']])}</div>
+        <div class="card-h"><h3>攻击成功率走势（按运行时间顺序分段）</h3>${legend([['防护关闭', C.off], ['防护开启', C.on], ['该段运行轮次', C.soft]])}</div>
         ${lineChart(d.trend, [
           { key: 'off_rate', name: '防护关闭攻击成功率', color: C.off },
-          { key: 'on_rate', name: '防护开启攻击成功率', color: C.on }], { bars: { key: 'runs', name: '该段运行轮次', color: '#c9d4e8' } })}
+          { key: 'on_rate', name: '防护开启攻击成功率', color: C.on }], { bars: { key: 'runs', name: '该段运行轮次', color: C.soft } })}
       </div>
       <div class="card">
         <div class="card-h"><h3>触发最多的规则</h3><a class="link" href="#/policies">查看策略 →</a></div>
-        ${hbars(d.rules.map(([rule, n]) => ({ label: rule, value: n, color: /^POL|DT-2a/.test(rule) ? C.block : /DT-(2b|4a|4b|4c|5)/.test(rule) ? C.ask : '#7b8aa3' })))}
+        ${hbars(d.rules.map(([rule, n]) => ({ label: rule, value: n, color: /^POL|DT-2a/.test(rule) ? C.block : /DT-(2b|4a|4b|4c|5)/.test(rule) ? C.ask : C.muted })))}
       </div>
     </section>
 
@@ -142,7 +142,7 @@ PAGES.scenarios = async (el) => {
           const on = st.attack_on ? `${badge(`开 ${st.attack_on_success || 0}/${st.attack_on} 成功`, st.attack_on_success ? 'block' : 'allow')}` : '';
           return `<tr data-id="${esc(s.id)}"><td class="mono strong">${esc(s.id)}</td>
             <td>${badge(CAT_ZH[s.category] || '旧版', s.category === 'attack' ? 'attack' : s.category === 'normal' ? 'allow' : 'gray')}</td>
-            <td>${esc(s.family_label || '')}</td><td class="mono small">${esc(s.attack_source || '')}</td>
+            <td class="nowrap">${esc(s.family_label || '')}</td><td class="mono small">${esc(s.attack_source || '')}</td>
             <td class="task-cell" title="${esc(s.task)}">${esc((s.task || '').length > 90 ? s.task.slice(0, 88) + '…' : s.task)}</td><td>${off} ${on}${!off && !on ? '<span class="muted">暂无</span>' : ''}</td>
             <td>${s.origin === 'console' ? badge('自定义', 'blue') : badge('官方', 'gray')}</td>
             <td class="ops"><button class="btn sm" data-act="arena">对决</button><button class="btn sm" data-act="escort">护航</button></td></tr>`;
@@ -288,13 +288,18 @@ PAGES.policies = async (el) => {
 const arena = { scenario: null, env: 'attack', runs: {} };
 PAGES.arena = async (el, [sid]) => {
   const list = await getScenarios();
+  if (!sid && app.job?.status === 'running' && app.job.mode === 'arena') { arena.scenario = app.job.scenario; arena.env = app.job.environment; }
   arena.scenario = sid || arena.scenario || (list.find((s) => s.id === 'c-indirect-readme') || list.find((s) => s.category === 'attack') || list[0]).id;
-  el.innerHTML = `
+  const view = 'arena:' + arena.scenario + ':' + arena.env;
+  if (el.dataset.view !== view) {
+    // The frame is built once per scenario/environment; polling only refreshes lanes, verdict and log.
+    el.dataset.view = view;
+    el.innerHTML = `
     <section class="card arena-ctl">
       <label>攻防场景<select id="a-sc">${scenarioOptions(list, arena.scenario)}</select></label>
       <div class="seg" id="a-env"><button data-v="attack">攻击环境</button><button data-v="clean">干净环境</button></div>
       <button class="btn primary big" id="a-go">⚔ 开始双路对决</button>
-      <div class="muted small">同一任务、同一攻击，依次在“防护关闭”与“防护开启”下运行真实 Pi Agent。未发起时展示该场景最近一次的历史运行。</div>
+      <div class="muted small">同一任务、同一攻击，“防护关闭”与“防护开启”两路真实 Pi Agent 同时运行，左右对照。未发起时展示该场景最近一次的历史运行。</div>
     </section>
     <section id="a-info" class="card scenario-strip"></section>
     <section class="arena">
@@ -304,16 +309,19 @@ PAGES.arena = async (el, [sid]) => {
     </section>
     <section id="a-verdict"></section>
     <section id="a-log"></section>`;
-  $$('#a-env button').forEach((b) => b.classList.toggle('active', b.dataset.v === arena.env));
-  $('#a-sc').addEventListener('change', () => go('#/arena/' + $('#a-sc').value));
-  $$('#a-env button').forEach((b) => b.addEventListener('click', () => { arena.env = b.dataset.v; route(); }));
-  $('#a-go').disabled = app.job?.status === 'running';
-  $('#a-go').addEventListener('click', async () => {
-    try { await launch({ scenario: arena.scenario, environment: arena.env, mode: 'arena' }); arena.live = true; toast('已开始双路对决'); route(); } catch (e) { toast('无法启动：' + e.message, true); }
-  });
-  const s = list.find((x) => x.id === arena.scenario);
-  $('#a-info').innerHTML = s ? `<div class="meta">${badge(CAT_ZH[s.category] || '旧版', s.category === 'attack' ? 'attack' : 'allow')} ${badge(s.family_label || '', 'gray')} ${s.attack_source ? badge('载荷来源 ' + s.attack_source, 'gray') : ''}</div>
+    $$('#a-env button').forEach((b) => b.classList.toggle('active', b.dataset.v === arena.env));
+    $('#a-sc').addEventListener('change', () => go('#/arena/' + $('#a-sc').value));
+    $$('#a-env button').forEach((b) => b.addEventListener('click', () => { arena.env = b.dataset.v; route(); }));
+    $('#a-go').addEventListener('click', async () => {
+      try { await launch({ scenario: arena.scenario, environment: arena.env, mode: 'arena' }); arena.live = true; toast('两路 Agent 已同时启动'); route(); } catch (e) { toast('无法启动：' + e.message, true); }
+    });
+    const s = list.find((x) => x.id === arena.scenario);
+    $('#a-info').innerHTML = s ? `<div class="meta">${badge(CAT_ZH[s.category] || '旧版', s.category === 'attack' ? 'attack' : 'allow')} ${badge(s.family_label || '', 'gray')} ${s.attack_source ? badge('载荷来源 ' + s.attack_source, 'gray') : ''}</div>
     <div><b>用户任务：</b>${esc(s.task)}</div>${s.payload_text ? `<div class="payload"><b>攻击载荷：</b>${esc(s.payload_text)}</div>` : ''}` : '';
+  }
+  const busy = app.job?.status === 'running';
+  $('#a-go').disabled = busy;
+  $('#a-go').textContent = busy ? '⏳ 对决进行中…' : '⚔ 开始双路对决';
 
   const job = app.job && app.job.mode === 'arena' && app.job.scenario === arena.scenario && app.job.environment === arena.env ? app.job : null;
   let ids = {};
@@ -324,58 +332,77 @@ PAGES.arena = async (el, [sid]) => {
   }
   const traces = {};
   for (const p of ['off', 'on']) traces[p] = ids[p] ? await api('/api/runs/' + ids[p]).catch(() => null) : null;
-  for (const p of ['off', 'on']) renderLane($('#lane-' + p), p, traces[p], job ? job.steps.find((x) => x.protect === p) : null);
+  for (const p of ['off', 'on']) renderLane($('#lane-' + p), p, traces[p], job ? {...job.steps.find((x) => x.protect === p), preparing_memory: job.preparing_memory} : null);
   renderArenaVerdict(traces, job);
-  if (job) {
-    $('#a-log').innerHTML = `<details class="card"><summary>运行日志（${job.status === 'running' ? '运行中' : job.status === 'finished' ? '已完成' : '失败'} · ${job.elapsed}s）</summary><pre class="code">${esc(job.log_tail || '')}</pre></details>`;
-    if (job.status === 'running') later(() => { if (location.hash.startsWith('#/arena')) route(); }, 2000);
-  }
+  renderJobLog($('#a-log'), job);
+  if (job && job.status === 'running') later(() => { if (location.hash.startsWith('#/arena')) route(); }, 1500);
 };
+
+function renderJobLog(box, job) {
+  if (!job) { setHTML(box, ''); return; }
+  if (!$('details', box)) { box.innerHTML = '<details class="card"><summary></summary><pre class="code"></pre></details>'; box.__html = null; }
+  const state = job.status === 'running' ? '运行中' : job.status === 'finished' ? '已完成' : '失败';
+  $('summary', box).textContent = `运行日志（${state} · ${Math.round(job.elapsed)}s）`;
+  const pre = $('pre', box);
+  if (pre.textContent !== (job.log_tail || '')) pre.textContent = job.log_tail || '';
+}
+
+// Inline approval for a held step, so the decision sits next to the action it concerns.
+function laneApprovals(runId, calls) {
+  const pending = pendingApprovals(app.job).filter((a) => a.run_id === runId);
+  const matched = new Set(calls.map((c) => c.call_id));
+  return { pending, unmatched: pending.filter((a) => !matched.has(a.call_id)) };
+}
 
 function renderLane(box, protect, t, step) {
   const head = protect === 'off' ? ['裸奔 Agent', '防护关闭 · 只记录本应作出的裁决'] : ['D²Guard 护航', '防护开启 · 每次工具调用先裁决再执行'];
   if (!t) {
-    const msg = step?.status === 'failed' ? '运行失败，请查看下方日志。' : step ? (step.status === 'queued' ? '排队中，等待另一路结束…' : '正在启动真实 Agent…') : '该场景在此环境下暂无运行记录';
-    box.innerHTML = `<div class="lane-h"><b>${head[0]}</b><small>${head[1]}</small></div><div class="lane-empty">${msg}</div>`;
+    const msg = step?.preparing_memory ? '前置 Agent 正在写入跨会话记忆，完成后两路同时开始…' : step?.status === 'failed' ? '运行失败，请查看下方日志。' : step ? (step.status === 'queued' ? '等待启动…' : '正在启动真实 Agent（加载快镜模型约 10–20 秒）…') : '该场景在此环境下暂无运行记录';
+    setHTML(box, `<div class="lane-h"><b>${head[0]}</b><small>${head[1]}</small></div><div class="lane-empty">${msg}</div>`);
     return;
   }
   const r = t.run;
   const [label, cls] = outcomeLabel(r);
+  const { unmatched } = laneApprovals(r.id, t.calls);
   const steps = t.calls.map((c, i) => {
-    const w = c.would_verdict || c.verdict;
+    const w = effectiveVerdict(c);
+    const waiting = approvalFor(r.id, c.call_id);
     const state = c.executed ? (w === 'ALLOW' || !w ? 'done' : 'leak') : (['ASK','BLOCK'].includes(c.verdict) ? 'stopped' : 'pending');
-    const stateTxt = { done: '已执行', leak: '已执行（本应拦截）', stopped: c.verdict === 'BLOCK' ? '已阻断' : '已挂起，等待确认', pending: c.verdict === 'ALLOW' ? '已放行，尚无执行记录' : '待裁决' }[state];
-    return `<div class="step ${state} v-${(w || '').toLowerCase()}">
+    const stateTxt = { done: '已执行', leak: '已执行（本应拦截）', stopped: c.verdict === 'BLOCK' ? '已阻断' : waiting ? '已挂起，等你确认 ↓' : '已挂起', pending: c.verdict === 'ALLOW' ? '已放行，尚无执行记录' : '待裁决' }[state];
+    return `<div class="step ${state} v-${(w || '').toLowerCase()}${waiting ? ' awaiting' : ''}">
       <span class="step-n">${i + 1}</span>
       <div class="step-b"><div><span class="mono strong">${esc(c.op)}</span> <span class="mono target">${esc(c.target)}</span></div>
-        <div class="step-m">${verdictBadge(c)} <span class="mono muted">${esc(c.rule_id || '')}</span> · ${stateTxt}${(c.induced_by || []).length ? ' · <b class="c-off">外部指令诱导</b>' : ''}</div></div></div>`;
+        <div class="step-m">${verdictBadge(c)} <span class="mono muted">${esc(c.rule_id || '')}</span> · ${stateTxt}${(c.induced_by || []).length ? ' · <b class="c-off">外部指令诱导</b>' : ''}</div>
+        ${waiting ? approvalButtons(waiting) : ''}</div></div>`;
   }).join('');
-  box.innerHTML = `
+  setHTML(box, `
     <div class="lane-h"><b>${head[0]}</b><small>${head[1]}</small></div>
+    ${unmatched.map((a) => `<div class="lane-tip">⏸ Agent 暂停在 <b>${esc(a.tool)}</b>，等你决定。${approvalButtons(a)}</div>`).join('')}
     <div class="lane-result"><span class="big badge ${cls}">${esc(label)}</span>
       <a class="link" href="#/trace/${esc(r.id)}">溯源 →</a></div>
     <div class="lane-kpi"><div><b>${t.calls.length}</b>工具调用</div><div><b class="c-warn">${t.calls.filter((c) => c.verdict === 'ASK' && !c.executed).length}</b>挂起</div>
       <div><b class="c-off">${t.calls.filter((c) => c.verdict === 'BLOCK').length}</b>阻断</div><div><b class="${r.received_bytes ? 'c-off' : ''}">${r.received_bytes ?? 0}</b>外发字节</div>
       <div><b>${r.elapsed_seconds != null ? r.elapsed_seconds.toFixed(0) + 's' : '…'}</b>耗时</div></div>
     <div class="steps">${steps || '<div class="lane-empty">等待 Agent 提出第一次工具调用…</div>'}</div>
-    <div class="muted small lane-id">${runTime(r.id)} · ${esc(r.id)} · ${esc(r.decision_mode || 'unknown')}${r.complete ? '' : ' · 运行中'}</div>`;
+    <div class="muted small lane-id">${runTime(r.id)} · ${esc(r.id)} · ${esc(r.decision_mode || 'unknown')}${r.complete ? '' : ' · 运行中'}</div>`);
 }
 
 function renderArenaVerdict(tr, job) {
   const off = tr.off?.run, on = tr.on?.run;
-  if (!off || !on || !off.complete || !on.complete) { $('#a-verdict').innerHTML = ''; return; }
+  if (!off || !on || !off.complete || !on.complete) { setHTML($('#a-verdict'), ''); return; }
   const offTxt = off.attack_succeeded ? `攻击成功${off.received_bytes ? `，接收端收到 ${off.received_bytes} 字节` : ''}` : outcomeLabel(off)[0];
   const onTxt = on.attack_succeeded ? '攻击成功' : `${outcomeLabel(on)[0]}${on.received_bytes ? '' : '，接收端 0 字节'}`;
   const good = off.attack_succeeded && !on.attack_succeeded;
-  $('#a-verdict').innerHTML = `<div class="card arena-verdict ${good ? 'good' : ''}">
+  setHTML($('#a-verdict'), `<div class="card arena-verdict ${good ? 'good' : ''}">
     <div><span class="c-off strong">防护关闭：</span>${esc(offTxt)}</div>
     <div><span class="c-on strong">防护开启：</span>${esc(onTxt)}</div>
     ${good ? '<div class="strong">同一攻击在 D²Guard 护航下未能得逞。</div>' : ''}
-    ${job ? '' : '<div class="muted small">以上为历史运行；点击“开始双路对决”可在真实 Agent 上重新运行。</div>'}</div>`;
+    ${job ? '' : '<div class="muted small">以上为历史运行；点击“开始双路对决”可在真实 Agent 上重新运行。</div>'}</div>`);
 }
 
 // ======================= 护航模式 · 计划—决策—执行 =======================
 const ALIGN = {
+  human_approved: ['人工批准 · 本次放行', 'allow', '已确认'],
   in_plan: ['计划内 · 按计划执行', 'allow', '一致'],
   pending: ['待裁决或执行', 'gray', '待核对'],
   unclassified: ['证据不足', 'gray', '待核对'],
@@ -389,31 +416,40 @@ const ALIGN = {
   induced_executed: ['请求污染/指令关联 · 已执行', 'block', '偏离未纠正'],
   deviation_executed: ['偏离计划 · 已执行', 'block', '偏离未纠正'],
 };
+let escortDefault = null;
 PAGES.escort = async (el, args) => {
   const list = await getScenarios();
   let runId = args[0] && args[0] !== 'new' ? args[0] : null;
   const pre = args[0] === 'new' ? args[1] : null;
   const job = app.job && app.job.mode === 'single' && app.job.steps[0].protect === 'on' ? app.job : null;
   if (!runId && job && job.steps[0].run_id) runId = job.steps[0].run_id;
-  const recent = await api('/api/runs?protection=on&limit=60');
-  if (!runId && !pre && !job) runId = (recent.runs.find((r) => r.environment === 'attack' && (r.asked || r.blocked)) || recent.runs[0])?.id;
-  el.innerHTML = `
-    <section class="card arena-ctl">
-      <label>攻防场景<select id="e-sc">${scenarioOptions(list, pre || job?.scenario || recent.runs.find(r => r.id === runId)?.scenario || list.find((s) => s.category === 'attack')?.id)}</select></label>
-      <div class="seg" id="e-env"><button data-v="attack" class="active">攻击环境</button><button data-v="clean">干净环境</button></div>
-      <button class="btn primary big" id="e-go">⛨ 护航运行</button>
-      <label>或查看历史<select id="e-run"><option value="">选择一轮防护开启的运行</option>${recent.runs.map((r) => `<option value="${esc(r.id)}" ${r.id === runId ? 'selected' : ''}>${runTime(r.id)} · ${esc(r.scenario)} · ${ENV_ZH[r.environment]} · ${outcomeLabel(r)[0]}</option>`).join('')}</select></label>
-    </section>
-    <div id="e-body"></div>`;
-  let env = job?.environment || recent.runs.find(r => r.id === runId)?.environment || 'attack';
-  $$('#e-env button').forEach(b => b.classList.toggle('active', b.dataset.v === env));
-  $$('#e-env button').forEach((b) => b.addEventListener('click', () => { env = b.dataset.v; $$('#e-env button').forEach((x) => x.classList.toggle('active', x === b)); }));
-  $('#e-run').addEventListener('change', () => { if ($('#e-run').value) go('#/escort/' + $('#e-run').value); });
-  $('#e-go').disabled = app.job?.status === 'running';
-  $('#e-go').addEventListener('click', async () => {
-    try { await launch({ scenario: $('#e-sc').value, environment: env, protect: 'on' }); toast('护航运行已开始'); go('#/escort'); } catch (e) { toast('无法启动：' + e.message, true); }
-  });
-  if (!runId) { $('#e-body').innerHTML = `<div class="card lane-empty">${job ? (job.status==='failed'?'运行失败，请查看任务日志。':'正在启动真实 Agent…') : '选择场景后点击“护航运行”。'}</div>`; if (job && job.status === 'running') later(route, 1500); return; }
+  const view = 'escort:' + args.join('/') + ':' + (job ? job.id : '');
+  if (el.dataset.view === view) {
+    if (!runId && !pre && !job) runId = escortDefault;
+  } else {
+    const recent = await api('/api/runs?protection=on&limit=60');
+    if (!runId && !pre && !job) runId = escortDefault = (recent.runs.find((r) => r.environment === 'attack' && (r.asked || r.blocked)) || recent.runs[0])?.id;
+    el.dataset.view = view;
+    el.innerHTML = `
+      <section class="card arena-ctl">
+        <label>攻防场景<select id="e-sc">${scenarioOptions(list, pre || job?.scenario || recent.runs.find(r => r.id === runId)?.scenario || list.find((s) => s.category === 'attack')?.id)}</select></label>
+        <div class="seg" id="e-env"><button data-v="attack" class="active">攻击环境</button><button data-v="clean">干净环境</button></div>
+        <button class="btn primary big" id="e-go">⛨ 护航运行</button>
+        <label>或查看历史<select id="e-run"><option value="">选择一轮防护开启的运行</option>${recent.runs.map((r) => `<option value="${esc(r.id)}" ${r.id === runId ? 'selected' : ''}>${runTime(r.id)} · ${esc(r.scenario)} · ${ENV_ZH[r.environment]} · ${outcomeLabel(r)[0]}</option>`).join('')}</select></label>
+      </section>
+      <div id="e-body"></div>`;
+    let env = job?.environment || recent.runs.find(r => r.id === runId)?.environment || 'attack';
+    $$('#e-env button').forEach(b => b.classList.toggle('active', b.dataset.v === env));
+    $$('#e-env button').forEach((b) => b.addEventListener('click', () => { env = b.dataset.v; $$('#e-env button').forEach((x) => x.classList.toggle('active', x === b)); }));
+    $('#e-run').addEventListener('change', () => { if ($('#e-run').value) go('#/escort/' + $('#e-run').value); });
+    $('#e-go').addEventListener('click', async () => {
+      try { await launch({ scenario: $('#e-sc').value, environment: env, protect: 'on' }); toast('护航运行已开始'); go('#/escort'); } catch (e) { toast('无法启动：' + e.message, true); }
+    });
+  }
+  const busy = app.job?.status === 'running';
+  $('#e-go').disabled = busy;
+  $('#e-go').textContent = busy ? '⏳ 运行中…' : '⛨ 护航运行';
+  if (!runId) { setHTML($('#e-body'), `<div class="card lane-empty">${job ? (job.status==='failed'?'运行失败，请查看任务日志。':'正在启动真实 Agent（加载快镜模型约 10–20 秒）…') : '选择场景后点击“护航运行”。'}</div>`); if (job && job.status === 'running') later(route, 1500); return; }
   const t = await api('/api/runs/' + encodeURIComponent(runId));
   renderEscort($('#e-body'), t);
   if (!t.run.complete) later(() => { if (location.hash.startsWith('#/escort')) route(); }, 1500);
@@ -423,14 +459,16 @@ function renderEscort(box, t) {
   const r = t.run, plan = t.plan || {};
   const counts = {};
   t.calls.forEach((c) => { counts[c.alignment] = (counts[c.alignment] || 0) + 1; });
-  const consistent = t.calls.filter((c) => (['in_plan', 'off_plan_low'].includes(c.alignment) || c.alignment.endsWith('_stopped'))).length;
+  const consistent = t.calls.filter((c) => (['in_plan', 'human_approved', 'off_plan_low'].includes(c.alignment) || c.alignment.endsWith('_stopped'))).length;
   const deviations = t.calls.filter((c) => ['induced_stopped','deviation_stopped','induced_executed','deviation_executed','off_plan_allowed'].includes(c.alignment)).length;
   const corrected = (counts.induced_stopped || 0) + (counts.deviation_stopped || 0);
   const score = t.calls.length ? Math.round((consistent / t.calls.length) * 100) : null;
   const chips = (xs, cls) => (xs && xs.length ? xs.map((x) => badge(typeof x === 'string' ? x : JSON.stringify(x), cls)).join(' ') : '<span class="muted">无</span>');
   const spawn = (plan.spawn || []).map((s, i) => `子 Agent ${i + 1}：读 ${(s.read || []).join('、') || '—'}；写 ${(s.write || []).join('、') || '—'}`);
   const [label, cls] = outcomeLabel(r);
-  box.innerHTML = `
+  const { unmatched } = laneApprovals(r.id, t.calls);
+  setHTML(box, `
+    ${unmatched.map((a) => `<div class="card lane-tip">⏸ Agent 暂停在 <b>${esc(a.tool)}</b>，等你决定。${approvalButtons(a)}</div>`).join('')}
     <section class="escort-top">
       <div class="card plan">
         <div class="card-h"><h3>① 计划：用户授权锚点</h3>${badge(plan.mode === 'READONLY_REVIEW' ? '只读审查' : '任务模式', 'blue')}</div>
@@ -460,20 +498,21 @@ function renderEscort(box, t) {
           const a = ALIGN[c.alignment] || ['—', 'gray', '—'];
           const agent = t.agents.find((x) => x.id === c.agent)?.label || c.agent;
           const ind = (c.induced_by || [])[0];
-          const exec = c.executed ? (c.is_error ? '已执行（工具报错）' : '已执行') : c.verdict === 'BLOCK' ? '已阻断，未执行' : c.verdict === 'ASK' ? '已挂起，等待用户确认' : '未执行';
+          const waiting = approvalFor(r.id, c.call_id);
+          const exec = c.executed ? (c.is_error ? '已执行（工具报错）' : '已执行') : c.verdict === 'BLOCK' ? '已阻断，未执行' : c.verdict === 'ASK' ? (waiting ? '已挂起，等你确认' : '已挂起，未执行') : '未执行';
           return `<div class="pde-row a-${esc(c.alignment)}">
             <div class="step-n">${i + 1}</div>
             <div><div><span class="mono strong">${esc(c.op)}</span> <span class="mono target">${esc(c.target)}</span></div>
-              <div class="small muted">${esc(agent)} · ${c.in_scope ? '<b class="c-good">在用户授权内</b>' : '不在用户授权内'}</div>
+              <div class="small muted">${esc(agent)} · ${c.approval_status === 'approved_once' ? '<b class="c-good">原始计划外 · 已人工批准本次</b>' : c.in_scope ? '<b class="c-good">在用户原始授权内</b>' : '不在用户原始授权内'}</div>
               ${ind ? `<div class="quote small">关联来源 <b>${esc(ind.uri)}</b>${ind.excerpt ? '：' + esc(ind.excerpt) : ''}</div>` : ''}</div>
             <div>${verdictBadge(c)} <span class="mono">${esc(c.rule_id || '')}</span> ${c.risk ? badge(c.risk, 'gray') : ''}
               <div class="small">${esc(c.reason || '')}</div>${c.latency_ms != null ? `<div class="small muted">裁决耗时 ${c.latency_ms.toFixed(1)} ms</div>` : ''}</div>
-            <div><b class="${c.executed ? (c.alignment.endsWith('executed') ? 'c-off' : '') : 'c-warn'}">${exec}</b>${c.result_excerpt ? `<div class="small muted">${esc(c.result_excerpt.slice(0, 90))}</div>` : ''}</div>
+            <div><b class="${c.executed ? (c.alignment.endsWith('executed') ? 'c-off' : '') : 'c-warn'}">${exec}</b>${c.result_excerpt ? `<div class="small muted">${esc(c.result_excerpt.slice(0, 90))}</div>` : ''}${waiting ? approvalButtons(waiting) : ''}</div>
             <div>${badge(a[2], a[1])}<div class="small">${esc(a[0])}</div></div>
           </div>`;
         }).join('') || '<div class="lane-empty">等待 Agent 提出第一次工具调用…</div>'}
       </div>
-    </section>`;
+    </section>`);
 }
 
 // ======================= 溯源分析 =======================
@@ -531,6 +570,59 @@ PAGES.runs = async (el) => {
     $(id).addEventListener('input', () => { rstate[key] = $(id).value.trim(); rstate.limit = 100; clearTimeout(timer); timer = setTimeout(draw, 250); });
   }
   await draw();
+};
+
+// ======================= 模型设置 =======================
+const STYLE_ZH = { chat_completions: 'Chat Completions（…/chat/completions）', responses: 'Responses（…/responses）' };
+PAGES.settings = async (el) => {
+  const s = await api('/api/settings');
+  const block = (id, m) => `
+    <label>接口地址（base_url）<input id="${id}-url" value="${esc(m.base_url)}" placeholder="https://api.example.com/v1" autocomplete="off"></label>
+    <label>接口类型<select id="${id}-style">${Object.entries(STYLE_ZH).map(([k, v]) => `<option value="${k}" ${m.api_style === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
+    <label>模型名称<input id="${id}-model" value="${esc(m.model)}" list="${id}-models" placeholder="例如 qwen3-32b" autocomplete="off"><datalist id="${id}-models"></datalist></label>
+    <label>API Key<input id="${id}-key" type="password" placeholder="${m.has_key ? '已保存在本机，留空表示不修改' : id === 'r' ? '留空则沿用 Agent 的 Key（同一接口地址时）' : '未配置'}" autocomplete="new-password"></label>
+    <div class="row"><button class="btn" data-test="${id}">测试连接</button><button class="btn" data-list="${id}">获取模型列表</button></div>
+    <div class="test-out muted" id="${id}-out"></div>`;
+  el.innerHTML = `
+    <section class="card"><div class="muted">这里决定两件事：<b>Agent 用哪个大模型干活</b>，<b>慢镜用哪个大模型写研判与溯源报告</b>。
+      快镜是本地的 Laya 模型，不需要配置。保存后从<b>下一次运行</b>开始生效；API Key 只保存在本机 <span class="mono">.local</span> 目录，页面不会显示已保存的 Key。
+      支持任何 OpenAI 兼容接口。${s.running ? '<br><b class="c-warn">当前有运行在进行，它仍使用启动时的模型。</b>' : ''}</div></section>
+    <section class="settings-grid">
+      <div class="card"><div class="card-h"><h3>Agent 模型</h3>${badge('执行任务', 'blue')}</div>
+        <div class="muted small">被保护的 Pi Agent 调用这个模型来理解任务、决定调用哪些工具。</div>
+        ${block('a', s.agent)}</div>
+      <div class="card"><div class="card-h"><h3>慢镜模型</h3>${badge('异步研判 · 溯源报告', 'gray')}</div>
+        <div class="muted small">在挂起或阻断之后，慢镜调用这个模型生成中文研判报告；它不会改变放行、挂起、阻断的裁决。</div>
+        <label class="check"><input type="checkbox" id="r-same" ${s.review.separate ? '' : 'checked'}> 与 Agent 使用同一个模型</label>
+        <fieldset id="r-fields" ${s.review.separate ? '' : 'disabled'}>${block('r', s.review.separate ? s.review : { ...s.review, base_url: s.review.base_url || s.agent.base_url, api_style: s.review.api_style || s.agent.api_style })}
+          <div class="muted small">与 Agent 用同一个接口地址时，API Key 可以留空，自动沿用 Agent 的 Key。</div></fieldset></div>
+    </section>
+    <section class="card row"><button class="btn primary big" id="s-save">保存设置</button><span class="muted">保存时会检查必填项；建议先点“测试连接”。</span></section>`;
+  const form = (id) => ({ base_url: $(`#${id}-url`).value.trim(), api_style: $(`#${id}-style`).value, model: $(`#${id}-model`).value.trim(), api_key: $(`#${id}-key`).value.trim() });
+  $('#r-same').addEventListener('change', () => { $('#r-fields').disabled = $('#r-same').checked; });
+  $('.settings-grid', el).addEventListener('click', async (e) => {
+    const t = e.target.closest('[data-test],[data-list]'); if (!t) return;
+    const id = t.dataset.test || t.dataset.list, out = $(`#${id}-out`), target = id === 'a' ? 'agent' : 'review';
+    t.disabled = true;
+    try {
+      if (t.dataset.test) {
+        out.textContent = '正在发送一条测试消息…';
+        const r = await send('/api/settings/test', 'POST', { target, ...form(id) });
+        out.innerHTML = r.ok ? `<b class="c-good">连接成功</b> · ${r.latency_ms} ms · 模型回复：${esc(r.reply || '（空）')}` : `<b class="c-off">连接失败</b> · ${esc(r.error)}`;
+      } else {
+        const r = await send('/api/settings/models', 'POST', { target, ...form(id) });
+        $(`#${id}-models`).innerHTML = r.models.map((m) => `<option value="${esc(m)}">`).join('');
+        out.innerHTML = r.models.length ? `找到 ${r.models.length} 个模型，点击“模型名称”输入框可下拉选择。` : esc(r.error || '接口没有返回模型列表，可直接填写模型名称。');
+      }
+    } catch (err) { out.innerHTML = `<b class="c-off">${esc(err.message)}</b>`; }
+    t.disabled = false;
+  });
+  $('#s-save').addEventListener('click', async () => {
+    try {
+      await send('/api/settings', 'PUT', { agent: form('a'), review: { separate: !$('#r-same').checked, ...form('r') } });
+      toast('已保存，下一次运行开始生效'); delete el.dataset.view; route();
+    } catch (err) { toast(err.message, true); }
+  });
 };
 
 // ---------------- boot ----------------

@@ -79,3 +79,4 @@ def calibrate(rows,z):
 def nll(rows,ps):
     y=np.array([LABELS.index(r['label']) for r in rows])
     return float(-np.log(np.maximum(ps[np.arange(len(rows)),y],1e-12)).mean())
+

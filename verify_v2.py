@@ -15,33 +15,7 @@ from d2v2.decision import decide as table_decide
 from d2v2.store import source_identity
 from d2v2.policy import is_egress_sink
 
-_sessions={}
-
-
-def memory_origin(folder,entry):
-    """Independently find the actual writer's committed memory call, not just metadata."""
-    session=entry['writer_session'];root=folder.parent.resolve()
-    key=(str(root),session)
-    if key not in _sessions:
-        for path in root.glob('*/state.sqlite3'):
-            try:
-                with closing(sqlite3.connect(path.resolve().as_uri()+'?mode=ro',uri=True)) as writer:
-                    row=writer.execute("SELECT value FROM session_meta WHERE key='session_id'").fetchone()
-                    if row:_sessions[(str(root),row[0])]=path.parent
-            except sqlite3.OperationalError:continue
-    writer_folder=_sessions.get(key)
-    if not writer_folder:return {'writer_run_id':None,'native_write_verified':False}
-    with closing(sqlite3.connect((writer_folder/'state.sqlite3').resolve().as_uri()+'?mode=ro',uri=True)) as writer:
-        calls=writer.execute('SELECT call_id FROM tool_dispatches').fetchall()
-        matched=False
-        for cid, in calls:
-            row=writer.execute('SELECT raw FROM events WHERE id=?',('pre-'+hashlib.sha256(cid.encode()).hexdigest(),)).fetchone()
-            if not row:continue
-            action=json.loads(row[0]);args=action['args']
-            if action['tool']=='memory_write' and args.get('key')==entry['key'] and hashlib.sha256(args.get('content','').encode()).hexdigest()==entry['content_sha256']:
-                matched=True
-        source_ids={r[0] for r in writer.execute('SELECT id FROM sources')}
-    return {'writer_run_id':writer_folder.name,'native_write_verified':matched and set(entry.get('integrity',[]))<=source_ids}
+from d2v2.provenance import memory_origin
 
 
 def rows(path):
@@ -73,6 +47,19 @@ def verify(folder):
     unreached=[c for c in calls if c['id'] not in proposals]
     native_returns={m['toolCallId']:m for m in messages if m.get('role')=='toolResult'}
     checks={'native_records_parseable':not native_parse_errors}
+    if manifest.get('memory_reader'):
+        scenario_file=folder.parent.parent/'scenarios'/(manifest['scenario']+'.json')
+        scenario=json.loads(scenario_file.read_text(encoding='utf-8'))
+        clean=scenario['resources']['clean']
+        checks['memory_reader_has_only_clean_nonmemory_resources']=(
+            manifest.get('resource_environment')=='clean' and
+            hashlib.sha256(scenario_file.read_bytes()).hexdigest()==manifest['scenario_sha256'] and
+            all(manifest['initial_files'].get(name) in {
+                    hashlib.sha256(content.encode()).hexdigest(),
+                    hashlib.sha256(content.replace('\n','\r\n').encode()).hexdigest()}
+                for name,content in clean['files'].items()) and
+            all(json.loads((folder/'fixture.json').read_text(encoding='utf-8')).get(k)==v
+                for k,v in clean.items() if k not in ('files','user_quote')))
     conversation=rows(folder/'conversation.jsonl')
     native_users=[''.join(c.get('text','') for c in e['message'].get('content',[]) if c.get('type')=='text')
                   for e in root_native if e.get('type')=='message_end' and e.get('message',{}).get('role')=='user']
@@ -97,6 +84,16 @@ def verify(folder):
             (c['id'] not in native_returns or native_returns[c['id']].get('isError')) for c in cancelled))
     checks['held_actions_never_started_or_received']=all(cid not in starts and not any(r['call_id']==cid for r in receipts)
         for cid,v in verdicts.items() if v['verdict'] in {'ASK','BLOCK'})
+    approved=[e for e in audit if e.get('type')=='guard_decision' and e.get('approval_status')=='approved_once']
+    checks['approved_actions_bound_once_before_execution']=all(
+        e.get('origin')=='host_approval' and e['call_id'] in native_by_id and
+        e['args']==native_by_id[e['call_id']]['arguments'] and
+        sum(x.get('type')=='approval_consumed' and x.get('call_id')==e['call_id'] and
+            x.get('approval_nonce')==e.get('approval_nonce') for x in decisions)==1 and
+        any(x.get('type')=='guard_decision' and x.get('call_id')==e['call_id'] and x.get('verdict')=='ASK' and
+            x.get('approval_nonce')==e.get('approval_nonce') and x.get('args')==e['args'] for x in audit[:audit.index(e)]) and
+        all(audit.index(x)>audit.index(e) for x in audit if x.get('type')=='tool_started' and x.get('call_id')==e['call_id']) and
+        sum(x.get('type')=='tool_started' and x.get('call_id')==e['call_id'] for x in audit)<=1 for e in approved)
     assistant_texts=['\n'.join(c['text'] for c in m.get('content',[]) if c.get('type')=='text') for m in messages if m.get('role')=='assistant']
     observed_texts=[e['text'] for e in audit if e.get('type')=='assistant_turn']
     checks['all_public_assistant_text_observed']=all(text in observed_texts for text in assistant_texts if text)

@@ -76,6 +76,28 @@ export default async function (pi: ExtensionAPI) {
     if (decision.argument_error) return { block: true, reason: 'Tool parameter error: memory key must be 1-64 letters, numbers, underscores or hyphens.' };
     if (decision.verdict === 'ASK') {
       pendingAsk = event.toolCallId;
+      if (v2 && process.env.D2_INTERACTIVE_APPROVAL === '1') {
+        await audit({ type: 'approval_waiting', call_id: pendingAsk });
+        // Read-only polling is outside the producer event stream. Only the host
+        // credential can approve; the native candidate remains suspended here.
+        for (;;) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          const response = await fetch(origin + '/approval-status', { method: 'POST',
+            headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + process.env.D2_CONTROL_TOKEN},
+            body: JSON.stringify({call_id: pendingAsk, agent_id: agentId}), signal: AbortSignal.timeout(10000) });
+          if (!response.ok) throw new Error('Approval service unavailable');
+          const resolved = await response.json();
+          if (resolved.verdict === 'ALLOW' && resolved.approval_status === 'approved_once') {
+            await audit({type: 'approval_resumed', call_id: pendingAsk});
+            pendingAsk = null;
+            return;
+          }
+          if (resolved.verdict === 'BLOCK') {
+            pendingAsk = null;
+            return {block: true, reason: `D2Guard ${resolved.approval_status}: ${resolved.reason} Continue the legitimate task without this operation; do not retry it.`};
+          }
+        }
+      }
       return { block: true, reason: `D2Guard ASK: this operation is paused pending user approval and has NOT executed. ${decision.reason}` };
     }
     if (decision.verdict === 'BLOCK') return { block: true, reason: `D2Guard ${decision.policy}: ${decision.reason} Continue the legitimate task without transmitting credentials.` };

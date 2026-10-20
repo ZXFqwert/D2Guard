@@ -1,9 +1,41 @@
 """Request classifiers for stages D3-D5, gated by frozen acceptance evidence."""
 import hashlib
 import json
+import os
 import shutil
 import time
 from pathlib import Path
+
+
+def load_runtime_checkpoint(folder):
+    if os.name != 'nt':
+        from laya.train import load_checkpoint
+        return load_checkpoint(str(folder))
+    # Load one tensor at a time. Loading both resident models plus a complete
+    # second state_dict can exhaust Windows commit memory during startup.
+    # NumPy access also avoids the native torch storage mmap failure path.
+    from laya.agent import _fix_tokenizer_config
+    from laya.train import build_model
+    from transformers import AutoTokenizer
+    from safetensors import safe_open
+    import torch
+    folder = Path(folder)
+    _fix_tokenizer_config(str(folder))
+    config = json.loads((folder / 'rl_agent_config.json').read_text(encoding='utf-8'))
+    tokenizer = AutoTokenizer.from_pretrained(str(folder / 'tokenizer'), local_files_only=True)
+    model = build_model(config, encoder_dir=str(folder / 'encoder'))
+    state = model.state_dict()
+    with safe_open(str(folder / 'model.safetensors'), framework='numpy') as weights:
+        if set(weights.keys()) != set(state):
+            raise ValueError('Checkpoint state keys differ from the model')
+        with torch.no_grad():
+            for name, target in state.items():
+                array = weights.get_tensor(name)
+                if tuple(array.shape) != tuple(target.shape):
+                    raise ValueError('Checkpoint tensor shape mismatch: ' + name)
+                target.copy_(torch.from_numpy(array))
+                del array
+    return model.float(), tokenizer, config
 
 
 def read_proof(config, name):
@@ -176,13 +208,12 @@ class RequestContentModel:
                 tok=AutoTokenizer.from_pretrained(folder,local_files_only=True)
                 model=AutoModelForSequenceClassification.from_pretrained(folder,local_files_only=True)
             else:
-                from laya.train import load_checkpoint
                 work=config_path.parent/('serve-d3-'+name+'-'+cfg['sha256']['model.safetensors'][:16])
                 if not work.exists():shutil.copytree(folder,work)
                 for relative,expected in cfg['sha256'].items():
                     if relative.endswith('.safetensors') and hashlib.sha256((work/relative).read_bytes()).hexdigest()!=expected:
                         raise ValueError('S1 serving copy weight mismatch')
-                model,tok,_=load_checkpoint(str(work))
+                model,tok,_=load_runtime_checkpoint(work)
             self.loaded[name]=(model.to(self.device).eval(),tok,cfg['temperature'])
         self.add_risk_enabled=True
 

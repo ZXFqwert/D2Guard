@@ -63,9 +63,29 @@ def affirmative_clauses(text):
             yield clause
 
 
+def readonly_intent(text):
+    from .user_message import split_user_message
+    trusted, _ = split_user_message(text)
+    markers = r'\bread[ _-]?only\b|只读|\bcode[ _-]?review\b|\breview\s+(?:(?:the|project)\s+){0,2}code\b|代码.{0,4}(?:检视|审查|审阅|评审)|(?:检视|审查|审阅|评审).{0,4}代码'
+    for match in re.finditer(markers, trusted, re.I):
+        prefix = trusted[:match.start()]
+        # An explicitly negated task mode is not a read-only instruction.
+        if re.search(r"\b(?:not|isn't|isn’t)\s+(?:(?:a|an)\s+)?$|(?:不是|并非|无需|不要求|不限制为)\s*$", prefix, re.I):
+            continue
+        return True
+    return False
+
+
 def grant(text, ref, version):
-    result={'version':version,'intent_mode':'READONLY_REVIEW' if re.search(r'read.?only|只读',text,re.I) else 'TASK',
-        'read':[],'write':[],'net':[],'spawn':[],'commands':[],'mcp':[],'evidence_ref':ref,'coverage_incomplete':False}
+    result={'version':version,'intent_mode':'READONLY_REVIEW' if readonly_intent(text) else 'TASK',
+        'read':[],'write':[],'net':[],'spawn':[],'commands':[],'mcp':[],'git_push':[],'evidence_ref':ref,'coverage_incomplete':False}
+    for clause in affirmative_clauses(text):
+        # Bind a user-requested push to its named remote and exact refspec.
+        # Git refs are case-sensitive; do not casefold HEAD or branch names.
+        for match in re.finditer(r'\bgit\s+push\s+([\w.-]+)\s+([\w:/.-]+)',clause,re.I):
+            result['git_push'].append({'remote':match.group(1),'ref':match.group(2).rstrip('.')})
+        for match in re.finditer(r'\bpush\s+([\w:/.-]+)\s+to\s+(?:the\s+)?(?:local\s+)?([\w.-]+)|推送\s*([\w:/.-]+)\s*(?:到|至)\s*([\w.-]+)',clause,re.I):
+            result['git_push'].append({'remote':(match.group(2) or match.group(4)).rstrip('.'),'ref':match.group(1) or match.group(3)})
     for clause in affirmative_clauses(target_view(text)):
         local={'read':[],'write':[]}
         for match in re.finditer(r"(?:\brun|\bexecute|运行|执行)\s+`([^`]+)`",clause,re.I):result['commands'].append(match.group(1).strip())
@@ -101,6 +121,9 @@ def literal_scope(delta,args,anchor,hits=()):
     if name=='net.fetch':return delta['op']+' '+target in anchor.get('net',[])
     if name=='exec' and not hits:return args.get('command',args.get('cmd','')).strip().casefold() in anchor.get('commands',[])
     if name=='mcp.call' and not hits:return args.get('name','').casefold() in anchor.get('mcp',[])
+    if name=='git.push' and not hits:
+        requested={'remote':args.get('remote','origin'),'ref':args.get('ref','HEAD')}
+        return requested in anchor.get('git_push',[])
     if name=='spawn_subagent' and not hits:
         task=args.get('task','')
         requested=grant(task,{},0)

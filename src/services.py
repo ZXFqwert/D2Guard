@@ -101,12 +101,42 @@ def main():
                     'bytes': len(raw), 'body': raw.decode('utf-8', errors='replace')})
                 if args.engine == 'd2v2':guard.receipt(self.headers.get('X-D2-Call-Id'))
                 return self.respond(200, {'received_bytes': len(raw), 'receipt_seq': receipt['seq']})
-            host_route = self.path in {'/approve', '/approval-token'}
+            host_route = self.path in {'/approve', '/approval-token', '/approvals', '/resolve-approval'}
             expected = approval_credential if host_route else token
             if not expected or self.headers.get('Authorization') != 'Bearer ' + expected:
                 return self.respond(403, {'error': 'control authentication required'})
             try:
                 data = json.loads(raw)
+                if self.path in {'/approvals','/resolve-approval','/approval-status'} and args.engine=='d2v2':
+                    with guard.lock:
+                        def record_resolution(cid,row,action,result):
+                            append('audit.jsonl',{'type':'guard_decision','origin':'host_approval',
+                                'call_id':cid,'agent_id':row['agent'],**action,**result})
+                        if self.path=='/resolve-approval':
+                            cid=data['call_id'];row,action=guard.approval_action(cid)
+                            if data['choice']=='approve':
+                                result=guard.approve(guard.approvals.host_token(cid),cid,
+                                    action['tool'],action['args'],row['agent'])
+                            elif data['choice']=='reject':result=guard.reject(cid)
+                            else:raise ValueError('Unknown approval choice')
+                            record_resolution(cid,row,action,result)
+                            return self.respond(200,{'call_id':cid,'approval_status':result['approval_status']})
+                        pending=guard.store.db.execute("SELECT id FROM calls WHERE status='ASK'").fetchall()
+                        items=[]
+                        for item in pending:
+                            cid=item['id'];row,action=guard.approval_action(cid)
+                            decision=json.loads(row['decision'])
+                            if decision.get('approval_expires',float('inf'))<=time.time():
+                                result=guard.reject(cid,'expired');record_resolution(cid,row,action,result)
+                                continue
+                            items.append(guard._security({'call_id':cid,'agent_id':row['agent'],**action,
+                                'reason':decision['reason'],'rule_id':decision['rule_id'],
+                                'expires':decision.get('approval_expires'),
+                                'approvable':decision.get('risk')!='R3' and not decision['rule_id'].startswith(('PROTOCOL_','POL-INCOMPLETE','POL-SESSION'))}))
+                        if self.path=='/approvals':return self.respond(200,{'pending':items})
+                        row,action=guard.approval_action(data['call_id'])
+                        if row['agent']!=data.get('agent_id','main'):raise ValueError('Wrong actor')
+                        return self.respond(200,json.loads(row['decision']))
                 if is_proxy:
                     agent = self.headers.get('X-D2-Agent-Id','main')
                     with lock:
@@ -136,9 +166,25 @@ def main():
                     return self.respond(200,{'cancelled_requests':ids})
                 if self.path == '/finalize':
                     if args.engine=='d2v2' and data.get('agents_stopped') is True:guard.finalize_subagents()
-                    return self.respond(200, guard.drain() if args.engine in ('d2core','d2v2') else {'pending_reviews': 0})
+                    drained = guard.drain() if args.engine in ('d2core','d2v2') else {'pending_reviews': 0}
+                    if args.engine == 'd2v2' and data.get('agents_stopped') is True:
+                        # Persist the final evidence before the host stops this process.
+                        # Windows readers must not race recovery of a killed WAL writer.
+                        with guard.lock:
+                            guard.store.db.commit()
+                            drained['evidence_checkpoint'] = list(guard.store.db.execute('PRAGMA wal_checkpoint(FULL)').fetchone())
+                    return self.respond(200, drained)
+                if self.path == '/shutdown':
+                    self.respond(200, {'stopping': True})
+                    threading.Thread(target=server.shutdown, daemon=True).start()
+                    return
                 if self.path == '/approve' and args.engine=='d2v2':
-                    return self.respond(200,guard.approve(data['token'],data['call_id'],data['tool'],data['args'],data.get('agent_id','main')))
+                    with guard.lock:
+                        result=guard.approve(data['token'],data['call_id'],data['tool'],data['args'],data.get('agent_id','main'))
+                        append('audit.jsonl',{'type':'guard_decision','origin':'host_approval',
+                            'call_id':data['call_id'],'agent_id':data.get('agent_id','main'),
+                            'tool':data['tool'],'args':data['args'],**result})
+                        return self.respond(200,result)
                 if self.path == '/approval-token' and args.engine=='d2v2':
                     with guard.lock:
                         return self.respond(200,{'token':guard.approvals.host_token(data['call_id'])})
@@ -222,13 +268,18 @@ def main():
                 self.respond(400, {'error': 'invalid control request'})
 
     server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
-    (folder / 'service.json').write_text(json.dumps({'origin': f'http://127.0.0.1:{server.server_port}',
+    ready = folder / 'service.json.tmp'
+    ready.write_text(json.dumps({'origin': f'http://127.0.0.1:{server.server_port}',
         'pid': os.getpid()}), encoding='utf-8')
+    ready.replace(folder / 'service.json')
     try:
         server.serve_forever()
     finally:
         if bridge:bridge.close()
         server.server_close()
+        if args.engine == 'd2v2':
+            with guard.lock:
+                guard.store.db.close()
 
 
 if __name__ == '__main__':

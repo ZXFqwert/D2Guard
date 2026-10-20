@@ -72,10 +72,10 @@ class OriginalLaya:
     calibrated_questions = frozenset()
 
     def token_offsets(self, text):
-        return self.agent.tok(text,add_special_tokens=False,return_offsets_mapping=True)['offset_mapping']
+        return self.tokenizer(text,add_special_tokens=False,return_offsets_mapping=True)['offset_mapping']
 
     def count_tokens(self, text):
-        return len(self.agent.tok(text, add_special_tokens=False)['input_ids'])
+        return len(self.tokenizer(text, add_special_tokens=False)['input_ids'])
 
     def answer_questions(self, views):
         from d2v2.views import encode_view, check_fields, InputBudgetExceeded
@@ -85,6 +85,7 @@ class OriginalLaya:
                'diagnostics':{'taint_followed':'not_requested; excluded_from_decision'}}
         answers={}
         try:
+            self._ensure_model()
             for q,view in views.items():
                 check_fields(view)
                 encoded=encode_view(view)
@@ -109,11 +110,11 @@ class OriginalLaya:
         return answers
 
     def token_span(self,raw,char_span):
-        offsets=self.agent.tok(raw,add_special_tokens=False,return_offsets_mapping=True)['offset_mapping']
+        offsets=self.tokenizer(raw,add_special_tokens=False,return_offsets_mapping=True)['offset_mapping']
         indices=[i for i,(a,b) in enumerate(offsets) if a<char_span[1] and b>char_span[0]]
         return [indices[0],indices[-1]+1] if indices else [0,0]
 
-    def __init__(self, config_path):
+    def __init__(self, config_path, lazy=False):
         config = json.loads(Path(config_path).read_text(encoding='utf-8'))
         if config.get('remote_only'):
             raise RuntimeError('English Laya is configured on the compute host only. Run there or prepare the pinned English model locally; no multilingual fallback.')
@@ -142,16 +143,40 @@ class OriginalLaya:
             target=runtime/source.relative_to(path);target.parent.mkdir(parents=True,exist_ok=True)
             if source.name=='model.safetensors':os.link(source,target)
             else:shutil.copy2(source,target)
-        self.agent = laya.load(str(runtime), device=device, backend='eager')
+        self.agent = None
+        self._runtime_path = runtime
+        self._device = device
         self.last_trace = {}
         self.metadata = {k: config[k] for k in ('repository', 'revision', 'sha256')}
         self.metadata.update(backend='original-laya-eager', device=device, threads=4,
                              laya_version=laya.__version__, torch_version=torch.__version__)
-        self.metadata.update(dtype=str(self.agent.dtype), amp_enabled=self.agent.amp_enabled,
-                             gpu_name=torch.cuda.get_device_name(0) if device.startswith('cuda') else None)
-        self.agent.system_one({'task':'Read project documentation.', 'action':'Read README.md'}, {'A1':ACTION_QUESTIONS['A1']}, max_len=512)
-        self.metadata['load_and_warmup_ms'] = (time.perf_counter()-start)*1000
-        self.model_loaded = True
+        self.model_loaded = False
+        if lazy:
+            # A1/A2 are uncalibrated and do not participate in the decision table.
+            # Runtime needs this exact tokenizer; baseline weights load on demand.
+            from laya.agent import _fix_tokenizer_config, _load_tokenizer
+            _fix_tokenizer_config(str(runtime))
+            cfg = json.loads((runtime/'rl_agent_config.json').read_text(encoding='utf-8'))
+            self.tokenizer = _load_tokenizer(str(runtime/'tokenizer'), cfg)
+            self.metadata.update(backend='original-laya-tokenizer-lazy', model_loaded=False)
+        else:
+            self._ensure_model()
+        self.metadata['initialization_ms'] = (time.perf_counter()-start)*1000
+
+    def _ensure_model(self):
+        if self.agent is not None:
+            return
+        import laya
+        import torch
+        start=time.perf_counter()
+        self.agent=laya.load(str(self._runtime_path),device=self._device,backend='eager')
+        self.tokenizer=self.agent.tok
+        self.agent.system_one({'task':'Read project documentation.','action':'Read README.md'}, {'A1':ACTION_QUESTIONS['A1']},max_len=512)
+        self.model_loaded=True
+        self.metadata.update(backend='original-laya-eager',model_loaded=True,
+                             dtype=str(self.agent.dtype),amp_enabled=self.agent.amp_enabled,
+                             gpu_name=torch.cuda.get_device_name(0) if self._device.startswith('cuda') else None,
+                             load_and_warmup_ms=(time.perf_counter()-start)*1000)
 
     def classify_security(self, previous_security_state, security_delta):
         start = time.perf_counter()
@@ -165,6 +190,7 @@ class OriginalLaya:
         try:
             if len(encoded) > 32768:
                 raise ValueError('Input exceeds bounded local inference size')
+            self._ensure_model()
             result = self.agent.system_one(payload, QUESTIONS, max_len=512)
             trace['usage'] = result.get('usage', {})
             trace['answers'] = result['answers']

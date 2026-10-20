@@ -17,6 +17,7 @@ def required_questions(facts):
     if (facts.get('hard_policy') or facts.get('soft_policy') or facts.get('secret_hit') and facts.get('untrusted_sink')
             or facts.get('context_secret') and facts.get('untrusted_sink') and not facts.get('network_granted')
             or facts.get('literal_scope')
+            or facts.get('direct_injection') and (facts.get('sensitive') or facts.get('high_risk'))
             or facts.get('sensitive') and facts.get('directive')):
         return ()
     if facts.get('sensitive') or facts.get('low_risk'):
@@ -40,6 +41,8 @@ def decide(facts, model_answers):
         return 'ASK', facts['soft_policy'], 'R2', facts.get('soft_reason') or '状态策略要求确认。'
     if facts.get('literal_scope'):
         return 'ALLOW', 'DT-3', 'R0', '动作在用户字面授权内，未命中机密外流条件。'
+    if facts.get('direct_injection') and (facts.get('sensitive') or facts.get('high_risk')):
+        return 'ASK', 'DT-4i', 'R2', '用户输入含直接注入特征（上下文劫持、角色伪装或越权声明），该消息不产生授权，敏感或高风险动作需人工确认。'
     if facts.get('sensitive') and facts.get('directive'):
         return 'ASK', 'DT-4a', 'R2', '未授权敏感动作命中外部指令索引；这是关联证据，不是因果证明。'
     a1, a2 = answer(model_answers, 'A1'), answer(model_answers, 'A2')

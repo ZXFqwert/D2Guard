@@ -1,0 +1,81 @@
+version: 2
+trust:
+  domains: []
+commands:
+  download_commands: [curl, wget, invoke-webrequest, iwr, invoke-restmethod, irm]
+  execution_commands: [sh, bash, zsh, dash, cmd, powershell, pwsh, python, python3, perl, ruby, node, iex, invoke-expression]
+rules:
+  - id: POL-FS-WRITE-SENSITIVE
+    match: {tool: [fs.write, exec], effect: file_write}
+    when:
+      target.path matches:
+        - '*/.ssh/*'
+        - '*/.ssh'
+        - '*/.aws/*'
+        - '*/.aws'
+        - '/etc/cron*'
+        - '/etc/init.d/*'
+        - '/etc/rc*.d/*'
+        - '/etc/systemd/system/*'
+        - '/usr/lib/systemd/system/*'
+        - '*/.config/autostart/*'
+        - '*/.config/systemd/user/*'
+        - '*/start menu/programs/startup/*'
+        - '*/windows/system32/tasks/*'
+        - '*/library/launchagents/*'
+        - '/library/launchdaemons/*'
+        - '*/.vscode/settings.json'
+        - '*/.claude/*'
+        - '*/.codex/*'
+        - '*/.pi/*'
+        - '*/.bashrc'
+        - '*/.bash_profile'
+        - '*/.bash_login'
+        - '*/.zshrc'
+        - '*/.zshenv'
+        - '*/.zprofile'
+        - '*/.zlogin'
+        - '*/.profile'
+        - '*/powershell/profile.ps1'
+        - '*/powershell/*_profile.ps1'
+        - '*/windowspowershell/profile.ps1'
+        - '*/windowspowershell/*_profile.ps1'
+        - '*/.config/fish/config.fish'
+        - '*/.git/hooks/*'
+        - '*/.git/config'
+        - '*/.github/workflows/*'
+        - '*/.gitlab-ci.yml'
+        - '*/.circleci/config.yml'
+        - '*/jenkinsfile'
+        - '*/azure-pipelines.yml'
+    risk: {base: R3}
+    verdict: {R3: BLOCK}
+    explain: 禁止写入凭证、持久化启动或 Agent 配置路径。
+  - id: POL-NET-SECRET-EXFIL
+    match: {tool: [net.fetch, mcp.call]}
+    when:
+      any:
+        - all: [action.fingerprint_egress, args.contains_secret_fingerprint]
+        - all: [action.egress_sink, ctx.confidentiality.nonempty, target.domain not in trust.domains, not authority.net_granted]
+    risk: {base: R2, escalate: [{if: args.contains_secret_fingerprint, to: R3}]}
+    verdict: {R3: BLOCK, R2: ASK}
+    explain: 外发参数命中机密指纹，或持有机密的上下文试图向未授权目标外发。
+  - id: POL-GIT-REVIEW-NO-PUSH
+    match: {tool: [git.push, git.commit, exec], effect: vcs_publish}
+    when: {authority.mode: READONLY_REVIEW}
+    risk: {base: R3}
+    verdict: {R3: BLOCK}
+    explain: 只读审查禁止提交或推送代码。
+  - id: POL-EXEC-RESTRICT
+    match: {tool: [exec]}
+    when:
+      any: [cmd.ast.pipe_to_interpreter, cmd.ast.decode_then_exec, cmd.ast.remote_download_exec, cmd.reads_sensitive_env]
+    risk: {base: R3}
+    verdict: {R3: BLOCK}
+    explain: 命令包含受禁止的下载、管道或解码执行链，或访问敏感环境变量。
+  - id: POL-SUBAGENT-SECRET-LEAK
+    match: {tool: [spawn_subagent]}
+    when: args.contains_secret_fingerprint
+    risk: {base: R3}
+    verdict: {R3: BLOCK}
+    explain: 子任务参数携带已登记机密；仅引用路径由子 Agent 的实际动作另行裁决。

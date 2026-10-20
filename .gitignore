@@ -8,6 +8,7 @@ node_modules/
 
 # Local environments, model artifacts and training outputs
 .venv/
+.venv-windows/
 weights/
 training/work/
 *.safetensors

@@ -5,6 +5,8 @@ import math
 def source_request_taint(analysis, mode='taint_gate', source_sha=None):
     if not isinstance(analysis,dict) or analysis.get('structural_gap'):
         return True,'missing_or_structural_gap'
+    if analysis.get('direct_injection'):
+        return True,'direct_injection'
     if any(r.get('stance')=='requested' for d in analysis.get('directives',[]) for r in d.get('action_relations',[])):
         return True,'rule_requested'
     if mode=='rules_gate':return False,'rule_no_requested'

@@ -5,3 +5,4 @@ tokenizers==0.22.1
 huggingface-hub==0.36.0
 numpy==2.2.6
 scikit-learn==1.7.2
+safetensors==0.6.2

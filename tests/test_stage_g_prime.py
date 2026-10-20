@@ -21,6 +21,9 @@ class Effects(unittest.TestCase):
   for cmd in ['ls -la','pwd && ls && git log --oneline | head -20','find . -type f','git status 2>/dev/null','git remote -v; git branch -a; git status --porcelain','git remote get-url origin','git branch --contains HEAD','git config --get remote.origin.url']:
    e=command_effects(cmd);self.assertTrue(e['parsed']);self.assertEqual(e['kind'],'read');self.assertFalse(is_egress_sink('exec',{'command':cmd}))
   e=command_effects('git log --oneline > summary.txt');self.assertEqual(e['write_paths'],['summary.txt']);self.assertEqual(e['kind'],'write')
+  # File tests in a read-only chain are reads, not unknown programs.
+  e=command_effects('ls -la && [ -f owners.json ] && cat owners.json || echo "owners.json not found"')
+  self.assertEqual((e['kind'],e['unknown_effect'],e['read_paths']),('read',False,['owners.json']))
  def test_effects_are_not_a_command_whitelist(self):
   e=command_effects('pytest');self.assertTrue(e['parsed']);self.assertTrue(e['unknown_effect'])
   p=HardPolicies('.')
@@ -121,7 +124,6 @@ class CoreSources(unittest.TestCase):
   r=self.decide('literal-secret','spawn_subagent',{'task':'Process '+test_v2.SECRET})
   self.assertEqual((r['verdict'],r['rule_id']),('BLOCK','POL-SUBAGENT-SECRET-LEAK'))
 
-@unittest.skipUnless(os.name=='posix','Verified POSIX host executor')
 class HostExecutor(unittest.TestCase):
  def test_clean_environment_local_write_and_timeout(self):
   from sandbox_exec import execute

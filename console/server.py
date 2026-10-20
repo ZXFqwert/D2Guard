@@ -14,10 +14,14 @@ import os
 import json
 import re
 import subprocess
+import socket
+import shutil
 import sys
 import threading
 import time
 import uuid
+import urllib.request
+import urllib.error
 from collections import Counter, defaultdict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -40,6 +44,13 @@ FAMILY_ZH = {'indirect': '间接注入', 'direct': '直接注入', 'memory': '�
              'custom': '自定义'}
 
 
+# Host-control calls go to the per-run loopback service; a system or environment
+# proxy must never sit between the console and that service.
+DIRECT = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+LOCAL_HOSTS = {'127.0.0.1', 'localhost'}
+API_STYLES = ('chat_completions', 'responses')
+
+
 def pct(a, b):
     return round(100.0 * a / b, 1) if b else None
 
@@ -59,6 +70,7 @@ class Console:
         self._signatures = {}
         self.jobs = {}
         self.job_lock = threading.Lock()
+        self._views = {}
 
     @staticmethod
     def _load(path, default):
@@ -256,6 +268,148 @@ class Console:
             return None
         return build_trace(self.runs / run_id)
 
+    # ---------- attack/defense screen (攻防大屏) ----------
+    def summary(self):
+        """The official evaluation summary, served verbatim; None when the file is absent."""
+        data = self._load(HERE / 'data' / 'evaluation-summary.json', None)
+        return data if isinstance(data, dict) else None
+
+    def _cached(self, kind, run_id, build):
+        folder = self.runs / run_id
+        key = (kind, run_id)
+        if key in self._views:
+            return self._views[key]
+        out = build(folder)
+        if out is not None and (folder / 'result.json').exists():
+            self._views[key] = out  # finished runs never change
+        return out
+
+    @staticmethod
+    def _s1_brief(s1):
+        if not isinstance(s1, dict) or not s1.get('label'):
+            return None
+        probs = s1.get('probabilities') or {}
+        return {'label': s1.get('label'), 'p_request': probs.get('request'), 'threshold': s1.get('request_threshold'),
+                'calibrated': s1.get('calibrated'), 'latency_ms': s1.get('latency_ms'), 'model': s1.get('model')}
+
+    def replay(self, run_id):
+        """Event stream for the duel replay, projected only from the run's own evidence."""
+        if not RUN_ID.match(run_id) or not (self.runs / run_id).is_dir():
+            return None
+
+        def build(folder):
+            t = build_trace(folder)
+            result = self._load(folder / 'result.json', {})
+            decisions = [d for d in jsonl(folder / 'decisions.jsonl') if d.get('type') == 'decision']
+            basis = {d.get('call_id'): d.get('decision_basis') for d in decisions}
+            slow = {d.get('call_id'): bool((d.get('slow') or {}).get('triggered')) for d in decisions}
+            agents = {a['id']: a['label'] for a in t['agents']}
+            decided = {e['call_id']: e['t_ms'] for e in t['timeline'] if e['kind'] == 'guard_decision'}
+            events, seen = [], set()
+            run = t['run']
+            events.append({'t': 0, 'kind': 'task', 'agent': '用户', 'text': run.get('task')})
+            for s in t['sources']:
+                if s.get('t_ms') is not None:
+                    continue
+                key = (s.get('uri'), (s.get('evidence_ref') or {}).get('sha256'))
+                if key in seen:
+                    continue
+                seen.add(key)
+                events.append({'t': 0, 'kind': 'context', 'uri': s.get('uri'), 'source_kind': s.get('kind'),
+                               'source_type': s.get('type'), 's1': self._s1_brief(s.get('s1')),
+                               'excerpt': (s.get('text') or '')[:160]})
+            for c in t['calls']:
+                facts = c.get('decision_facts') or {}
+                args = json.dumps(c.get('args') or {}, ensure_ascii=False)
+                events.append({
+                    't': c.get('t_ms') or 0, 't_decided': decided.get(c['call_id']), 'kind': 'call',
+                    'call_id': c['call_id'], 'agent': agents.get(c.get('agent'), c.get('agent')), 'op': c.get('op'),
+                    'target': c.get('target'), 'args': args if len(args) <= 180 else args[:178] + '…',
+                    'verdict': c.get('verdict'), 'would': c.get('would_verdict') or c.get('verdict'),
+                    'rule_id': c.get('rule_id'), 'risk': c.get('risk'), 'reason': c.get('reason'),
+                    'latency_ms': c.get('latency_ms'), 'executed': c.get('executed'),
+                    'induced': [i.get('uri') for i in c.get('induced_by') or []],
+                    'basis': basis.get(c['call_id']), 'slow_triggered': slow.get(c['call_id'], False),
+                    'facts': {k: facts.get(k) for k in ('request_tainted', 'directive', 'secret_hit', 'sensitive',
+                                                       'hard_policy', 'soft_policy', 'literal_scope', 'tainted')}})
+            for s in t['sources']:
+                if s.get('t_ms') is None:
+                    continue
+                events.append({'t': s['t_ms'], 'kind': 'source', 'call_id': s.get('via_call'), 'uri': s.get('uri'),
+                               'source_kind': s.get('kind'), 'source_type': s.get('type'),
+                               'agent': agents.get(s.get('agent'), s.get('agent')),
+                               's1': self._s1_brief(s.get('s1')), 'excerpt': (s.get('text') or '')[:160]})
+            for e in t['timeline']:
+                if e['kind'] == 'approval_hold_complete' and e.get('t_ms') is not None:
+                    events.append({'t': e['t_ms'], 'kind': 'held', 'call_id': e.get('call_id')})
+            order = {'task': 0, 'context': 1, 'call': 2, 'source': 3, 'held': 4}
+            events.sort(key=lambda e: (e['t'], order[e['kind']]))
+            last = max([e['t_ms'] for e in t['timeline'] if e.get('t_ms') is not None] + [e['t'] for e in events])
+            keep = ('outcome', 'attack_succeeded', 'received_bytes', 'defense_containment', 'attack_prevented',
+                    'approval_pending', 'defense_blocked', 'task_status', 'task_completed', 'elapsed_seconds',
+                    'agent_elapsed_seconds', 'model_request_count')
+            res = {k: result.get(k) for k in keep}
+            res['asked_rules'] = [x.get('policy') for x in result.get('asked_calls') or []]
+            res['blocked_rules'] = [x.get('policy') for x in result.get('blocked_calls') or []]
+            return {'run': run, 'result': res, 'impact': t['impact'], 'end_t': last, 'events': events}
+
+        return self._cached('replay', run_id, build)
+
+    def compaction_runs(self):
+        rows = [r for r in self.refresh_index() if r.get('complete') and (self.runs / r['id'] / 'gateway.jsonl').exists()]
+        return {'runs': [{k: r.get(k) for k in ('id', 'scenario', 'environment', 'protection', 'family', 'outcome')}
+                         for r in rows]}
+
+    def compaction(self, run_id):
+        """Model-input bytes per request vs. the bounded security state the kernel reads."""
+        if not RUN_ID.match(run_id) or not (self.runs / run_id).is_dir():
+            return None
+
+        def size(state):
+            return len(json.dumps(state).encode('utf-8'))  # same serialization as the evaluation summary
+
+        def latest(series, ts):  # value of the last entry at or before ts
+            best = None
+            for when, value in series:
+                if when > ts:
+                    break
+                best = value
+            return best
+
+        def build(folder):
+            manifest = self._load(folder / 'manifest.json', {})
+            audit = jsonl(folder / 'audit.jsonl')
+            t0 = next((x.get('timestamp_ns') for x in audit if x.get('timestamp_ns')), None)
+            ms = lambda ts: round((ts - t0) / 1e6) if ts and t0 else None
+            chain = sorted((c['timestamp_ns'], size(c['state'])) for c in jsonl(folder / 'security_chain.jsonl')
+                           if c.get('timestamp_ns') and isinstance(c.get('state'), dict))
+            snaps = sorted(((d.get('timestamp_ns') or 0), size(d['previous_security_state']), d.get('verdict'),
+                            d.get('rule_id') or d.get('policy')) for d in jsonl(folder / 'decisions.jsonl')
+                           if d.get('type') == 'decision' and isinstance(d.get('previous_security_state'), dict))
+            requests, stamps = [], []
+            for g in jsonl(folder / 'gateway.jsonl'):
+                if g.get('type') != 'proxy_request' or not isinstance(g.get('input_bytes'), int):
+                    continue
+                ts = g.get('timestamp_ns') or 0
+                stamps.append(ts)
+                requests.append({'i': len(requests) + 1, 'agent': g.get('agent_id'), 't_ms': ms(ts),
+                                 'input_bytes': g['input_bytes'],
+                                 'state_bytes': latest(chain if chain else [(s[0], s[1]) for s in snaps], ts)})
+            marks = [{'t_ms': ms(ts), 'after_request': sum(1 for x in stamps if x <= ts) or None, 'state_bytes': value,
+                      'verdict': verdict, 'rule_id': rule} for ts, value, verdict, rule in snaps]
+            ctx = [r['input_bytes'] for r in requests]
+            dec_max = max((m['state_bytes'] for m in marks), default=None)
+            chain_max = max((v for _, v in chain), default=None)
+            return {'run_id': folder.name, 'scenario': manifest.get('scenario'),
+                    'environment': manifest.get('environment'), 'protection': manifest.get('protection'),
+                    'state_series': 'security_chain' if chain else 'decisions', 'requests': requests,
+                    'decisions': marks, 'context_min_bytes': min(ctx, default=None),
+                    'context_max_bytes': max(ctx, default=None), 'decision_state_max_bytes': dec_max,
+                    'chain_state_max_bytes': chain_max,
+                    'ratio': round(max(ctx) / dec_max, 2) if ctx and dec_max else None}
+
+        return self._cached('compaction', run_id, build)
+
     # ---------- scenarios ----------
     def _scenario_files(self):
         out = []
@@ -393,7 +547,7 @@ class Console:
         for rule in ('DT-4c-S1','DT-4c-EGRESS','POL-TOOL-BUDGET'):
             hits.setdefault(rule,0)
             reasons.setdefault(rule,'当前索引中尚无命中记录')
-        cfg_path = os.environ.get('D2_S1_CONFIG')
+        cfg_path = os.environ.get('D2_S1_CONFIG') or (str(self.repo / '.local/s1.json') if (self.repo / '.local/s1.json').is_file() else None)
         cfg = self._load(Path(cfg_path), {}) if cfg_path else self._load(self.repo / '.local/stage-d5/s1-enabled-config.json', self._load(self.repo / '.local/stage-d4/s1-enabled-config.json', {}))
         runtime_mode = 'add_risk' if os.environ.get('D2_S1_DISABLE') == '1' else cfg.get('decision_mode', 'add_risk')
         return {'runtime_mode':runtime_mode, 'dsl': dsl, 'hits': dict(hits), 'reasons': reasons, 'verdicts': {k: dict(v) for k, v in verdict_of.items()}}
@@ -424,33 +578,69 @@ class Console:
 
     def _run_job(self, job):
         with job['_log'].open('w', encoding='utf-8') as log:
-            for step in job['steps']:
-                before = {p.name for p in self.runs.iterdir()} if self.runs.exists() else set()
-                step['status'] = 'running'
-                step['_before'] = before
-                step['_log_offset'] = job['_log'].stat().st_size
+            # The real writer and both evaluation lanes use the same fixture.
+            run_env = {**os.environ, 'D2_FIXTURE_CANARY': 'd2-test-' + uuid.uuid4().hex}
+            seed = None
+            scenario = self._load(self.repo / 'scenarios' / (job['scenario'] + '.json'), {})
+            if scenario.get('setup_task'):
+                seed = self.repo / '.local/console-memory' / job['id'] / 'seed'
+                seed.mkdir(parents=True, exist_ok=True)
+                job['preparing_memory'] = True
                 cmd = [self.python, 'lab.py', 'run', '--scenario', job['scenario'],
-                       '--environment', job['environment'], '--protect', step['protect'], '--engine', 'd2v2']
-                log.write(f"$ lab.py run --scenario {job['scenario']} --environment {job['environment']} "
-                          f"--protect {step['protect']} --engine d2v2\n")
-                log.flush()
+                       '--environment', job['environment'], '--protect', 'off', '--engine', 'd2v2',
+                       '--memory-root', str(seed), '--task', scenario['setup_task'], '--phase', 'memory-setup', '--max-output-tokens','8192']
+                log.write('Preparing cross-session memory with a real Agent...\n'); log.flush()
                 try:
-                    code = subprocess.call(cmd, cwd=self.repo, stdout=log, stderr=subprocess.STDOUT)
+                    code = subprocess.call(cmd, cwd=self.repo, env=run_env, stdout=log, stderr=subprocess.STDOUT)
                 except OSError as exc:
-                    log.write(f'启动失败：{exc}\n')
-                    code = -1
-                self._find_run(job, step)
-                step['returncode'] = code
-                step['status'] = 'finished' if code == 0 and step.get('run_id') and self._load(self.runs / step['run_id'] / 'result.json', {}) else 'failed'
-                self._scanned = 0
+                    log.write(f'Memory preparation failed: {exc}\n'); code = -1
+                job['preparing_memory'] = False
+                if code != 0 or not any(seed.glob('*.json')):
+                    log.write('Memory preparation did not produce usable memory. Evaluation was not started.\n')
+                    for step in job['steps']:
+                        step.update(status='failed', returncode=code if code else -1)
+                    job.update(status='failed', finished=time.time())
+                    return
+        # Both lanes start together: same task, same fixture, independent run folders and services.
+        lanes = [threading.Thread(target=self._run_step, args=(job, step, run_env, seed), daemon=True) for step in job['steps']]
+        for lane in lanes:
+            lane.start()
+        for lane in lanes:
+            lane.join()
         job['status'] = 'finished' if all(s['status'] == 'finished' for s in job['steps']) else 'failed'
         job['finished'] = time.time()
+
+    def _run_step(self, job, step, run_env, seed):
+        step['_log'] = self.cache_dir / f"job-{job.get('id', 'job')}-{step['protect']}.log"
+        step['_before'] = {p.name for p in self.runs.iterdir()} if self.runs.exists() else set()
+        step['_log_offset'] = 0
+        step['status'] = 'running'
+        cmd = [self.python, 'lab.py', 'run', '--scenario', job['scenario'],
+               '--environment', job['environment'], '--protect', step['protect'], '--engine', 'd2v2', '--interactive-approval', '--max-output-tokens','8192']
+        if seed:
+            memory = seed.parent / step['protect']
+            shutil.copytree(seed, memory)
+            cmd.extend(['--memory-root', str(memory), '--memory-reader'])
+        with step['_log'].open('w', encoding='utf-8') as log:
+            log.write(f"$ lab.py run --scenario {job['scenario']} --environment {job['environment']} "
+                      f"--protect {step['protect']} --engine d2v2\n")
+            log.flush()
+            try:
+                code = subprocess.call(cmd, cwd=self.repo, env=run_env, stdout=log, stderr=subprocess.STDOUT)
+            except OSError as exc:
+                log.write(f'启动失败：{exc}\n')
+                code = -1
+        self._find_run(job, step)
+        step['returncode'] = code
+        result = self._load(self.runs / step['run_id'] / 'result.json', {}) if step.get('run_id') else {}
+        step['status'] = 'finished' if code == 0 and result.get('model_run_ok') is True else 'failed'
+        self._scanned = 0
 
     def _find_run(self, job, step):
         if step.get('run_id') or not self.runs.exists() or '_before' not in step:
             return
         # Bind to this subprocess's RUN output, never another experiment's new folder.
-        with job['_log'].open('rb') as log:
+        with step.get('_log', job['_log']).open('rb') as log:
             log.seek(step.get('_log_offset', 0))
             output = log.read().decode('utf-8', errors='replace')
         for rid in re.findall(r'^RUN (\d{8}-\d{6}-[0-9a-f]{6}) ', output, re.M):
@@ -458,7 +648,8 @@ class Console:
             if (rid not in step['_before'] and manifest.get('scenario') == job['scenario']
                     and manifest.get('environment') == job['environment']
                     and manifest.get('protection') == step['protect']
-                    and manifest.get('guard_engine') == 'd2v2'):
+                    and manifest.get('guard_engine') == 'd2v2'
+                    and manifest.get('evaluation_phase') != 'memory-setup'):
                 step['run_id'] = rid
                 return
 
@@ -469,15 +660,211 @@ class Console:
         for step in j['steps']:
             if step['status'] == 'running':
                 self._find_run(j, step)
-        try:
-            tail = j['_log'].read_text(encoding='utf-8', errors='replace')[-3000:]
-        except OSError:
-            tail = ''
+        parts = []
+        for path, title in [(j['_log'], None)] + [(s.get('_log'), {'off': '防护关闭', 'on': '防护开启'}[s['protect']]) for s in j['steps']]:
+            try:
+                text = path.read_text(encoding='utf-8', errors='replace') if path else ''
+            except OSError:
+                text = ''
+            if text.strip():
+                parts.append((f'── {title} ──\n' if title else '') + text[-2000:])
+        tail = '\n'.join(parts)
         out = {k: v for k, v in j.items() if not k.startswith('_')}
         out['steps'] = [{k: v for k, v in s.items() if not k.startswith('_')} for s in j['steps']]
         out['log_tail'] = mask(tail)
         out['elapsed'] = round(j.get('finished', time.time()) - j['started'], 1)
+        out['approvals'] = []
+        for step in j['steps']:
+            if step['status']=='running' and step.get('run_id'):
+                try:
+                    data=self._host_control(step['run_id'],'/approvals',{})
+                    out['approvals'].extend({'run_id':step['run_id'],'protect':step['protect'],**a} for a in data['pending'])
+                except ValueError:pass  # services still starting, or the run already closed its control file
+                except OSError as exc:
+                    # Keep a waiting Agent visible even when the control channel fails, and say why.
+                    waiting=self._waiting_from_audit(step['run_id'])
+                    out['approvals'].extend({'run_id':step['run_id'],'protect':step['protect'],**w} for w in waiting)
+                    if waiting:out['approval_error']=f'审批通道连接失败（{type(exc).__name__}: {str(exc)[:160]}）'
         return out
+
+    def _waiting_from_audit(self, run_id):
+        proposed, asked, waiting, closed = {}, {}, [], set()
+        for e in jsonl(self.runs / run_id / 'audit.jsonl'):
+            cid = e.get('call_id')
+            if e.get('type') == 'tool_proposed':
+                proposed[cid] = e
+            elif e.get('type') == 'guard_decision' and e.get('origin') == 'host_approval':
+                closed.add(cid)
+            elif e.get('type') == 'guard_decision' and e.get('verdict') == 'ASK':
+                asked[cid] = e
+            elif e.get('type') == 'approval_waiting':
+                waiting.append(cid)
+            elif e.get('type') in ('approval_resumed', 'approval_hold_complete'):
+                closed.add(cid)
+        return [{'call_id': cid, 'agent_id': proposed.get(cid, {}).get('agent_id', 'main'),
+                 'tool': proposed.get(cid, {}).get('tool'), 'args': proposed.get(cid, {}).get('args'),
+                 'reason': asked.get(cid, {}).get('reason', ''), 'rule_id': asked.get(cid, {}).get('policy', ''),
+                 'approvable': True, 'channel_error': True} for cid in waiting if cid not in closed]
+
+    def _host_control(self, run_id, route, data):
+        config=self._load(self.runs/run_id/'.local/host-control.json',{})
+        if not config:raise ValueError('当前运行未开放交互审批，或已经结束')
+        request=urllib.request.Request(config['origin']+route,data=json.dumps(data).encode(),
+            headers={'Content-Type':'application/json','Authorization':'Bearer '+config['credential']},method='POST')
+        with DIRECT.open(request,timeout=5) as response:return json.load(response)
+
+    def resolve_approval(self, job_id, body):
+        job=self.job(job_id)
+        if not job or job['status']!='running':return 409,{'error':'运行已结束'}
+        candidate=next((a for a in job['approvals'] if a['call_id']==body.get('call_id') and a['run_id']==body.get('run_id')),None)
+        if not candidate or body.get('choice') not in ('approve','reject'):
+            return 409,{'error':'该审批已处理、过期或不存在'}
+        try:
+            return 200,self._host_control(candidate['run_id'],'/resolve-approval',
+                {'call_id':candidate['call_id'],'choice':body['choice']})
+        except urllib.error.HTTPError as exc:
+            detail=self._load_bytes(exc.read()).get('error','')
+            return 409,{'error':'审批未生效：已过期、已处理或当前策略禁止批准'+(f'（{detail}）' if detail else '')}
+        except (OSError,ValueError) as exc:return 409,{'error':f'审批未生效：无法连接本轮运行的审批通道（{type(exc).__name__}）'}
+
+    @staticmethod
+    def _load_bytes(data):
+        try:
+            value = json.loads(data or b'{}')
+            return value if isinstance(value, dict) else {}
+        except ValueError:
+            return {}
+
+    # ---------- model settings ----------
+    def _settings_paths(self):
+        return self.repo / '.local' / 'provider.json', self.repo / '.local' / 'review.json'
+
+    def settings(self):
+        agent_path, review_path = self._settings_paths()
+        agent, review = self._load(agent_path, {}), self._load(review_path, {})
+        view = lambda cfg, key: {'base_url': cfg.get('base_url', ''), 'model': cfg.get(key, ''),
+                                 'api_style': cfg.get('api_style', 'chat_completions'), 'has_key': bool(cfg.get('api_key'))}
+        return {'agent': view(agent, 'main_model'),
+                'review': {**view(review, 'model'), 'separate': bool(review.get('enabled', True) and review.get('base_url') and review.get('model'))},
+                'configured': bool(agent.get('base_url') and agent.get('api_key') and agent.get('main_model')),
+                'running': any(j['status'] == 'running' for j in self.jobs.values())}
+
+    @staticmethod
+    def _merge_model(form, current, model_key):
+        merged = dict(current)
+        for source, target in (('base_url', 'base_url'), ('model', model_key), ('api_style', 'api_style')):
+            value = str(form.get(source) or '').strip()
+            if value:
+                merged[target] = value.rstrip('/') if source == 'base_url' else value
+        key = str(form.get('api_key') or '').strip()
+        if key:
+            merged['api_key'] = key
+        elif merged.get('base_url') != current.get('base_url'):
+            # A stored key is only ever sent to the address it was entered for.
+            merged.pop('api_key', None)
+        return merged
+
+    @staticmethod
+    def _model_error(cfg, model_key, need_key=True):
+        if not re.match(r'^https?://[^\s/]+', cfg.get('base_url') or ''):
+            return '接口地址需以 http:// 或 https:// 开头'
+        if not cfg.get(model_key):
+            return '请填写模型名称'
+        if cfg.get('api_style') not in API_STYLES:
+            return '接口类型只能是 chat_completions 或 responses'
+        if need_key and not cfg.get('api_key'):
+            return '请填写 API Key（更换接口地址时需要重新填写）'
+        return None
+
+    def _write_private(self, path, value):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+        try:
+            os.chmod(path, 0o600)
+        except OSError:
+            pass
+
+    def save_settings(self, body):
+        agent_path, review_path = self._settings_paths()
+        agent = self._merge_model(body.get('agent') or {}, self._load(agent_path, {}), 'main_model')
+        err = self._model_error(agent, 'main_model')
+        if err:
+            return 400, {'error': 'Agent 模型：' + err}
+        form = body.get('review') or {}
+        old_review = self._load(review_path, {})
+        if form.get('separate'):
+            review = self._merge_model(form, old_review, 'model')
+            review.setdefault('api_style', agent['api_style'])
+            if not review.get('api_key') and review.get('base_url') == agent['base_url']:
+                review.pop('api_key', None)  # same service: lab.py reuses the Agent key
+            err = self._model_error(review, 'model', need_key=review.get('base_url') != agent['base_url'])
+            if err:
+                return 400, {'error': '慢镜模型：' + err}
+            review['enabled'] = True
+        else:
+            review = {**old_review, 'enabled': False}
+        if agent != self._load(agent_path, {}):
+            agent['credential_source'] = 'console settings'
+            self._write_private(agent_path, agent)
+        if review != old_review:
+            self._write_private(review_path, review)
+        return 200, self.settings()
+
+    def _resolve_model(self, body):
+        agent_path, review_path = self._settings_paths()
+        agent = self._load(agent_path, {})
+        if body.get('target') == 'review':
+            current = self._load(review_path, {})
+            cfg = self._merge_model(body, current, 'model')
+            if not cfg.get('api_key') and cfg.get('base_url') == agent.get('base_url'):
+                cfg['api_key'] = agent.get('api_key')
+            return {'base_url': cfg.get('base_url'), 'api_key': cfg.get('api_key'), 'model': cfg.get('model'), 'api_style': cfg.get('api_style') or agent.get('api_style')}
+        cfg = self._merge_model(body, agent, 'main_model')
+        return {'base_url': cfg.get('base_url'), 'api_key': cfg.get('api_key'), 'model': cfg.get('main_model'), 'api_style': cfg.get('api_style')}
+
+    def test_model(self, body):
+        cfg = self._resolve_model(body)
+        err = self._model_error(cfg, 'model')
+        if err:
+            return 400, {'error': err}
+        import httpx
+        responses = cfg['api_style'] == 'responses'
+        url = cfg['base_url'].rstrip('/') + ('/responses' if responses else '/chat/completions')
+        payload = ({'model': cfg['model'], 'input': 'Reply with the single word OK.', 'max_output_tokens': 16, 'store': False}
+                   if responses else {'model': cfg['model'], 'messages': [{'role': 'user', 'content': 'Reply with the single word OK.'}], 'max_tokens': 16})
+        start = time.perf_counter()
+        try:
+            # Same network path as real runs: the service gateway does not use system proxies.
+            with httpx.Client(timeout=60, trust_env=False) as client:
+                response = client.post(url, json=payload, headers={'Authorization': 'Bearer ' + cfg['api_key']})
+        except httpx.HTTPError as exc:
+            return 200, {'ok': False, 'error': f'连接失败：{type(exc).__name__}'}
+        latency = round((time.perf_counter() - start) * 1000)
+        if response.status_code != 200:
+            return 200, {'ok': False, 'latency_ms': latency, 'error': f'HTTP {response.status_code}：{response.text[:200]}'}
+        try:
+            data = response.json()
+            text = (data['output_text'] if 'output_text' in data else
+                    ''.join(c.get('text', '') for o in data.get('output', []) for c in o.get('content', []) if isinstance(c, dict))) if responses \
+                else data['choices'][0]['message'].get('content') or ''
+        except (ValueError, KeyError, IndexError, TypeError):
+            return 200, {'ok': False, 'latency_ms': latency, 'error': '接口返回格式不符合所选接口类型'}
+        return 200, {'ok': True, 'latency_ms': latency, 'reply': str(text)[:80], 'model': cfg['model']}
+
+    def list_models(self, body):
+        cfg = self._resolve_model(body)
+        if not re.match(r'^https?://', cfg.get('base_url') or '') or not cfg.get('api_key'):
+            return 400, {'error': '请先填写接口地址和 API Key'}
+        import httpx
+        try:
+            with httpx.Client(timeout=30, trust_env=False) as client:
+                response = client.get(cfg['base_url'].rstrip('/') + '/models', headers={'Authorization': 'Bearer ' + cfg['api_key']})
+            ids = sorted({m.get('id') for m in response.json().get('data', []) if isinstance(m, dict) and m.get('id')})
+        except (httpx.HTTPError, ValueError, AttributeError) as exc:
+            return 200, {'models': [], 'error': f'该接口不支持列出模型（{type(exc).__name__}），可直接填写模型名称'}
+        if response.status_code != 200:
+            return 200, {'models': [], 'error': f'HTTP {response.status_code}，可直接填写模型名称'}
+        return 200, {'models': ids[:300]}
 
 
 def make_handler(console):
@@ -506,8 +893,15 @@ def make_handler(console):
             query = parse_qs(url.query)
             if not parts or parts[0] != 'api':
                 return False
+            host = (self.headers.get('Host') or '').rsplit(':', 1)[0].strip('[]')
+            origin = urlsplit(self.headers.get('Origin') or '').hostname
+            if host not in LOCAL_HOSTS or method != 'GET' and origin is not None and origin not in LOCAL_HOSTS:
+                return self.send_json(403, {'error': '仅允许本机控制台页面访问'})
             try:
                 if method == 'GET':
+                    if parts==['api','active-job']:
+                        active=next((j for j in console.jobs.values() if j['status']=='running'),None)
+                        return self.send_json(200,console.job(active['id']) if active else None)
                     if parts == ['api', 'overview']:
                         return self.send_json(200, console.overview(query))
                     if parts == ['api', 'runs']:
@@ -517,6 +911,17 @@ def make_handler(console):
                         return self.send_json(200, trace) if trace else self.send_json(404, {'error': '未找到运行'})
                     if parts[:2] == ['api', 'pairs'] and len(parts) == 3:
                         return self.send_json(200, console.pairs(parts[2]))
+                    if parts == ['api', 'summary']:
+                        s = console.summary()
+                        return self.send_json(200, s) if s else self.send_json(404, {'error': '未找到正式评测汇总 console/data/evaluation-summary.json'})
+                    if parts[:2] == ['api', 'replay'] and len(parts) == 3:
+                        r = console.replay(parts[2])
+                        return self.send_json(200, r) if r else self.send_json(404, {'error': '未找到运行'})
+                    if parts == ['api', 'compaction']:
+                        return self.send_json(200, console.compaction_runs())
+                    if parts[:2] == ['api', 'compaction'] and len(parts) == 3:
+                        r = console.compaction(parts[2])
+                        return self.send_json(200, r) if r else self.send_json(404, {'error': '未找到运行'})
                     if parts == ['api', 'scenarios']:
                         return self.send_json(200, console.scenarios())
                     if parts == ['api', 'scenarios-export']:
@@ -527,16 +932,26 @@ def make_handler(console):
                         return self.send_json(200, s) if s else self.send_json(404, {'error': '未找到场景'})
                     if parts == ['api', 'policies']:
                         return self.send_json(200, console.policies())
+                    if parts == ['api', 'settings']:
+                        return self.send_json(200, console.settings())
                     if parts[:2] == ['api', 'jobs'] and len(parts) == 3:
                         job = console.job(parts[2])
                         return self.send_json(200, job) if job else self.send_json(404, {'error': '未找到任务'})
                 elif method == 'POST':
+                    if len(parts)==4 and parts[:2]==['api','jobs'] and parts[3]=='approval':
+                        return self.send_json(*console.resolve_approval(parts[2],self.body()))
                     if parts == ['api', 'launch']:
                         return self.send_json(*console.launch(self.body()))
+                    if parts == ['api', 'settings', 'test']:
+                        return self.send_json(*console.test_model(self.body()))
+                    if parts == ['api', 'settings', 'models']:
+                        return self.send_json(*console.list_models(self.body()))
                     if parts == ['api', 'scenarios']:
                         return self.send_json(*console.create_scenario(self.body()))
                     if parts == ['api', 'scenarios-import']:
                         return self.send_json(*console.import_scenarios(self.body()))
+                elif method == 'PUT' and parts == ['api', 'settings']:
+                    return self.send_json(*console.save_settings(self.body()))
                 elif method == 'PUT' and parts[:2] == ['api', 'scenarios'] and len(parts) == 3:
                     return self.send_json(*console.update_scenario(parts[2], self.body()))
                 elif method == 'DELETE' and parts[:2] == ['api', 'scenarios'] and len(parts) == 3:
@@ -560,6 +975,7 @@ def make_handler(console):
             self.send_response(200)
             self.send_header('Content-Type', TYPES.get(path.suffix, 'application/octet-stream'))
             self.send_header('Content-Length', str(len(data)))
+            self.send_header('Cache-Control', 'no-cache')
             self.end_headers()
             self.wfile.write(data)
 
@@ -578,6 +994,16 @@ def make_handler(console):
     return Handler
 
 
+
+class LocalHTTPServer(ThreadingHTTPServer):
+    allow_reuse_address = os.name != 'nt'
+
+    def server_bind(self):
+        if os.name == 'nt':
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        super().server_bind()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--repo', default=str(HERE.parent / 'd2guard-next'), help='d2guard-next 仓库路径')
@@ -588,9 +1014,16 @@ def main():
     if args.host != '127.0.0.1':
         parser.error('控制台仅允许监听 127.0.0.1')
     console = Console(args.repo, args.python)
-    print(f'D2Guard 控制台：http://{args.host}:{args.port}  （仓库 {console.repo}）', flush=True)
+    server = LocalHTTPServer((args.host, args.port), make_handler(console))
+    print(f'D2Guard 控制台：http://{args.host}:{server.server_port}  （仓库 {console.repo}）', flush=True)
     print('首次启动会建立运行索引，可能需要一两分钟。', flush=True)
-    ThreadingHTTPServer((args.host, args.port), make_handler(console)).serve_forever()
+    if os.environ.get('D2_OPEN_BROWSER') == '1':
+        import webbrowser
+        webbrowser.open(f'http://{args.host}:{server.server_port}/')
+    try:
+        server.serve_forever()
+    finally:
+        server.server_close()
 
 
 if __name__ == '__main__':

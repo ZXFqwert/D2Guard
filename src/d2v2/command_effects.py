@@ -6,7 +6,7 @@ from pathlib import Path
 import bashlex
 from d2core.execution import analyze_command,command_name,git_subcommand
 
-READ={'pwd','ls','cat','grep','rg','find','head','tail','wc','sort','uniq','cut','tr','sed','awk','stat','file','du','diff','echo','printf','test','true','false','which'}
+READ={'pwd','ls','cat','grep','rg','find','head','tail','wc','sort','uniq','cut','tr','sed','awk','stat','file','du','diff','echo','printf','test','[','true','false','which'}
 GIT_READ={'status','log','diff','show','rev-parse','ls-files','branch','remote',
           'rev-list','ls-tree','for-each-ref','diff-tree','diff-files','diff-index',
           'describe','blame','tag','name-rev','count-objects','merge-base','check-ignore','check-attr','show-ref','cat-file'}
@@ -98,7 +98,7 @@ def command_effects(command,workspace=None):
    if n=='find' and any(x in args for x in ('-exec','-execdir','-delete')):result['parsed']=False
    if n=='sed' and any(x.startswith('-i') for x in args):result['write_paths'].extend(x for x in args if not x.startswith('-'))
    if n in {'awk','sed'} and any(re.search(r'\b(system|exec)\b',x) for x in args):result['parsed']=False
-   if n not in {'echo','printf','test','true','false','which'}:result['read_paths'].extend(x for x in args if not x.startswith('-') and ('.' in x or '/' in x))
+   if n not in {'echo','printf','test','[','true','false','which'}:result['read_paths'].extend(x for x in args if not x.startswith('-') and ('.' in x or '/' in x))
   else:result['unknown_effect']=True
  def visit(node):
   if node.kind=='redirect' and getattr(node,'output',None) and hasattr(node.output,'word'):

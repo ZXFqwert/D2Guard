@@ -41,7 +41,7 @@ class Approvals:
         payload=token.split('.')[0]
         body=json.loads(base64.urlsafe_b64decode(payload+'='*(-len(payload)%4)))
         return {'approval_token_sha256':hashlib.sha256(token.encode()).hexdigest(),
-                'approval_nonce':body['nonce']}
+                'approval_nonce':body['nonce'],'approval_expires':body['expires']}
 
     def host_token(self, call_id):
         # Memory only; never returned by the Agent decision endpoint.

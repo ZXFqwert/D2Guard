@@ -28,7 +28,10 @@ def main():
   if src.exists():shutil.copy2(src,code/name)
  shutil.copy2(ROOT/'src/d2v2/policies.yaml',code/'policies.yaml')
  (code/'deploy').mkdir(exist_ok=True);shutil.copy2(ROOT/'deploy/host-exec.md',code/'deploy/host-exec.md')
- (code/'tools').mkdir(exist_ok=True);shutil.copy2(ROOT/'tools/configure_delivery.py',code/'tools/configure_delivery.py')
+ (code/'tools').mkdir(exist_ok=True)
+ for name in ('configure_delivery.py','setup_windows.py','windows_console.py','package_delivery.py'):
+  shutil.copy2(ROOT/'tools'/name,code/'tools'/name)
+ shutil.copy2(ROOT/'deploy/WINDOWS-使用说明.md',code/'WINDOWS-使用说明.md')
  # Only tests whose import closure is available in the runtime export.
  candidates={p.stem:p for p in (ROOT/'tests').glob('*.py')};excluded=set()
  for name,p in candidates.items():
@@ -51,8 +54,12 @@ def main():
  if not console.exists():console=ROOT/'console'
  (code/'console').mkdir(exist_ok=True)
  for name in ('server.py','d2trace.py'):shutil.copy2(console/name,code/'console'/name)
- copytree(console/'static',code/'console/static');copytree(ROOT/'scenarios',dest/'04-测试样例/scenarios')
+ copytree(console/'static',code/'console/static')
+ if (console/'data').exists():copytree(console/'data',code/'console/data')
+ copytree(ROOT/'scenarios',dest/'04-测试样例/scenarios')
  copytree(Path(a.assets),code)
+ for name in ('setup-windows.bat','start-console.bat','build-submission.bat'):
+  shutil.copy2(ROOT/'deploy/windows'/name,code/name)
  shutil.copy2(ROOT/'tools/delivery-readme.md',code/'README.md')
  for cache in list(code.rglob('__pycache__')):
   if code in cache.resolve().parents:shutil.rmtree(cache)

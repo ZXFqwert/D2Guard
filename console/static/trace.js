@@ -9,6 +9,9 @@ async function renderTracePage(el, id) {
   el.innerHTML = `
     <section class="card run-head" id="run-head"></section>
     <section class="pairs" id="pairs"></section>
+    ${(t.memory_links || []).length ? `<section class="card"><h3>跨会话记忆来源</h3>${t.memory_links.map(m => `<p><b>${esc(m.key)}</b> · ${m.native_write_verified ? '已核对原生写入调用及内容哈希' : '写入证据未核实'}<br>
+      写入会话：${m.writer_run_id ? `<a class="link" href="#/trace/${esc(m.writer_run_id)}">${esc(m.writer_run_id)} → 查看写入过程</a>` : esc(m.writer_session)}<br>
+      <small class="mono">内容 SHA-256：${esc(m.content_sha256)}</small></p>`).join('')}</section>` : ''}
     <nav class="tabs" id="tabs">
       <button data-tab="graph">攻击路径 DAG</button>
       <button data-tab="timeline">时序链路</button>
@@ -103,19 +106,49 @@ function layoutGraph(g) {
 }
 
 function nodeStyle(n) {
+  const V = { ALLOW: ['var(--allow-bg)', 'var(--allow)'], ASK: ['var(--ask-bg)', 'var(--ask)'], BLOCK: ['var(--block-bg)', 'var(--block)'] };
   switch (n.kind) {
-    case 'user': return { fill: '#eef3ff', stroke: 'var(--user)' };
-    case 'agent': return { fill: '#f4effd', stroke: 'var(--agent)' };
-    case 'source': return n.hot ? { fill: '#ffecec', stroke: 'var(--induce)' } : { fill: '#e8f7fb', stroke: 'var(--source)' };
-    case 'target': return { fill: n.executed ? '#e9edf2' : '#fff', stroke: n.executed ? 'var(--target)' : '#b6bec9', dash: n.executed ? '' : '4 3' };
+    case 'user': return { fill: 'var(--user-bg)', stroke: 'var(--user)' };
+    case 'agent': return { fill: 'var(--agent-bg)', stroke: 'var(--agent)' };
+    case 'source': return n.hot || n.s1 === 'request' ? { fill: 'var(--hot-bg)', stroke: 'var(--induce)' } : { fill: 'var(--source-bg)', stroke: 'var(--source)' };
+    case 'target': return n.executed ? { fill: 'var(--target-bg)', stroke: 'var(--target)' } : { fill: 'transparent', stroke: 'var(--node-line)', dash: '4 3' };
     case 'call': {
-      const v = n.verdict, w = n.would_verdict || v;
-      const color = { ALLOW: 'var(--allow)', ASK: 'var(--ask)', BLOCK: 'var(--block)' }[w] || '#9aa5b4';
-      const bg = { ALLOW: 'var(--allow-bg)', ASK: 'var(--ask-bg)', BLOCK: 'var(--block-bg)' }[w] || '#fff';
-      return w !== v ? { fill: '#fff', stroke: color, dash: '5 3' } : { fill: bg, stroke: color };
+      const v = n.verdict, w = effectiveVerdict(n);
+      const [bg, color] = V[w] || ['var(--node-bg)', 'var(--node-line)'];
+      return w !== v ? { fill: 'transparent', stroke: color, dash: '5 3' } : { fill: bg, stroke: color };
     }
-    default: return { fill: '#fff', stroke: '#9aa5b4' };
+    case 'decision': { const [, color] = V[(n.label || '').split(' ')[0]] || [, 'var(--node-line)']; return { fill: 'var(--panel-2)', stroke: color }; }
+    case 'mcp_server': case 'mcp_tool': case 'mcp': return { fill: 'var(--source-bg)', stroke: 'var(--mcp)' };
+    case 'execution_result': return { fill: 'var(--sunken)', stroke: n.is_error ? 'var(--block-line)' : 'var(--node-line)' };
+    default: return { fill: 'var(--node-bg)', stroke: 'var(--node-line)' };
   }
+}
+
+// The path that leads to each held action: who proposed it (through the agent / sub-agent chain and the
+// model request), flagged sources it is associated with, and the verdict it received. Association only.
+function attackPath(g) {
+  const held = g.nodes.filter((n) => n.kind === 'call' && ['ASK', 'BLOCK'].includes(effectiveVerdict(n)));
+  const byId = Object.fromEntries(g.nodes.map((n) => [n.id, n]));
+  const flagged = (n) => n && n.kind === 'source' && (n.hot || n.s1 === 'request');
+  const nodes = new Set(), edges = new Set();
+  const up = ['propose', 'proposal_after_request', 'request', 'spawn', 'task', 'mcp_observation', 'provides'];
+  const todo = held.map((n) => n.id);
+  held.forEach((n) => nodes.add(n.id));
+  while (todo.length) {
+    const id = todo.pop();
+    g.edges.forEach((e, i) => {
+      if (e.to !== id) return;
+      const ok = up.includes(e.kind) || e.kind.startsWith('induce') || (e.kind === 'ingest' && flagged(byId[e.from]));
+      if (!ok || (['mcp_observation', 'provides'].includes(e.kind) && !nodes.has(e.to))) return;
+      edges.add(i);
+      if (!nodes.has(e.from)) { nodes.add(e.from); todo.push(e.from); }
+    });
+  }
+  const down = new Set(held.map((n) => n.id));
+  g.edges.forEach((e, i) => { if (down.has(e.from) && ['decision', 'prevented', 'effect', 'mcp_dispatch', 'proposed_mcp'].includes(e.kind)) { edges.add(i); nodes.add(e.to); } });
+  g.edges.forEach((e, i) => { if (e.kind === 'execution' && nodes.has(e.from) && byId[e.from]?.kind === 'decision') { edges.add(i); nodes.add(e.to); } });
+  const verdicts = held.map((n) => n.verdict);
+  return { held: new Set(held.map((n) => n.id)), nodes, edges, executed: held.some((n) => n.executed), block: verdicts.includes('BLOCK') };
 }
 
 function renderGraph(t) {
@@ -123,6 +156,8 @@ function renderGraph(t) {
   const hot = new Set(g.edges.filter((e) => e.kind.startsWith('induce')).map((e) => e.from));
   const executedTargets = new Set(g.edges.filter((e) => e.kind === 'effect').map((e) => e.to));
   g.nodes.forEach((n) => { n.hot = hot.has(n.id); if (n.kind === 'target') n.executed = executedTargets.has(n.id); });
+  const ap = attackPath(g);
+  const showAp = tstate.ap !== false && ap.held.size > 0;
   const { pos, h } = layoutGraph(g);
   const W = COLS.at(-1).x + NW + 20;
   const edgePath = (e) => {
@@ -142,14 +177,18 @@ function renderGraph(t) {
   };
   const marker = (id, color) => `<marker id="${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="${color}"/></marker>`;
   const markerFor = (k) => (k.startsWith('induce') ? 'm-red' : k === 'spawn' ? 'm-purple' : k === 'effect' ? 'm-dark' : 'm-gray');
-  const edges = g.edges.map((e, i) => `<path class="edge ${e.kind}" data-i="${i}" data-from="${esc(e.from)}" data-to="${esc(e.to)}" d="${edgePath(e)}" marker-end="url(#${markerFor(e.kind)})"/>`).join('');
+  const onAp = (i) => showAp && ap.edges.has(i);
+  // Attack-path edges are drawn last so they sit above the ordinary flow.
+  const order = g.edges.map((e, i) => i).sort((a, b) => onAp(a) - onAp(b));
+  const edges = order.map((i) => { const e = g.edges[i]; return `<path class="edge ${e.kind}${onAp(i) ? ' attack-path' : ''}" data-i="${i}" data-from="${esc(e.from)}" data-to="${esc(e.to)}" d="${edgePath(e)}" marker-end="url(#${onAp(i) ? 'm-ap' : markerFor(e.kind)})"/>`; }).join('');
   const nodes = g.nodes.map((n) => {
     const p = pos[n.id]; if (!p) return '';
     const st = nodeStyle(n);
     let sub = '';
     if (n.kind === 'call') {
-      const w = n.would_verdict || n.verdict;
-      const v = w !== n.verdict ? `应${VERDICT_ZH[w]}（防护关闭）` : (VERDICT_ZH[n.verdict] || '待裁决');
+      const w = effectiveVerdict(n);
+      const approvalText = { approved_once: '人工批准本次', rejected: '人工拒绝', expired: '审批过期' }[n.approval_status];
+      const v = approvalText || (w !== n.verdict ? `应${VERDICT_ZH[w]}（防护关闭）` : (VERDICT_ZH[n.verdict] || '待裁决'));
       sub = `${n.rule_id || ''} · ${v} · ${n.executed ? '已执行' : '未执行'}`;
     } else if (n.kind === 'source') sub = n.hot ? '关联证据（未证实因果）' + (n.s1 ? ` · S1:${n.s1}` : '') : (n.s1 ? `S1:${n.s1}` : '外部来源（不可信）');
     else if (n.kind === 'target') sub = n.executed ? '已受影响' : '未发生（已拦截或未执行）';
@@ -157,23 +196,29 @@ function renderGraph(t) {
     else if (n.kind === 'agent') sub = n.id === 'agent:main' ? '宿主 Pi Agent' : '派发的子 Agent';
     const label = n.label.length > 28 ? n.label.slice(0, 27) + '…' : n.label;
     if (sub.length > 30) sub = sub.slice(0, 29) + '…';
-    return `<g class="node" data-id="${esc(n.id)}" transform="translate(${p.x},${p.y})">
+    const cls = `${showAp && ap.nodes.has(n.id) ? ' on-path' : ''}${showAp && ap.held.has(n.id) ? ' held-node' : ''}`;
+    return `<g class="node${cls}" data-id="${esc(n.id)}" transform="translate(${p.x},${p.y})">
       <rect width="${NW}" height="${NH}" fill="${st.fill}" stroke="${st.stroke}" ${st.dash ? `stroke-dasharray="${st.dash}"` : ''}/>
       <text x="12" y="22">${esc(label)}</text><text class="sub" x="12" y="41">${esc(sub)}</text></g>`;
   }).join('');
   const heads = COLS.map((c) => `<text class="colhead" x="${c.x}" y="22">${c.title}</text>`).join('');
+  const apCls = t.run.protection === 'on' && !ap.block && !ap.executed ? 'ap-held' : '';
+  const apText = t.run.protection === 'on' ? '被挂起 / 阻断动作的上游路径' : '防护本应拦截、实际已执行的动作路径';
   $('#tab-graph').innerHTML = `
     <div class="graph-legend">
+      ${ap.held.size ? `<label><input type="checkbox" id="ap-toggle" ${showAp ? 'checked' : ''}> 高亮拦截路径</label>
+        <span><i style="border-color:${apCls ? 'var(--ask)' : 'var(--off)'};border-top-style:dashed"></i>${apText}（关联，非因果证明）</span>` : ''}
       <span><i style="border-color:var(--induce);border-top-style:dashed"></i>关联（来源 → 动作，未证实因果）</span>
-      <span><i style="border-color:#9aa5b4"></i>摄入 / 提出</span>
+      <span><i style="border-color:var(--edge)"></i>摄入 / 提出</span>
       <span><i style="border-color:var(--agent)"></i>派发子 Agent</span>
-      <span><i style="border-color:#34495e"></i>实际影响</span>
-      <span><i style="border-color:#b6bec9;border-top-style:dashed"></i>被拦截，未发生</span>
-      <span>图${t.graph.acyclic ? '已通过无环检查' : '存在环，请检查证据'}</span>
+      <span><i style="border-color:var(--edge-effect)"></i>实际影响</span>
+      <span><i style="border-color:var(--edge-prevented);border-top-style:dashed"></i>被拦截，未发生</span>
+      <span class="muted">图${t.graph.acyclic ? '已通过无环检查' : '存在环，请检查证据'}</span>
     </div>
-    <div class="graph-wrap"><svg width="${W}" height="${h}" viewBox="0 0 ${W} ${h}">
-      <defs>${marker('m-red', '#d23b3b')}${marker('m-gray', '#9aa5b4')}${marker('m-purple', '#7a4fd0')}${marker('m-dark', '#34495e')}</defs>
+    <div class="graph-wrap"><svg class="${apCls}" width="${W}" height="${h}" viewBox="0 0 ${W} ${h}">
+      <defs>${marker('m-red', 'var(--induce)')}${marker('m-gray', 'var(--edge)')}${marker('m-purple', 'var(--agent)')}${marker('m-dark', 'var(--edge-effect)')}${marker('m-ap', 'var(--ap)')}</defs>
       ${heads}${edges}${nodes}</svg></div>`;
+  $('#ap-toggle')?.addEventListener('change', (e) => { tstate.ap = e.target.checked; renderGraph(t); });
 
   const svg = $('#tab-graph svg');
   const neighbors = (id) => {
@@ -264,7 +309,7 @@ function renderCalls(t) {
 }
 
 // ---------------- sources with highlighted spans ----------------
-const PRIORITY = { directive: 3, s1: 2, unknown: 1 };
+const PRIORITY = { injection: 4, directive: 3, s1: 2, unknown: 1 };
 function highlight(text, marks) {
   const chars = Array.from(text);
   const owner = new Array(chars.length).fill(null);
@@ -287,7 +332,7 @@ function highlight(text, marks) {
 function renderSources(t) {
   if (!t.sources.length) { $('#tab-sources').innerHTML = '<p class="muted">本轮没有摄入外部内容。</p>'; return; }
   $('#tab-sources').innerHTML = `
-    <div class="graph-legend"><span><mark class="directive">　</mark> 规则抽取的指令</span><span><mark class="s1">　</mark> 快镜 S1 检出</span><span><mark class="unknown">　</mark> 未完全解析的指令信号</span></div>
+    <div class="graph-legend"><span><mark class="injection">　</mark> 直接注入特征</span><span><mark class="directive">　</mark> 规则抽取的指令</span><span><mark class="s1">　</mark> 快镜 S1 检出</span><span><mark class="unknown">　</mark> 未完全解析的指令信号</span></div>
     ${t.sources.map((s) => {
       const s1 = s.s1 && typeof s.s1 === 'object' && s.s1.label ? badge('S1：' + s.s1.label + (s.s1.p != null ? ' ' + Number(s.s1.p).toFixed(2) : ''), s.s1.label === 'request' ? 'block' : '') : '';
       return `<div class="src" id="src-${esc(s.event_id)}"><div class="src-head">${badge(s.kind)}<b>${esc(s.uri)}</b>${s1}
@@ -301,7 +346,7 @@ function renderSources(t) {
 function renderReport(t) {
   const imp = t.impact;
   const list = (xs) => (xs.length ? xs.map(esc).join('<br>') : '<span class="muted">无</span>');
-  const flagged = t.calls.filter((c) => ['ASK', 'BLOCK'].includes(c.would_verdict || c.verdict));
+  const flagged = t.calls.filter((c) => ['ASK', 'BLOCK'].includes(effectiveVerdict(c)));
   const cards = flagged.map((c) => {
     const rv = c.review;
     let slow = '<div class="slow muted small">慢镜研判：本轮未生成。</div>';

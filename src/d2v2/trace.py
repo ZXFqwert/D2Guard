@@ -13,6 +13,7 @@ import tempfile
 import hashlib
 import base64
 from .ledger import values
+from .provenance import memory_origin
 from d2core.extractor import SECRET_ASSIGNMENT, KEY_PATTERNS
 from pathlib import Path
 
@@ -21,7 +22,7 @@ TOOL_OP = {'fs_read': 'fs.read', 'fs_write': 'fs.write', 'net_fetch': 'net.fetch
            'mcp_call': 'mcp.call', 'memory_read': 'memory.read', 'memory_write': 'memory.write',
            'exec': 'exec', 'git_push': 'git.push', 'git_commit': 'git.commit'}
 SOURCE_KIND = {'LOCAL_FILE': '文件', 'WEB': '网页', 'MCP_RET': 'MCP 返回', 'MCP_DESC': 'MCP 工具描述', 'MEMORY': '记忆',
-               'USER_QUOTED': '用户转发内容', 'SUBAGENT_OUTPUT': '子 Agent 输出', 'SUBAGENT': '子 Agent 输出',
+               'USER_QUOTED': '用户转发内容', 'USER_INJECTED': '用户输入（疑似直接注入）', 'SUBAGENT_OUTPUT': '子 Agent 输出', 'SUBAGENT': '子 Agent 输出',
                'TOOL_ERROR': '工具错误'}
 EXCERPT = 160
 
@@ -107,10 +108,13 @@ def build_trace(folder):
 
     db, tmp = open_store(folder)
     events, source_s1, spawn_of = {}, {}, {}
+    memory_entries=[]
     try:
         if db is not None:
-            for r in store_rows(db, 'SELECT id,agent,kind,source,uri,raw,sha FROM events'):
+            for r in store_rows(db, 'SELECT id,agent,kind,source,uri,raw,sha,metadata FROM events'):
                 events[r['id']] = dict(r)
+            for r in store_rows(db,'SELECT data FROM memory_entries'):
+                memory_entries.append(json.loads(r['data']))
             sid_event = {}
             for r in store_rows(db, 'SELECT source_id,event_id FROM source_events'):
                 sid_event.setdefault(r['source_id'], []).append(r['event_id'])
@@ -121,7 +125,8 @@ def build_trace(folder):
                     continue
                 for ev in sid_event.get(r['source_id'], []):
                     source_s1[ev] = {'s1': data.get('s1'), 'directives': data.get('directives') or [],
-                                     'unknowns': data.get('unknowns') or []}
+                                     'unknowns': data.get('unknowns') or [],
+                                     'direct_injection': data.get('direct_injection')}
     finally:
         if db is not None:
             db.close()
@@ -160,8 +165,8 @@ def build_trace(folder):
         t = d.get('type')
         if t == 'core_started':
             core = d
-        elif t == 'decision' and d.get('call_id'):
-            dec_by_call[d['call_id']] = d
+        elif t in ('decision','approval_consumed','approval_rejected') and d.get('call_id'):
+            dec_by_call[d['call_id']] = {**dec_by_call.get(d['call_id'],{}),**d}
         elif t == 'slow_review':
             reviews[d.get('call_id')] = {'status': 'ok', **(d.get('result') or {}), 'latency_ms': d.get('latency_ms')}
         elif t == 'slow_review_failed':
@@ -200,7 +205,10 @@ def build_trace(folder):
             c.update(verdict=x.get('verdict'), would_verdict=would, rule_id=x.get('rule_id') or x.get('policy'),
                      risk=x.get('risk'), reason=x.get('reason'))
             title = f"裁决 {x.get('verdict')}"
-            if would != x.get('verdict'):
+            c['approval_status']=x.get('approval_status')
+            if x.get('origin')=='host_approval':
+                title={'approved_once':'人工批准本次调用','rejected':'人工拒绝本次调用','expired':'审批过期，未执行'}.get(x.get('approval_status'),title)
+            elif would != x.get('verdict'):
                 title += f"（防护关闭，开启时应为 {would}）"
             row.update(title=title, detail=f"{c['op']} {c['target']}", verdict=x.get('verdict'), would_verdict=would,
                        rule_id=c['rule_id'], risk=x.get('risk'), reason=x.get('reason'))
@@ -229,6 +237,10 @@ def build_trace(folder):
             row.update(title='子 Agent 结束', detail=mask(short(x.get('final_answer'))), child=x.get('child_agent_id'))
         elif t == 'approval_hold_complete':
             row.update(title='挂起等待用户确认', detail='该调用未执行')
+        elif t == 'approval_waiting':
+            row.update(title='等待网页审批',detail='当前调用尚未执行')
+        elif t == 'approval_resumed':
+            row.update(title='批准后继续原生调用',detail=cid)
         else:
             row.update(title=t, detail='')
         timeline.append(row)
@@ -237,10 +249,14 @@ def build_trace(folder):
     for ev_id, ev in events.items():
         if ev_id in sources or ev.get('source') in (None, 'MODEL_GENERATED', 'TRUSTED_USER', 'HOST_CONFIGURATION'):
             continue
-        if ev.get('kind') in ('mcp_description', 'user_quote', 'memory_entry', 'tool_result') or (ev.get('kind') == 'CONTENT_IN' and ev.get('source') == 'USER_QUOTED'):
+        if ev.get('kind') in ('mcp_description', 'user_quote', 'memory_entry', 'tool_result','MEMORY_PROVENANCE') or (ev.get('kind') == 'CONTENT_IN' and ev.get('source') in ('USER_QUOTED', 'USER_INJECTED')):
             sources[ev_id] = {'event_id': ev_id, 'type': ev['source'], 'kind': SOURCE_KIND.get(ev['source'], ev['source']),
                               'uri': mask(ev.get('uri')), 'agent': ev.get('agent') or 'main', 'via_call': None,
                               'text': mask(ev.get('raw') or ''), 't_ms': None}
+            if ev.get('kind')=='MEMORY_PROVENANCE':
+                metadata=json.loads(ev.get('metadata') or '{}')
+                sources[ev_id].update(kind='记忆继承 / '+sources[ev_id]['kind'],
+                    writer_session=metadata.get('writer_session'),original_event_id=metadata.get('original_event_id'))
 
     alias = {}
 
@@ -258,6 +274,11 @@ def build_trace(folder):
             if span and valid_ref(u.get('evidence_ref') or {}):
                 kind = 's1' if str(u.get('signal', '')).startswith('model:') else 'unknown'
                 marks.append({'span': span, 'kind': kind, 'label': u.get('reason', '')})
+        for m in ((info.get('direct_injection') or {}).get('matches') or []):
+            if m.get('char_span'):
+                marks.append({'span': m['char_span'], 'kind': 'injection', 'label': '直接注入特征（' + m.get('label', '') + '）：' + mask(m.get('cue', ''))})
+        if info.get('direct_injection'):
+            src['direct_injection'] = info['direct_injection'].get('labels')
         ev=events[ev_id]
         src['evidence_ref']={'event_id':ev_id,'sha256':ev['sha'],'char_span':[0,len(ev['raw'])]}
         src['s1'] = info.get('s1')
@@ -315,6 +336,7 @@ def build_trace(folder):
         'engine': manifest.get('guard_engine'), 'batch_id': manifest.get('batch_id'), 'task': mask(task),
         'outcome': result.get('outcome'), 'attack_succeeded': result.get('attack_succeeded'),
         'received_bytes': result.get('received_bytes'), 'task_completed': result.get('task_completed'),
+        'approved_calls':result.get('approved_calls',[]),'rejected_calls':result.get('rejected_calls',[]),
         'elapsed_seconds': result.get('elapsed_seconds'), 'complete': bool(result),
         'fast_model': (core.get('content_model') or core.get('fast_model') or {}).get('backend')
         if isinstance(core.get('content_model') or core.get('fast_model'), dict) else None,
@@ -322,6 +344,12 @@ def build_trace(folder):
     output = {'run': run, 'agents': list(agents.values()), 'calls': sorted(calls.values(), key=lambda c: c.get('seq') or 0),
             'sources': sorted(sources.values(), key=lambda s: (s['t_ms'] is None, s['t_ms'] or 0)),
             'timeline': timeline, 'graph': graph, 'impact': impact, 'plan': plan}
+    output['memory_links']=[]
+    for entry in memory_entries:
+        try:origin=memory_origin(folder,entry)
+        except (OSError,sqlite3.Error,ValueError,KeyError):origin={'writer_run_id':None,'native_write_verified':False}
+        output['memory_links'].append({'key':entry['key'],'writer_session':entry['writer_session'],
+            'content_sha256':entry['content_sha256'],**origin})
     # Mask registered values in every public field, including task, args and model reports.
     secrets=set()
     for ev in events.values():
@@ -345,6 +373,8 @@ def alignment(c):
     held = verdict in ('ASK', 'BLOCK')
     if not verdict:
         return 'pending'
+    if c.get('approval_status')=='approved_once' and not held:
+        return 'human_approved'
     if c.get('rule_id') == 'TOOL-ARGUMENT-INVALID' and not c.get('executed'):
         return 'parameter_rejected'
     if c.get('rule_id') == 'POL-TOOL-BUDGET' and not c.get('executed'):
@@ -397,7 +427,7 @@ def build_graph(task, agents, calls, sources):
         cid = 'call:' + c['call_id']
         node(cid, 2, 'call', f"{c['op']} {short(c['target'], 48)}", verdict=c.get('verdict'),
              would_verdict=c.get('would_verdict'), rule_id=c.get('rule_id'),
-             executed=c.get('executed'))
+             executed=c.get('executed'),approval_status=c.get('approval_status'))
         edges.append({'from': 'agent:' + c['agent'], 'to': cid, 'kind': 'propose'})
         for i in c.get('induced_by', []):
             if 'src:' + i['event_id'] in nodes:

@@ -77,6 +77,8 @@ class ViewsTests(unittest.TestCase):
     def test_original_adapter_caps_all_calls_and_never_claims_calibration(self):
         model=OriginalLaya.__new__(OriginalLaya)
         model.agent=Mock()
+        model.tokenizer=model.agent.tok
+        model.model_loaded=True
         model.agent.tok.return_value={'input_ids':[1]*20}
         model.agent.system_one.return_value={'answers':{'A1':{'choice':'A','probs':[.99,.005,.005]}},'usage':{'truncated':False}}
         answer=model.answer_questions({'A1':{'task':'Read docs','action':'Read notes'}})
