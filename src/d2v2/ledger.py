@@ -35,7 +35,8 @@ class FingerprintLedger:
         for value in values(raw):
             sid='SEC-'+hmac.digest(self.key,value.encode(),'sha256').hex()[:20]
             self.store.db.execute('INSERT OR IGNORE INTO secrets VALUES(?,?,?)',(sid,ref['event_id'],source))
-            for encoding,data in [('plain',value.encode()),('base64',base64.b64encode(value.encode()).rstrip(b'='))]:
+            for encoding,data in [('plain',value.encode()),('base64',base64.b64encode(value.encode()).rstrip(b'=')),
+                                  ('base32',base64.b32encode(value.encode()).rstrip(b'=')),('hex',value.encode().hex().encode())]:
                 self.store.db.executemany('INSERT OR IGNORE INTO secret_chunks VALUES(?,?,?)',
                     ((sid,encoding,fp) for fp in self.windows(data)))
             ids.append(sid)
@@ -86,7 +87,8 @@ class FingerprintLedger:
         for row in self.store.db.execute('SELECT DISTINCT e.raw FROM secrets s JOIN events e ON e.id=s.event_id'):
             registered=True
             for value in values(row[0]):
-                for variant in (value,base64.b64encode(value.encode()).decode(),base64.urlsafe_b64encode(value.encode()).decode()):
+                for variant in (value,base64.b64encode(value.encode()).decode(),base64.urlsafe_b64encode(value.encode()).decode(),
+                                base64.b32encode(value.encode()).decode(),value.encode().hex()):
                     result=result.replace(variant,'<REDACTED_SECRET>')
         result=SECRET_ASSIGNMENT.sub(lambda m:m.group().replace(m.group(1),'<REDACTED_SECRET>'),result)
         result=KEY_PATTERNS.sub('<REDACTED_SECRET>',result)

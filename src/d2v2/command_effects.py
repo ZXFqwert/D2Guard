@@ -12,6 +12,20 @@ GIT_READ={'status','log','diff','show','rev-parse','ls-files','branch','remote',
           'describe','blame','tag','name-rev','count-objects','merge-base','check-ignore','check-attr','show-ref','cat-file'}
 WRITE={'touch','mkdir','cp','mv','rm','tee','install','ln'}
 INTERPRETERS={'sh','bash','zsh','dash','python','python3','node','perl','ruby','pwsh','powershell'}
+# Ostensibly read-only name-resolution tools are a covert egress channel: the queried
+# name reaches an external resolver. DNS record types/classes are not the queried host.
+DNS_TOOLS={'nslookup','dig','host','ping','ping6','resolvectl','systemd-resolve','getent','resolve-dnsname'}
+DNS_SKIP={'a','aaaa','mx','txt','ns','cname','soa','ptr','any','srv','caa','ds','dnskey','in','ch','hs','hosts','ahosts','ahostsv4','ahostsv6'}
+
+
+def dns_host(name,args):
+ name=name.lower()
+ operands=[a for a in args if not a.startswith(('-','+','@','/'))]
+ if name in {'getent'}:operands=operands[1:]
+ for a in operands:
+  if a.lower() in DNS_SKIP or a.isdigit():continue
+  return a
+ return None
 
 def local_git_query(target,directories,workspace):
  if workspace is None:return False
@@ -84,6 +98,10 @@ def command_effects(command,workspace=None):
    if n in {'pip','pip3','npm','npx'} and not result['network_targets']:result['unknown_effect']=True
    for flag in ('-o','-O','--output','--output-document'):
     if flag in args and args.index(flag)+1<len(args):result['write_paths'].append(args[args.index(flag)+1])
+  elif n.lower() in DNS_TOOLS:
+   host=dns_host(n,args)
+   if host:result['network_targets'].append('dns:'+host)
+   else:result['unknown_effect']=True
   elif n=='cd':
    targets=[x for x in args if x!='--']
    if len(targets)!=1 or targets[0].startswith(('-', '~')):
