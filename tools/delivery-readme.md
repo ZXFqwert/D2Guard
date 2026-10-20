@@ -14,9 +14,9 @@ Linux 按部署文档建立 venv、安装 requirements-core.txt 和 requirements
 
 生成提交 ZIP 请使用 build-submission.bat，勿直接压缩带本地配置和环境的整个目录。
 
-在线测试可访问 https://agent.li33.art/safe/preview/#/arena ，点击“开始双路对决”后由算力机执行真实任务。公网模型配置由部署端维护，ASK 可在网页审批。新增 `di-*` 场景和 `tools/run_direct_input_evaluation.py` 用于直接输入的配对复测，详见 `acceptance/direct-input-20261020/`。
+本机启动控制台后访问 http://127.0.0.1:8768/#/arena ，点击“开始双路对决”后执行真实任务。模型配置由部署端维护（见 `.local/provider.json`），ASK 可在网页审批。新增 `di-*` 场景和 `tools/run_direct_input_evaluation.py` 用于直接输入的配对复测，详见 `acceptance/direct-input-20261020/`。
 
-自由输入与连续追问入口为 https://agent.li33.art/safe/preview/#/chat 。本机启动后访问 http://127.0.0.1:8768/#/chat。前端通过 Pi 0.85.1 原生 RPC 的 prompt/abort 接口连接同一会话；上下文、自动压缩与工具调用循环由 Pi 管理。D²Guard 检查每轮用户输入和每次工具执行，提供审批与证据展示。附带文本按引用资料处理。网页刷新可恢复当前会话；会话结束或闲置 30 分钟后关闭，服务重启不会自动恢复已关闭会话。
+自由输入与连续追问入口为 http://127.0.0.1:8768/#/chat 。前端通过 Pi 0.85.1 原生 RPC 的 prompt/abort 接口连接同一会话；上下文、自动压缩与工具调用循环由 Pi 管理。D²Guard 检查每轮用户输入和每次工具执行，提供审批与证据展示。附带文本按引用资料处理。网页刷新可恢复当前会话；会话结束或闲置 30 分钟后关闭，服务重启不会自动恢复已关闭会话。
 
 控制台启动时加载并预热快镜，后续任务共享模型与分词器，每轮安全状态、工作区、审批和证据独立。常驻进程只监听本机，凭据不传给 Agent；配置或推理源码变化后需重启控制台。Windows 使用经逐字节校验的只读 FP32 权重映射，数值与原 FP16 权重转 FP32 一致，减少页面文件占用；转换文件只位于 .local，不纳入提交包。慢镜研判在后台进行，结束会话后仍可能需要等待证据归档。
 

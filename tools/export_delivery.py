@@ -18,7 +18,7 @@ def scan(folder):
   counts['ip']+=len(re.findall(r'\b(?:\d{1,3}\.){3}\d{1,3}\b',text))
   if any(v in text for v in secrets) or re.search(r'\bsk-[A-Za-z0-9]{20,}',text):blocked.append(p.relative_to(folder).as_posix())
   # Infrastructure identifiers are forbidden, synthetic/local-service addresses are not secrets.
-  if any(v in text for v in ('175.6.27.158','10.33.0.30','li33_compute_roots','/home/roots/')):blocked.append(p.relative_to(folder).as_posix())
+  if any(v in text for v in ('175.6.27.158','10.33.0.30','li33_compute_roots','/home/roots/','li33.art')):blocked.append(p.relative_to(folder).as_posix())
  return {'passed':not blocked,'blocked_files':sorted(set(blocked)),'pattern_counts':counts,'known_secret_count':len(secrets),'note':'Generic API field names, Bearer construction and loopback/lab/test fixture addresses are code, not credentials; matching live keys or compute identifiers blocks export.'}
 def main():
  p=argparse.ArgumentParser();p.add_argument('--assets',required=True);p.add_argument('--destination',default=str(ROOT.parent/'交付件'));a=p.parse_args();dest=Path(a.destination).resolve();code=dest/'03-程序源码';code.mkdir(parents=True,exist_ok=True)
