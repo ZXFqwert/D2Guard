@@ -23,13 +23,14 @@ def scan(folder):
 def main():
  p=argparse.ArgumentParser();p.add_argument('--assets',required=True);p.add_argument('--destination',default=str(ROOT.parent/'交付件'));a=p.parse_args();dest=Path(a.destination).resolve();code=dest/'03-程序源码';code.mkdir(parents=True,exist_ok=True)
  for name in ('src','extensions','scenarios','training'):copytree(ROOT/name,code/name)
- for name in ('lab.py','verify_v2.py','run_evaluation.py','policies.yaml','package.json','runtime-lock.json','requirements-core.txt','requirements-laya.txt','requirements-gpu.txt'):
+ for name in ('lab.py','verify_v2.py','run_evaluation.py','policies.yaml','package.json','runtime-lock.json','runtime-source-manifest.json','requirements-core.txt','requirements-laya.txt','requirements-gpu.txt'):
   src=ROOT/name
   if src.exists():shutil.copy2(src,code/name)
  shutil.copy2(ROOT/'src/d2v2/policies.yaml',code/'policies.yaml')
  (code/'deploy').mkdir(exist_ok=True);shutil.copy2(ROOT/'deploy/host-exec.md',code/'deploy/host-exec.md')
  (code/'tools').mkdir(exist_ok=True)
- for name in ('configure_delivery.py','setup_windows.py','windows_console.py','package_delivery.py'):
+ for name in ('configure_delivery.py','setup_runtime.py','console_launcher.py','setup_windows.py','windows_console.py','package_delivery.py',
+              'run_direct_input_evaluation.py','audit_direct_input_evaluation.py','check_native_chat.py','verify_delivery_sources.py'):
   shutil.copy2(ROOT/'tools'/name,code/'tools'/name)
  shutil.copy2(ROOT/'deploy/WINDOWS-使用说明.md',code/'WINDOWS-使用说明.md')
  # Only tests whose import closure is available in the runtime export.
@@ -50,8 +51,7 @@ def main():
   if name not in excluded:shutil.copy2(p,code/'tests'/p.name)
   elif (code/'tests'/p.name).exists():(code/'tests'/p.name).unlink()
  shutil.copy2(ROOT/'tests/boundary.test.mjs',code/'tests/boundary.test.mjs')
- console=ROOT.parent/'d2guard-console'
- if not console.exists():console=ROOT/'console'
+ console=ROOT/'console'
  (code/'console').mkdir(exist_ok=True)
  for name in ('server.py','d2trace.py'):shutil.copy2(console/name,code/'console'/name)
  copytree(console/'static',code/'console/static')

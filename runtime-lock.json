@@ -1,12 +1,13 @@
 {
   "pi_package": "@earendil-works/pi-coding-agent",
   "pi_version": "0.85.1",
-  "integration": "official CLI JSON mode and explicit TypeScript extension",
+  "integration": "official CLI JSON/RPC modes and explicit TypeScript extension; native Pi session context",
   "installed_node_observed": "24.15.0",
   "node_minimum": "22.19.0",
   "python_minimum": "3.11",
   "python_dependencies": "requirements-core.txt; original Laya: requirements-laya.txt",
-  "installation_scope": "existing global Pi; no user-wide settings changed",
+  "installation_scope": "project-local npm prefix .local/pi-runtime; no user-wide settings changed",
+  "fast_inference": "resident host-only inference with independent per-session safety state",
   "per_run_integrity": "CLI bundle and project runtime SHA256 stored in manifest.json",
   "default_engine": "d2v2"
 }

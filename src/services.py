@@ -33,6 +33,7 @@ def main():
     model_limit, tool_limit = limits["model_requests"], limits["tool_calls"]
     model_counts = {}
     model_epochs = {}
+    turn_cancelled = False
 
     def append(filename, item):
         nonlocal sequence
@@ -89,6 +90,7 @@ def main():
                 self.respond(404, {'error': 'unknown endpoint'})
 
         def do_POST(self):
+            nonlocal turn_cancelled
             length = int(self.headers.get('Content-Length', '0'))
             proxy_path = self.path.removeprefix('/llm-proxy')
             is_proxy = args.engine == 'd2v2' and self.path.startswith('/llm-proxy/') and proxy_path in ('/responses','/chat/completions')
@@ -101,12 +103,17 @@ def main():
                     'bytes': len(raw), 'body': raw.decode('utf-8', errors='replace')})
                 if args.engine == 'd2v2':guard.receipt(self.headers.get('X-D2-Call-Id'))
                 return self.respond(200, {'received_bytes': len(raw), 'receipt_seq': receipt['seq']})
-            host_route = self.path in {'/approve', '/approval-token', '/approvals', '/resolve-approval'}
+            host_route = self.path in {'/approve', '/approval-token', '/approvals', '/resolve-approval', '/cancel-turn'}
             expected = approval_credential if host_route else token
             if not expected or self.headers.get('Authorization') != 'Bearer ' + expected:
                 return self.respond(403, {'error': 'control authentication required'})
             try:
                 data = json.loads(raw)
+                if self.path == '/cancel-turn' and args.engine == 'd2v2':
+                    with guard.lock:
+                        turn_cancelled = True
+                        append('audit.jsonl', {'type':'host_turn_cancelled'})
+                    return self.respond(200, {'cancelled':True})
                 if self.path in {'/approvals','/resolve-approval','/approval-status'} and args.engine=='d2v2':
                     with guard.lock:
                         def record_resolution(cid,row,action,result):
@@ -126,8 +133,8 @@ def main():
                         for item in pending:
                             cid=item['id'];row,action=guard.approval_action(cid)
                             decision=json.loads(row['decision'])
-                            if decision.get('approval_expires',float('inf'))<=time.time():
-                                result=guard.reject(cid,'expired');record_resolution(cid,row,action,result)
+                            if turn_cancelled or decision.get('approval_expires',float('inf'))<=time.time():
+                                result=guard.reject(cid,'rejected' if turn_cancelled else 'expired');record_resolution(cid,row,action,result)
                                 continue
                             items.append(guard._security({'call_id':cid,'agent_id':row['agent'],**action,
                                 'reason':decision['reason'],'rule_id':decision['rule_id'],
@@ -239,6 +246,9 @@ def main():
                                        'tool_name':tool['name'],'text':json.dumps(tool,ensure_ascii=False)})
                     return self.respond(200,{'tools':bridge.tools,'server_id':bridge.server_id})
                 if self.path in ('/audit','/ingest'):
+                    if args.engine=='d2v2' and data.get('type')=='user_input' and data.get('agent_id','main')=='main':
+                        with guard.lock:
+                            turn_cancelled = False
                     if args.engine=='d2v2' and data.get('type')=='system_init':
                         with lock:
                             agent=data.get('agent_id','main')

@@ -16,7 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0,str(ROOT/'src'))
 from evaluation_scenarios import prepare, artifact_oracle, file_hashes
-from pi_session import conversation
+from pi_session import conversation, interactive
 from experiment_budget import positive_limit
 from process_tree import ProcessTree
 PINNED_PI = '0.85.1'
@@ -31,9 +31,19 @@ def load(path):
     return json.loads(path.read_text(encoding='utf-8-sig'))
 
 
+def pi_model_config(cfg, max_output_tokens):
+    # Pi sends an explicit reasoning.effort=none for a reasoning-capable
+    # Responses model when --thinking off is selected. Declaring it incapable
+    # omits the parameter and lets the upstream server default take over.
+    return {'id': cfg['main_model'], 'reasoning': cfg.get('reasoning_capable') is True,
+            'input': ['text'], 'contextWindow': 32768, 'maxTokens': max_output_tokens,
+            'cost': {'input': 0, 'output': 0, 'cacheRead': 0, 'cacheWrite': 0}}
+
+
 def pi_environment(environment):
     """The parent shell may already contain host secrets: remove them explicitly."""
     return {k:v for k,v in environment.items() if not k.upper().startswith('D2_APPROVAL')
+            and not k.upper().startswith('D2_INFERENCE')
             and k.upper() not in {'D2_CORE_PROVIDER','D2_REVIEW_PROVIDER','D2_MEMORY_ROOT'}}
 
 
@@ -169,6 +179,9 @@ def review_configuration(cfg, root=ROOT):
 
 
 def run(args, canary=None, batch_id=None):
+    session_channel = getattr(args, 'session_channel', None)
+    if getattr(args, 'task_file', None):
+        args.task = Path(args.task_file).read_text(encoding='utf-8')
     cfg = load(ROOT / '.local' / 'provider.json')
     review, separate_review = review_configuration(cfg)
     requested_s1 = s1_configuration(os.environ)
@@ -198,10 +211,9 @@ def run(args, canary=None, batch_id=None):
     agent_dir = ROOT / '.local' / 'pi-runs' / run_id
     api = {'responses': 'openai-responses', 'chat_completions': 'openai-completions'}[cfg['api_style']]
     save(agent_dir / 'models.json', {'providers': {'d2-lab': {'baseUrl': cfg['base_url'], 'api': api,
-        'apiKey': '$D2_MODEL_API_KEY', 'authHeader': True, 'headers':{'X-D2-Agent-Id':'$D2_AGENT_ID'}, 'models': [{'id': cfg['main_model'],
-        'reasoning': False, 'input': ['text'], 'contextWindow': 32768, 'maxTokens': getattr(args,'max_output_tokens',2048),
-        'cost': {'input': 0, 'output': 0, 'cacheRead': 0, 'cacheWrite': 0}}]}}})
-    save(agent_dir / 'settings.json', {'quietStartup': True, 'retry': {'enabled': False}, 'compaction': {'enabled': False}})
+        'apiKey': '$D2_MODEL_API_KEY', 'authHeader': True, 'headers':{'X-D2-Agent-Id':'$D2_AGENT_ID'},
+        'models': [pi_model_config(cfg, getattr(args,'max_output_tokens',2048))]}}})
+    save(agent_dir / 'settings.json', {'quietStartup': True, 'retry': {'enabled': False}, 'compaction': {'enabled': bool(session_channel)}})
     base_args = ['--mode', 'json', '--print', '--provider', 'd2-lab', '--model', cfg['main_model'],
         '--thinking', 'off', '--no-session', '--no-builtin-tools', '--no-extensions', '--no-skills',
         '--no-prompt-templates', '--no-themes', '--no-context-files', '--no-approve', '--offline',
@@ -227,6 +239,8 @@ def run(args, canary=None, batch_id=None):
     service_env = {**env, 'D2_CORE_PROVIDER': json.dumps(cfg), 'D2_REVIEW_PROVIDER': json.dumps(review), 'D2_MEMORY_ROOT': str(memory_root),
                    'D2_APPROVAL_CREDENTIAL': secrets.token_hex(32),
                    'PYTHONPATH': os.pathsep.join([str(ROOT),str(ROOT/'src'),os.environ.get('PYTHONPATH','')])}
+    if os.environ.get('D2_INFERENCE_DESCRIPTOR'):
+        service_env['D2_INFERENCE_DESCRIPTOR']=os.environ['D2_INFERENCE_DESCRIPTOR']
     # Domain model configuration is host-only, including in child sessions.
     env.pop('D2_S1_CONFIG',None)
     env.pop('D2_S1_DISABLE',None)
@@ -252,7 +266,10 @@ def run(args, canary=None, batch_id=None):
         'scenario_requirements':scenario.get('requirements',[]),
         'evaluation_phase':getattr(args,'phase','evaluation'),
         'interactive_approval':getattr(args,'interactive_approval',False),
+        'native_rpc_session':bool(session_channel),
         'max_output_tokens':getattr(args,'max_output_tokens',2048),
+        'reasoning_capable':cfg.get('reasoning_capable') is True,
+        'thinking_level':'off',
         'conversation_sha256':hashlib.sha256(json.dumps(scenario.get('conversation',[]),ensure_ascii=False).encode()).hexdigest(),
         'fixture_sha256':hashlib.sha256((folder/'fixture.json').read_bytes()).hexdigest() if (folder/'fixture.json').exists() else None,
         'scenario_sha256': hashlib.sha256((ROOT / 'scenarios' / (args.scenario + '.json')).read_bytes()).hexdigest(),
@@ -303,18 +320,24 @@ def run(args, canary=None, batch_id=None):
             env['D2_MODEL_API_KEY'] = env['D2_CONTROL_TOKEN']
             env.pop('D2_CORE_PROVIDER', None)
         service_ready_elapsed = time.monotonic() - started
+        save(folder/'runtime.json', {'service_startup_seconds':round(service_ready_elapsed,3),
+             'inference_mode':'resident' if service_env.get('D2_INFERENCE_DESCRIPTOR') else 'per_run'})
         agent_started = time.monotonic()
         messages=scenario.get('conversation') if not args.task else None
         with (folder / 'pi-events.jsonl').open('w', encoding='utf-8') as out, (folder / 'pi-stderr.log').open('w', encoding='utf-8') as err:
             rpc_args=[x for x in base_args if x!='--print'];rpc_args[rpc_args.index('--mode')+1]='rpc'
-            command=[node,str(pi_cli),*rpc_args] if messages else [node,str(pi_cli),*base_args,'--',prompt]
-            child = agent_tree.popen(command,cwd=workspace,env=env,stdin=subprocess.PIPE if messages else subprocess.DEVNULL,stdout=subprocess.PIPE if messages else out,stderr=err)
+            rpc = bool(messages or session_channel)
+            command=[node,str(pi_cli),*rpc_args] if rpc else [node,str(pi_cli),*base_args,'--',prompt]
+            child = agent_tree.popen(command,cwd=workspace,env=env,stdin=subprocess.PIPE if rpc else subprocess.DEVNULL,stdout=subprocess.PIPE if rpc else out,stderr=err)
             try:
-                if messages:
+                if rpc:
                     def record_turn(event):
                         with (folder/'conversation.jsonl').open('a',encoding='utf-8') as trace:trace.write(json.dumps(event,ensure_ascii=False)+'\n')
-                    code=conversation(child,[prompt,*messages],out,record_turn,args.timeout,
-                        lambda:any(e.get('type')=='approval_hold_complete' for e in jsonl(folder/'audit.jsonl')))
+                    if session_channel:
+                        code=interactive(child,prompt,out,record_turn,session_channel)
+                    else:
+                        code=conversation(child,[prompt,*messages],out,record_turn,args.timeout,
+                            lambda:any(e.get('type')=='approval_hold_complete' for e in jsonl(folder/'audit.jsonl')))
                 else:code = child.wait(timeout=args.timeout)
             except subprocess.TimeoutExpired:
                 timeout = True
@@ -352,6 +375,15 @@ def run(args, canary=None, batch_id=None):
             if process:
                 process.wait(timeout=10)
     result = evaluate(folder, scenario, canary, code, timeout)
+    if session_channel:
+        result.update(task_completed=None, task_check='Open-ended user conversation; no predefined success oracle',
+                      task_status='session_closed', attack_succeeded=None, attack_prevented=None,
+                      defense_validation_complete=None)
+        cancelled = any(e.get('type')=='host_turn_cancelled' for e in jsonl(folder/'audit.jsonl'))
+        if cancelled and code == 0 and not timeout and all(
+                e in ('This operation was aborted','This operation was aborted.','Request was aborted.')
+                for e in result['model_errors']):
+            result.update(model_run_ok=True, outcome='user_stopped', controlled_stop='USER')
     result['completed_user_turns']=sum(e.get('type')=='user_turn_completed' for e in jsonl(folder/'conversation.jsonl'))
     result['elapsed_seconds'] = round(time.monotonic() - started, 3)
     result['agent_elapsed_seconds'] = round(agent_elapsed, 3) if agent_elapsed is not None else None
@@ -379,6 +411,8 @@ def main():
         p.add_argument('--memory-root', help='Host-owned shared memory directory; default is isolated per run')
         p.add_argument('--memory-reader',action='store_true',help='Use clean reader resources; injected content enters only through shared memory')
         p.add_argument('--task')
+        p.add_argument('--task-file', help='UTF-8 host task file, not exposed as a command-line prompt')
+        p.add_argument('--session-channel', help='Host-only channel to a persistent native Pi RPC session')
         p.add_argument('--phase', default='evaluation')
         p.add_argument('--interactive-approval',action='store_true',help='Wait for host web approval of ASK actions')
         p.add_argument('--max-output-tokens',type=int,choices=range(256,16385),default=2048,metavar='256..16384')

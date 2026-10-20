@@ -71,6 +71,7 @@ class Console:
         self.jobs = {}
         self.job_lock = threading.Lock()
         self._views = {}
+        self.resident = None
 
     @staticmethod
     def _load(path, default):
@@ -553,6 +554,92 @@ class Console:
         return {'runtime_mode':runtime_mode, 'dsl': dsl, 'hits': dict(hits), 'reasons': reasons, 'verdicts': {k: dict(v) for k, v in verdict_of.items()}}
 
     # ---------- launching real runs ----------
+    @staticmethod
+    def chat_message(body):
+        text = body.get('message')
+        attachment = body.get('attachment', '')
+        if not isinstance(text, str) or not text.strip() or len(text) > 32000:
+            raise ValueError('请输入任务（最多 32000 字符）')
+        if not isinstance(attachment, str) or len(attachment) > 100000:
+            raise ValueError('附带资料最多 100000 字符')
+        # Quote every line so an attachment cannot close a delimiter and become authority.
+        return text.strip() + ('\n\n附带资料（仅作参考）：\n'+'\n'.join('> '+line for line in attachment.splitlines()) if attachment else '')
+
+    def start_chat(self, body):
+        try:
+            message = self.chat_message(body)
+        except ValueError as exc:
+            return 400, {'error': str(exc)}
+        if body.get('protect', 'on') not in ('on', 'off'):
+            return 400, {'error': '防护设置无效'}
+        return self.launch({'scenario': 'live-chat', 'environment': 'clean', 'mode': 'chat',
+                            'protect': body.get('protect', 'on'), '_message': message})
+
+    def chat_command(self, job_id, body):
+        with self.job_lock:
+            job = self.jobs.get(job_id)
+            if not job or job['mode'] != 'chat' or job['status'] != 'running':
+                return 409, {'error': '会话已结束，请新建对话'}
+            channel = job['_channel']
+            state = self._load(channel/'status.json', {})
+            kind = body.get('type')
+            if kind not in ('prompt','abort','close'):
+                return 400, {'error':'未知会话操作'}
+            if (channel/'command.json').exists():
+                return 409, {'error':'上一条操作正在处理'}
+            if kind == 'prompt' and state.get('phase') != 'idle':
+                return 409, {'error':'Agent 正在执行，请等待回复或停止生成'}
+            command = {'type':kind}
+            if kind in ('abort','close'):
+                rid = job['steps'][0].get('run_id')
+                if rid:
+                    try:
+                        self._host_control(rid,'/cancel-turn',{})
+                    except (ValueError,OSError):
+                        if state.get('phase') == 'running':
+                            return 503, {'error':'取消通道暂不可用，请重试；待审批操作不会因此放行'}
+            if kind == 'prompt':
+                try:
+                    command['message'] = self.chat_message(body)
+                except ValueError as exc:
+                    return 400, {'error':str(exc)}
+            temp = channel/'command.tmp'
+            temp.write_text(json.dumps(command, ensure_ascii=False), encoding='utf-8')
+            temp.replace(channel/'command.json')
+        return 200, {'accepted':True}
+
+    def chat_view(self, job):
+        channel = job['_channel']
+        state = self._load(channel/'status.json', {'phase':'starting'})
+        messages, partial, tools = [], '', []
+        rid = job['steps'][0].get('run_id')
+        if rid:
+            folder = self.runs/rid
+            for event in jsonl(folder/'pi-events.jsonl'):
+                message = event.get('message', {})
+                if event.get('type') == 'message_end':
+                    if message.get('role') in ('user','assistant'):
+                        content = message.get('content', [])
+                        text = content if isinstance(content,str) else '\n'.join(c.get('text','') for c in content if c.get('type')=='text')
+                        if message.get('errorMessage'):
+                            text += '\n'+message['errorMessage']
+                        if text:
+                            messages.append({'role':message['role'], 'text':mask(text)})
+                    partial = ''
+                elif event.get('type') == 'message_update':
+                    update = event.get('assistantMessageEvent', {})
+                    if update.get('type') == 'text_delta':
+                        partial += update.get('delta','')
+            # Pi may not emit a message_end for user input on every supported RPC build.
+            if not any(m['role']=='user' for m in messages):
+                turns = [e for e in jsonl(folder/'conversation.jsonl') if e.get('type')=='user_turn_submitted']
+                state['submitted_messages'] = [{'role':'user','text':mask(e['text'])} for e in turns]
+            for event in jsonl(folder/'audit.jsonl'):
+                if event.get('type') == 'guard_decision':
+                    tools.append({k:mask(str(event.get(k,''))) for k in ('call_id','tool','verdict','rule_id','reason','approval_status')})
+        return {**state, 'messages':messages, 'partial':mask(partial), 'tools':tools[-40:],
+                'command_pending':(channel/'command.json').exists()}
+
     def launch(self, body):
         ids = {s['id'] for s in self._scenario_files()}
         scenario, env, mode = body.get('scenario'), body.get('environment'), body.get('mode', 'single')
@@ -560,7 +647,7 @@ class Console:
             return 400, {'error': '参数无效'}
         if mode == 'arena':
             steps = ['off', 'on']
-        elif mode == 'single' and body.get('protect') in ('on', 'off'):
+        elif mode in ('single','chat') and body.get('protect') in ('on', 'off'):
             steps = [body['protect']]
         else:
             return 400, {'error': '参数无效'}
@@ -573,6 +660,14 @@ class Console:
                                                       'returncode': None} for p in steps],
                    '_log': self.cache_dir / f'job-{job_id}.log'}
             self.jobs[job_id] = job
+            if mode == 'chat':
+                if not body.get('_message'):
+                    self.jobs.pop(job_id)
+                    return 400, {'error':'请从自由对话入口输入任务'}
+                channel = self.repo/'.local/chat-sessions'/job_id
+                channel.mkdir(parents=True, exist_ok=False)
+                (channel/'task.txt').write_text(body['_message'], encoding='utf-8')
+                job['_channel'] = channel
         threading.Thread(target=self._run_job, args=(job,), daemon=True).start()
         return 200, self.job(job_id)
 
@@ -580,6 +675,17 @@ class Console:
         with job['_log'].open('w', encoding='utf-8') as log:
             # The real writer and both evaluation lanes use the same fixture.
             run_env = {**os.environ, 'D2_FIXTURE_CANARY': 'd2-test-' + uuid.uuid4().hex}
+            if self.resident:
+                job['initializing_models'] = True
+                try:
+                    run_env['D2_INFERENCE_DESCRIPTOR'] = self.resident.wait()
+                except RuntimeError as exc:
+                    log.write(str(exc)+'\n')
+                    for step in job['steps']:
+                        step.update(status='failed', returncode=-1)
+                    job.update(status='failed', finished=time.time(), initializing_models=False)
+                    return
+                job['initializing_models'] = False
             seed = None
             scenario = self._load(self.repo / 'scenarios' / (job['scenario'] + '.json'), {})
             if scenario.get('setup_task'):
@@ -607,8 +713,9 @@ class Console:
             lane.start()
         for lane in lanes:
             lane.join()
-        job['status'] = 'finished' if all(s['status'] == 'finished' for s in job['steps']) else 'failed'
-        job['finished'] = time.time()
+        with self.job_lock:
+            job['status'] = 'finished' if all(s['status'] == 'finished' for s in job['steps']) else 'failed'
+            job['finished'] = time.time()
 
     def _run_step(self, job, step, run_env, seed):
         step['_log'] = self.cache_dir / f"job-{job.get('id', 'job')}-{step['protect']}.log"
@@ -617,6 +724,9 @@ class Console:
         step['status'] = 'running'
         cmd = [self.python, 'lab.py', 'run', '--scenario', job['scenario'],
                '--environment', job['environment'], '--protect', step['protect'], '--engine', 'd2v2', '--interactive-approval', '--max-output-tokens','8192']
+        if job.get('mode') == 'chat':
+            cmd += ['--session-channel', str(job['_channel']), '--task-file', str(job['_channel']/'task.txt'),
+                    '--phase', 'user-session']
         if seed:
             memory = seed.parent / step['protect']
             shutil.copytree(seed, memory)
@@ -671,8 +781,18 @@ class Console:
         tail = '\n'.join(parts)
         out = {k: v for k, v in j.items() if not k.startswith('_')}
         out['steps'] = [{k: v for k, v in s.items() if not k.startswith('_')} for s in j['steps']]
+        for step in out['steps']:
+            if step.get('status') == 'running' and step.get('run_id'):
+                step['progress'] = self._runtime_progress(step['run_id'])
         out['log_tail'] = mask(tail)
         out['elapsed'] = round(j.get('finished', time.time()) - j['started'], 1)
+        if j.get('mode') == 'chat':
+            out['chat'] = self.chat_view(j)
+            if out['chat']['phase'] == 'closed':
+                with self.job_lock:
+                    if j['status'] == 'running':
+                        j['status'] = 'finalizing'
+                    out['status'] = j['status']
         out['approvals'] = []
         for step in j['steps']:
             if step['status']=='running' and step.get('run_id'):
@@ -686,6 +806,40 @@ class Console:
                     out['approvals'].extend({'run_id':step['run_id'],'protect':step['protect'],**w} for w in waiting)
                     if waiting:out['approval_error']=f'审批通道连接失败（{type(exc).__name__}: {str(exc)[:160]}）'
         return out
+
+    def _runtime_progress(self, run_id):
+        """Expose transport timing and phase only, never model reasoning text."""
+        folder = self.runs / run_id
+        pending = {}
+        for event in jsonl(folder / 'gateway.jsonl'):
+            rid = event.get('request_id')
+            if event.get('type') == 'proxy_request':
+                pending[rid] = event
+            elif event.get('type') in ('proxy_response', 'proxy_error', 'proxy_cancelled'):
+                pending.pop(rid, None)
+        if not pending:
+            return None
+        started = min(e.get('timestamp_ns', time.time_ns()) for e in pending.values())
+        phase = 'waiting'
+        log = folder / 'pi-events.jsonl'
+        try:
+            with log.open('rb') as stream:
+                stream.seek(max(0, log.stat().st_size - 65536))
+                tail = stream.read().decode('utf-8', errors='replace').splitlines()
+            for line in reversed(tail):
+                try:
+                    event = json.loads(line)
+                except ValueError:
+                    continue
+                if event.get('type') == 'message_update':
+                    kind = event.get('assistantMessageEvent', {}).get('type', '')
+                    phase = 'thinking' if kind.startswith('thinking_') else 'generating'
+                    break
+            updated = max(0, round(time.time() - log.stat().st_mtime, 1))
+        except OSError:
+            updated = None
+        return {'phase': phase, 'request_seconds': max(0, round((time.time_ns() - started) / 1e9, 1)),
+                'last_update_seconds': updated}
 
     def _waiting_from_audit(self, run_id):
         proposed, asked, waiting, closed = {}, {}, [], set()
@@ -747,7 +901,8 @@ class Console:
         return {'agent': view(agent, 'main_model'),
                 'review': {**view(review, 'model'), 'separate': bool(review.get('enabled', True) and review.get('base_url') and review.get('model'))},
                 'configured': bool(agent.get('base_url') and agent.get('api_key') and agent.get('main_model')),
-                'running': any(j['status'] == 'running' for j in self.jobs.values())}
+                'running': any(j['status'] == 'running' for j in self.jobs.values()),
+                'reasoning_capable': agent.get('reasoning_capable') is True}
 
     @staticmethod
     def _merge_model(form, current, model_key):
@@ -762,10 +917,14 @@ class Console:
         elif merged.get('base_url') != current.get('base_url'):
             # A stored key is only ever sent to the address it was entered for.
             merged.pop('api_key', None)
+        if model_key == 'main_model' and 'reasoning_capable' in form:
+            merged['reasoning_capable'] = form['reasoning_capable']
         return merged
 
     @staticmethod
     def _model_error(cfg, model_key, need_key=True):
+        if 'reasoning_capable' in cfg and not isinstance(cfg['reasoning_capable'], bool):
+            return '思考模式控制选项必须为布尔值'
         if not re.match(r'^https?://[^\s/]+', cfg.get('base_url') or ''):
             return '接口地址需以 http:// 或 https:// 开头'
         if not cfg.get(model_key):
@@ -820,7 +979,8 @@ class Console:
                 cfg['api_key'] = agent.get('api_key')
             return {'base_url': cfg.get('base_url'), 'api_key': cfg.get('api_key'), 'model': cfg.get('model'), 'api_style': cfg.get('api_style') or agent.get('api_style')}
         cfg = self._merge_model(body, agent, 'main_model')
-        return {'base_url': cfg.get('base_url'), 'api_key': cfg.get('api_key'), 'model': cfg.get('main_model'), 'api_style': cfg.get('api_style')}
+        return {'base_url': cfg.get('base_url'), 'api_key': cfg.get('api_key'), 'model': cfg.get('main_model'), 'api_style': cfg.get('api_style'),
+                'reasoning_capable': cfg.get('reasoning_capable') is True}
 
     def test_model(self, body):
         cfg = self._resolve_model(body)
@@ -832,6 +992,8 @@ class Console:
         url = cfg['base_url'].rstrip('/') + ('/responses' if responses else '/chat/completions')
         payload = ({'model': cfg['model'], 'input': 'Reply with the single word OK.', 'max_output_tokens': 16, 'store': False}
                    if responses else {'model': cfg['model'], 'messages': [{'role': 'user', 'content': 'Reply with the single word OK.'}], 'max_tokens': 16})
+        if responses and cfg.get('reasoning_capable'):
+            payload['reasoning'] = {'effort': 'none'}
         start = time.perf_counter()
         try:
             # Same network path as real runs: the service gateway does not use system proxies.
@@ -899,8 +1061,12 @@ def make_handler(console):
                 return self.send_json(403, {'error': '仅允许本机控制台页面访问'})
             try:
                 if method == 'GET':
+                    if parts == ['api','runtime']:
+                        return self.send_json(200,console.resident.status() if console.resident else {'phase':'per_run'})
                     if parts==['api','active-job']:
                         active=next((j for j in console.jobs.values() if j['status']=='running'),None)
+                        if active is None:
+                            active=next((j for j in console.jobs.values() if j['status']=='finalizing'),None)
                         return self.send_json(200,console.job(active['id']) if active else None)
                     if parts == ['api', 'overview']:
                         return self.send_json(200, console.overview(query))
@@ -938,6 +1104,10 @@ def make_handler(console):
                         job = console.job(parts[2])
                         return self.send_json(200, job) if job else self.send_json(404, {'error': '未找到任务'})
                 elif method == 'POST':
+                    if parts == ['api','chat']:
+                        return self.send_json(*console.start_chat(self.body()))
+                    if len(parts)==4 and parts[:2]==['api','jobs'] and parts[3]=='chat':
+                        return self.send_json(*console.chat_command(parts[2],self.body()))
                     if len(parts)==4 and parts[:2]==['api','jobs'] and parts[3]=='approval':
                         return self.send_json(*console.resolve_approval(parts[2],self.body()))
                     if parts == ['api', 'launch']:
@@ -1015,6 +1185,9 @@ def main():
         parser.error('控制台仅允许监听 127.0.0.1')
     console = Console(args.repo, args.python)
     server = LocalHTTPServer((args.host, args.port), make_handler(console))
+    if os.environ.get('D2_RESIDENT_INFERENCE') == '1' and all((console.repo/'.local'/n).is_file() for n in ('laya.json','s1.json')):
+        from inference_pool import ResidentProcess
+        console.resident = ResidentProcess(console.repo, args.python)
     print(f'D2Guard 控制台：http://{args.host}:{server.server_port}  （仓库 {console.repo}）', flush=True)
     print('首次启动会建立运行索引，可能需要一两分钟。', flush=True)
     if os.environ.get('D2_OPEN_BROWSER') == '1':
@@ -1024,6 +1197,8 @@ def main():
         server.serve_forever()
     finally:
         server.server_close()
+        if console.resident:
+            console.resident.close()
 
 
 if __name__ == '__main__':

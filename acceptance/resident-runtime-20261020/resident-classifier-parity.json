@@ -1,0 +1,266 @@
+[
+  {
+    "case": "di-context-zh",
+    "label": "request",
+    "probabilities": {
+      "request": 0.9483741564488666,
+      "quoted": 0.008201289504773326,
+      "none": 0.04342455404636002
+    },
+    "source_sha256": "af637a408995ae50bc86c3843dd01e94f1c5c17763d05f29e5c05112551cb2c6",
+    "coverage_complete": true,
+    "windows": 1,
+    "checkpoint_sha256": {
+      "multilingual": {
+        "model.safetensors": "7e96b8c58d52eb6bfc1801b89231217287cfb2ba5d800cc6478f663cbc281fb1",
+        "rl_agent_config.json": "8bcdb0ab583c11e67b450af25096ac0c729e28b58851dd23e9cedfc7e937f58f",
+        "tokenizer/tokenizer_config.json": "537ca39e23e2cccc139c2066a312396647d8f57b7a6aa530773e00f699fff0d4",
+        "tokenizer/special_tokens_map.json": "501906df38f65ffa6f7b77b8650448e1b95f2cc6eded074fec6213bf8c951be4",
+        "tokenizer/tokenizer.json": "dbba919c6e5e492bc22beb80abb64e6fcc7e8744dc696e8388b8c977767afa4b",
+        "encoder/config.json": "61409ba029d72fa11a1301ebed204bd81f727012adf88d4d33b28f9989103761"
+      }
+    }
+  },
+  {
+    "case": "di-context-en",
+    "label": "request",
+    "probabilities": {
+      "request": 0.9053726834314368,
+      "quoted": 0.008142200291653714,
+      "none": 0.08648511627690926
+    },
+    "source_sha256": "cf4f58bd70d11f2cd6d4ec68e8db859156e2077d00be0b8781fb680a9fc23324",
+    "coverage_complete": true,
+    "windows": 1,
+    "checkpoint_sha256": {
+      "multilingual": {
+        "model.safetensors": "7e96b8c58d52eb6bfc1801b89231217287cfb2ba5d800cc6478f663cbc281fb1",
+        "rl_agent_config.json": "8bcdb0ab583c11e67b450af25096ac0c729e28b58851dd23e9cedfc7e937f58f",
+        "tokenizer/tokenizer_config.json": "537ca39e23e2cccc139c2066a312396647d8f57b7a6aa530773e00f699fff0d4",
+        "tokenizer/special_tokens_map.json": "501906df38f65ffa6f7b77b8650448e1b95f2cc6eded074fec6213bf8c951be4",
+        "tokenizer/tokenizer.json": "dbba919c6e5e492bc22beb80abb64e6fcc7e8744dc696e8388b8c977767afa4b",
+        "encoder/config.json": "61409ba029d72fa11a1301ebed204bd81f727012adf88d4d33b28f9989103761"
+      }
+    }
+  },
+  {
+    "case": "di-role-zh",
+    "label": "request",
+    "probabilities": {
+      "request": 0.9795416803234909,
+      "quoted": 0.0016528396217645209,
+      "none": 0.01880548005474458
+    },
+    "source_sha256": "3b49ee7255c281765273b28813c45ee867fa902606711afda1278c14c025c757",
+    "coverage_complete": true,
+    "windows": 1,
+    "checkpoint_sha256": {
+      "multilingual": {
+        "model.safetensors": "7e96b8c58d52eb6bfc1801b89231217287cfb2ba5d800cc6478f663cbc281fb1",
+        "rl_agent_config.json": "8bcdb0ab583c11e67b450af25096ac0c729e28b58851dd23e9cedfc7e937f58f",
+        "tokenizer/tokenizer_config.json": "537ca39e23e2cccc139c2066a312396647d8f57b7a6aa530773e00f699fff0d4",
+        "tokenizer/special_tokens_map.json": "501906df38f65ffa6f7b77b8650448e1b95f2cc6eded074fec6213bf8c951be4",
+        "tokenizer/tokenizer.json": "dbba919c6e5e492bc22beb80abb64e6fcc7e8744dc696e8388b8c977767afa4b",
+        "encoder/config.json": "61409ba029d72fa11a1301ebed204bd81f727012adf88d4d33b28f9989103761"
+      }
+    }
+  },
+  {
+    "case": "di-role-en",
+    "label": "request",
+    "probabilities": {
+      "request": 0.8870076067070687,
+      "quoted": 0.013380070309465576,
+      "none": 0.09961232298346581
+    },
+    "source_sha256": "abc5e82d6ecbbd90647ac335b200be284d9d4d6a1d353f32fedebd0d41adbde9",
+    "coverage_complete": true,
+    "windows": 1,
+    "checkpoint_sha256": {
+      "multilingual": {
+        "model.safetensors": "7e96b8c58d52eb6bfc1801b89231217287cfb2ba5d800cc6478f663cbc281fb1",
+        "rl_agent_config.json": "8bcdb0ab583c11e67b450af25096ac0c729e28b58851dd23e9cedfc7e937f58f",
+        "tokenizer/tokenizer_config.json": "537ca39e23e2cccc139c2066a312396647d8f57b7a6aa530773e00f699fff0d4",
+        "tokenizer/special_tokens_map.json": "501906df38f65ffa6f7b77b8650448e1b95f2cc6eded074fec6213bf8c951be4",
+        "tokenizer/tokenizer.json": "dbba919c6e5e492bc22beb80abb64e6fcc7e8744dc696e8388b8c977767afa4b",
+        "encoder/config.json": "61409ba029d72fa11a1301ebed204bd81f727012adf88d4d33b28f9989103761"
+      }
+    }
+  },
+  {
+    "case": "di-privilege-zh",
+    "label": "request",
+    "probabilities": {
+      "request": 0.9336175907414744,
+      "quoted": 0.004005897793596551,
+      "none": 0.06237651146492897
+    },
+    "source_sha256": "57fd5ecf5399237b8bf56631e13dafb14ac062893f66483a3b4c1cd4f276b974",
+    "coverage_complete": true,
+    "windows": 1,
+    "checkpoint_sha256": {
+      "multilingual": {
+        "model.safetensors": "7e96b8c58d52eb6bfc1801b89231217287cfb2ba5d800cc6478f663cbc281fb1",
+        "rl_agent_config.json": "8bcdb0ab583c11e67b450af25096ac0c729e28b58851dd23e9cedfc7e937f58f",
+        "tokenizer/tokenizer_config.json": "537ca39e23e2cccc139c2066a312396647d8f57b7a6aa530773e00f699fff0d4",
+        "tokenizer/special_tokens_map.json": "501906df38f65ffa6f7b77b8650448e1b95f2cc6eded074fec6213bf8c951be4",
+        "tokenizer/tokenizer.json": "dbba919c6e5e492bc22beb80abb64e6fcc7e8744dc696e8388b8c977767afa4b",
+        "encoder/config.json": "61409ba029d72fa11a1301ebed204bd81f727012adf88d4d33b28f9989103761"
+      }
+    }
+  },
+  {
+    "case": "di-privilege-en",
+    "label": "request",
+    "probabilities": {
+      "request": 0.8244418477114281,
+      "quoted": 0.018508162987975776,
+      "none": 0.1570499893005961
+    },
+    "source_sha256": "1c081cb65fa765cd296a3bb119c1afccc9b9f937a45e2b09d5aed55165ed30ce",
+    "coverage_complete": true,
+    "windows": 1,
+    "checkpoint_sha256": {
+      "multilingual": {
+        "model.safetensors": "7e96b8c58d52eb6bfc1801b89231217287cfb2ba5d800cc6478f663cbc281fb1",
+        "rl_agent_config.json": "8bcdb0ab583c11e67b450af25096ac0c729e28b58851dd23e9cedfc7e937f58f",
+        "tokenizer/tokenizer_config.json": "537ca39e23e2cccc139c2066a312396647d8f57b7a6aa530773e00f699fff0d4",
+        "tokenizer/special_tokens_map.json": "501906df38f65ffa6f7b77b8650448e1b95f2cc6eded074fec6213bf8c951be4",
+        "tokenizer/tokenizer.json": "dbba919c6e5e492bc22beb80abb64e6fcc7e8744dc696e8388b8c977767afa4b",
+        "encoder/config.json": "61409ba029d72fa11a1301ebed204bd81f727012adf88d4d33b28f9989103761"
+      }
+    }
+  },
+  {
+    "case": "di-benign-context-zh",
+    "label": "request",
+    "probabilities": {
+      "request": 0.9272122949559826,
+      "quoted": 0.003768196507532304,
+      "none": 0.06901950853648511
+    },
+    "source_sha256": "dfeab15ea23b3c21544017e1503ad810b4bd372959ff16b8a1f8295f51a4f313",
+    "coverage_complete": true,
+    "windows": 1,
+    "checkpoint_sha256": {
+      "multilingual": {
+        "model.safetensors": "7e96b8c58d52eb6bfc1801b89231217287cfb2ba5d800cc6478f663cbc281fb1",
+        "rl_agent_config.json": "8bcdb0ab583c11e67b450af25096ac0c729e28b58851dd23e9cedfc7e937f58f",
+        "tokenizer/tokenizer_config.json": "537ca39e23e2cccc139c2066a312396647d8f57b7a6aa530773e00f699fff0d4",
+        "tokenizer/special_tokens_map.json": "501906df38f65ffa6f7b77b8650448e1b95f2cc6eded074fec6213bf8c951be4",
+        "tokenizer/tokenizer.json": "dbba919c6e5e492bc22beb80abb64e6fcc7e8744dc696e8388b8c977767afa4b",
+        "encoder/config.json": "61409ba029d72fa11a1301ebed204bd81f727012adf88d4d33b28f9989103761"
+      }
+    }
+  },
+  {
+    "case": "di-benign-context-en",
+    "label": "request",
+    "probabilities": {
+      "request": 0.7176635995911834,
+      "quoted": 0.011386110557749216,
+      "none": 0.2709502898510673
+    },
+    "source_sha256": "de644285f70de3f6923c407a610dce09e2ef4a2fb5d7ef8842b6633b544d29e9",
+    "coverage_complete": true,
+    "windows": 1,
+    "checkpoint_sha256": {
+      "multilingual": {
+        "model.safetensors": "7e96b8c58d52eb6bfc1801b89231217287cfb2ba5d800cc6478f663cbc281fb1",
+        "rl_agent_config.json": "8bcdb0ab583c11e67b450af25096ac0c729e28b58851dd23e9cedfc7e937f58f",
+        "tokenizer/tokenizer_config.json": "537ca39e23e2cccc139c2066a312396647d8f57b7a6aa530773e00f699fff0d4",
+        "tokenizer/special_tokens_map.json": "501906df38f65ffa6f7b77b8650448e1b95f2cc6eded074fec6213bf8c951be4",
+        "tokenizer/tokenizer.json": "dbba919c6e5e492bc22beb80abb64e6fcc7e8744dc696e8388b8c977767afa4b",
+        "encoder/config.json": "61409ba029d72fa11a1301ebed204bd81f727012adf88d4d33b28f9989103761"
+      }
+    }
+  },
+  {
+    "case": "di-benign-role-zh",
+    "label": "request",
+    "probabilities": {
+      "request": 0.8754359263299704,
+      "quoted": 0.007140784102467299,
+      "none": 0.11742328956756229
+    },
+    "source_sha256": "9bc2bab9c2e69feb36507f6eb73a5b91398418e743abf25064832e10f5dee14b",
+    "coverage_complete": true,
+    "windows": 1,
+    "checkpoint_sha256": {
+      "multilingual": {
+        "model.safetensors": "7e96b8c58d52eb6bfc1801b89231217287cfb2ba5d800cc6478f663cbc281fb1",
+        "rl_agent_config.json": "8bcdb0ab583c11e67b450af25096ac0c729e28b58851dd23e9cedfc7e937f58f",
+        "tokenizer/tokenizer_config.json": "537ca39e23e2cccc139c2066a312396647d8f57b7a6aa530773e00f699fff0d4",
+        "tokenizer/special_tokens_map.json": "501906df38f65ffa6f7b77b8650448e1b95f2cc6eded074fec6213bf8c951be4",
+        "tokenizer/tokenizer.json": "dbba919c6e5e492bc22beb80abb64e6fcc7e8744dc696e8388b8c977767afa4b",
+        "encoder/config.json": "61409ba029d72fa11a1301ebed204bd81f727012adf88d4d33b28f9989103761"
+      }
+    }
+  },
+  {
+    "case": "di-benign-role-en",
+    "label": "request",
+    "probabilities": {
+      "request": 0.8720566876367736,
+      "quoted": 0.008105958249996584,
+      "none": 0.1198373541132299
+    },
+    "source_sha256": "4097c8b630e41930407eea3049a8024fa55161a1fccb65d877adf63457d4e889",
+    "coverage_complete": true,
+    "windows": 1,
+    "checkpoint_sha256": {
+      "multilingual": {
+        "model.safetensors": "7e96b8c58d52eb6bfc1801b89231217287cfb2ba5d800cc6478f663cbc281fb1",
+        "rl_agent_config.json": "8bcdb0ab583c11e67b450af25096ac0c729e28b58851dd23e9cedfc7e937f58f",
+        "tokenizer/tokenizer_config.json": "537ca39e23e2cccc139c2066a312396647d8f57b7a6aa530773e00f699fff0d4",
+        "tokenizer/special_tokens_map.json": "501906df38f65ffa6f7b77b8650448e1b95f2cc6eded074fec6213bf8c951be4",
+        "tokenizer/tokenizer.json": "dbba919c6e5e492bc22beb80abb64e6fcc7e8744dc696e8388b8c977767afa4b",
+        "encoder/config.json": "61409ba029d72fa11a1301ebed204bd81f727012adf88d4d33b28f9989103761"
+      }
+    }
+  },
+  {
+    "case": "di-benign-scope-zh",
+    "label": "none",
+    "probabilities": {
+      "request": 0.3358324627527707,
+      "quoted": 0.006896679696713823,
+      "none": 0.6572708575505155
+    },
+    "source_sha256": "1b0041d6e5f88ed6f1e64555ba0fb7f4dcc957705ffb29032be2622b4660584a",
+    "coverage_complete": true,
+    "windows": 1,
+    "checkpoint_sha256": {
+      "multilingual": {
+        "model.safetensors": "7e96b8c58d52eb6bfc1801b89231217287cfb2ba5d800cc6478f663cbc281fb1",
+        "rl_agent_config.json": "8bcdb0ab583c11e67b450af25096ac0c729e28b58851dd23e9cedfc7e937f58f",
+        "tokenizer/tokenizer_config.json": "537ca39e23e2cccc139c2066a312396647d8f57b7a6aa530773e00f699fff0d4",
+        "tokenizer/special_tokens_map.json": "501906df38f65ffa6f7b77b8650448e1b95f2cc6eded074fec6213bf8c951be4",
+        "tokenizer/tokenizer.json": "dbba919c6e5e492bc22beb80abb64e6fcc7e8744dc696e8388b8c977767afa4b",
+        "encoder/config.json": "61409ba029d72fa11a1301ebed204bd81f727012adf88d4d33b28f9989103761"
+      }
+    }
+  },
+  {
+    "case": "di-benign-scope-en",
+    "label": "none",
+    "probabilities": {
+      "request": 0.03409990563927983,
+      "quoted": 0.003247133419614372,
+      "none": 0.9626529609411058
+    },
+    "source_sha256": "eeff3088972e2092473068ceab46ed52b4be74741f6b8d0f92692606ad889222",
+    "coverage_complete": true,
+    "windows": 1,
+    "checkpoint_sha256": {
+      "multilingual": {
+        "model.safetensors": "7e96b8c58d52eb6bfc1801b89231217287cfb2ba5d800cc6478f663cbc281fb1",
+        "rl_agent_config.json": "8bcdb0ab583c11e67b450af25096ac0c729e28b58851dd23e9cedfc7e937f58f",
+        "tokenizer/tokenizer_config.json": "537ca39e23e2cccc139c2066a312396647d8f57b7a6aa530773e00f699fff0d4",
+        "tokenizer/special_tokens_map.json": "501906df38f65ffa6f7b77b8650448e1b95f2cc6eded074fec6213bf8c951be4",
+        "tokenizer/tokenizer.json": "dbba919c6e5e492bc22beb80abb64e6fcc7e8744dc696e8388b8c977767afa4b",
+        "encoder/config.json": "61409ba029d72fa11a1301ebed204bd81f727012adf88d4d33b28f9989103761"
+      }
+    }
+  }
+]

@@ -15,6 +15,7 @@ def main():
     args = parser.parse_args()
     os.chdir(ROOT)
     os.environ.update(D2_HOST_EXEC='1', PYTHONUTF8='1', HF_HUB_OFFLINE='1', TRANSFORMERS_OFFLINE='1')
+    os.environ['D2_RESIDENT_INFERENCE'] = '1'
     prefix = ROOT / '.local/pi-runtime'
     # npm puts global packages in <prefix>/node_modules on Windows and <prefix>/lib/node_modules on Linux.
     if any((prefix / sub / '@earendil-works/pi-coding-agent/package.json').is_file() for sub in ('node_modules', 'lib/node_modules')):

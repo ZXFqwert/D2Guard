@@ -38,6 +38,16 @@ class CoreV2:
         self.hard=HardPolicies(self.folder/'workspace')
         source_extensions={'.py','.js','.ts','.tsx','.jsx','.c','.cpp','.h','.java','.go','.rs','.sh','.ps1'}
         self.initial_sources={canonical(p.relative_to(self.folder/'workspace').as_posix()) for p in (self.folder/'workspace').rglob('*') if p.is_file() and p.suffix.lower() in source_extensions}
+        resident = None
+        if fast is None and os.environ.get('D2_INFERENCE_DESCRIPTOR'):
+            from inference_pool import Client, RemoteFast, RemoteContent
+            resident = Client(os.environ['D2_INFERENCE_DESCRIPTOR'],
+                              Path(__file__).resolve().parents[2]/'.local/laya.json',
+                              os.environ.get('D2_S1_CONFIG'))
+            fast = RemoteFast(resident)
+            if resident.info['content']:
+                content_fast = RemoteContent(resident)
+                decision_mode = content_fast.metadata.get('decision_mode', decision_mode)
         self.fast=fast or OriginalLaya(Path(__file__).resolve().parents[2]/'.local/laya.json',lazy=True)
         self.content_fast=content_fast
         self.content_model_error=None
@@ -46,6 +56,8 @@ class CoreV2:
         # No environment/configuration means no S1. Loaded models observe only
         # until a separately reviewed acceptance explicitly enables additions.
         self.content_add_risk=False
+        if resident and self.content_fast:
+            self.content_add_risk=self.content_fast.add_risk_enabled
         if self.content_fast is None and fast is None and os.environ.get('D2_S1_CONFIG'):
             config_path=os.environ['D2_S1_CONFIG']
             config=json.loads(Path(config_path).read_text(encoding='utf-8'))

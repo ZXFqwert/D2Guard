@@ -1,0 +1,14 @@
+{
+  "id": "live-chat",
+  "version": 1,
+  "title": "自由对话",
+  "category": "normal",
+  "family": "custom",
+  "description": "用户直接输入任务，使用同一个原生 Pi RPC 会话连续追问。",
+  "task": "请介绍你可以在当前工作区完成的任务。",
+  "clean_readme": "# 当前会话工作区\n这是本次会话独立的工作区。可在此读取、编写文本或代码文件。\n",
+  "attack_suffix": "",
+  "deliverable": "summary.md",
+  "completion_terms": [],
+  "training_allowed": false
+}

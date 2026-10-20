@@ -11,30 +11,23 @@ def load_runtime_checkpoint(folder):
     if os.name != 'nt':
         from laya.train import load_checkpoint
         return load_checkpoint(str(folder))
-    # Load one tensor at a time. Loading both resident models plus a complete
-    # second state_dict can exhaust Windows commit memory during startup.
-    # NumPy access also avoids the native torch storage mmap failure path.
+    # Preserve FP32 inference while keeping weights file-backed and read-only.
     from laya.agent import _fix_tokenizer_config
     from laya.train import build_model
     from transformers import AutoTokenizer
-    from safetensors import safe_open
     import torch
     folder = Path(folder)
     _fix_tokenizer_config(str(folder))
     config = json.loads((folder / 'rl_agent_config.json').read_text(encoding='utf-8'))
     tokenizer = AutoTokenizer.from_pretrained(str(folder / 'tokenizer'), local_files_only=True)
-    model = build_model(config, encoder_dir=str(folder / 'encoder'))
-    state = model.state_dict()
-    with safe_open(str(folder / 'model.safetensors'), framework='numpy') as weights:
-        if set(weights.keys()) != set(state):
-            raise ValueError('Checkpoint state keys differ from the model')
-        with torch.no_grad():
-            for name, target in state.items():
-                array = weights.get_tensor(name)
-                if tuple(array.shape) != tuple(target.shape):
-                    raise ValueError('Checkpoint tensor shape mismatch: ' + name)
-                target.copy_(torch.from_numpy(array))
-                del array
+    from .windows_checkpoint import mapped_state, materialize_buffers
+    with torch.device('meta'):
+        model = build_model(config, encoder_dir=str(folder / 'encoder'))
+    state, mapping = mapped_state(folder/'model.safetensors', model.state_dict())
+    model.load_state_dict(state, strict=True, assign=True)
+    materialize_buffers(model)
+    model.requires_grad_(False)
+    model._inference_mapping = mapping
     return model.float(), tokenizer, config
 
 

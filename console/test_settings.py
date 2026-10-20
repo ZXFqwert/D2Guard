@@ -40,6 +40,20 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(self.saved('provider.json')['api_key'], 'd2-test-agent')
         self.assertEqual(self.saved('provider.json')['main_model'], 'm2')
 
+    def test_reasoning_capability_survives_model_edits_and_can_be_disabled(self):
+        code, view = self.console.save_settings({'agent': {'reasoning_capable': True}})
+        self.assertEqual(code, 200)
+        self.assertTrue(view['reasoning_capable'])
+        self.console.save_settings({'agent': {'model': 'm2'}})
+        self.assertTrue(self.saved('provider.json')['reasoning_capable'])
+        self.console.save_settings({'agent': {'reasoning_capable': False}})
+        self.assertFalse(self.saved('provider.json')['reasoning_capable'])
+
+    def test_invalid_reasoning_capability_is_rejected(self):
+        code, _ = self.console.save_settings({'agent': {'reasoning_capable': 'false'}})
+        self.assertEqual(code, 400)
+        self.assertNotIn('reasoning_capable', self.saved('provider.json'))
+
     def test_separate_review_model_reuses_key_on_same_service(self):
         code, view = self.console.save_settings({'agent': {}, 'review': {'separate': True, 'base_url': 'https://a.test/v1', 'model': 'judge'}})
         self.assertEqual(code, 200)

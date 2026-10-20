@@ -21,6 +21,7 @@ const OUTCOME = {
   no_attack_observed: ['未观察到攻击', 'gray'],
   capability_unavailable: ['能力未开放', 'gray'],
   runtime_error: ['运行错误', 'gray'],
+  user_stopped: ['用户结束会话', 'gray'],
   running: ['运行中…', 'solid-blue'],
 };
 const VERDICT_CLASS = { ALLOW: 'allow', ASK: 'ask', BLOCK: 'block' };
@@ -170,6 +171,7 @@ const PAGES = {};
 const TITLES = {
   screen: ['态势', '攻防大屏'], overview: ['态势', '态势总览'], scenarios: ['管理', '攻防场景库'], policies: ['管理', '防御策略'],
   arena: ['执行', '攻防竞技场 · 双路对决'], escort: ['执行', '护航模式 · 计划—决策—执行'],
+  chat: ['执行', '自由对话 · Pi Agent'],
   trace: ['分析', '溯源分析'], runs: ['分析', '运行记录'], settings: ['管理', '模型设置'],
 };
 const app = { timers: [], cleanups: [], job: null };
@@ -211,12 +213,14 @@ async function topStatus() {
   let jobHtml = '';
   if (j && j.status === 'running') {
     const step = j.steps.find((s) => s.status === 'running') || j.steps[0];
-    const what = j.mode === 'arena' ? '双路对决' : PROTECT_ZH[step.protect];
-    jobHtml = `<a class="chip live" href="${j.mode === 'arena' ? '#/arena' : '#/escort'}">● 运行中：${esc(j.scenario)} · ${what}</a>`;
-    if ((j.approvals || []).length) jobHtml += `<a class="chip warn" href="${j.mode === 'arena' ? '#/arena' : '#/escort'}">⏸ 等待你确认 ${j.approvals.length} 项</a>`;
+    const what = j.mode === 'arena' ? '双路对决' : j.mode === 'chat' ? '自由对话' : PROTECT_ZH[step.protect];
+    const link = j.mode === 'arena' ? '#/arena' : j.mode === 'chat' ? '#/chat' : '#/escort';
+    jobHtml = `<a class="chip live" href="${link}">● ${j.chat?.phase === 'idle' ? '等待追问' : '运行中'}：${esc(j.scenario)} · ${what}</a>`;
+    if ((j.approvals || []).length) jobHtml += `<a class="chip warn" href="${link}">⏸ 等待你确认 ${j.approvals.length} 项</a>`;
   }
   const light = document.documentElement.dataset.theme === 'light';
-  setHTML($('#top-status'), `${jobHtml}<span class="chip">宿主 Pi Agent</span><span class="chip">内核 d2v2</span><span class="chip ok">● 本地 127.0.0.1</span>
+  const serviceLocation = ['localhost', '127.0.0.1'].includes(location.hostname) ? '本地服务' : '云端服务';
+  setHTML($('#top-status'), `${jobHtml}<span class="chip">宿主 Pi Agent</span><span class="chip">内核 d2v2</span><span class="chip ok">● ${serviceLocation}</span>
     <button class="theme-btn" id="theme-btn" title="切换浅色 / 深色主题">${light ? '☾ 深色' : '☀ 浅色'}</button>`);
 }
 function setTheme(theme) {
@@ -239,7 +243,7 @@ async function pollJob() {
   topStatus();
   renderApprovals(app.job);
   document.dispatchEvent(new CustomEvent('job', { detail: app.job }));
-  if (app.job.status === 'running') pollJob.t = setTimeout(pollJob, 1500);
+  if (['running','finalizing'].includes(app.job.status)) pollJob.t = setTimeout(pollJob, 1500);
 }
 
 // Job transitions must recover an execution page even after a transient trace request failed.

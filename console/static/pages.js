@@ -23,6 +23,7 @@ PAGES.overview = async (el) => {
   const totalDec = (v.ALLOW || 0) + (v.ASK || 0) + (v.BLOCK || 0);
   el.innerHTML = `
     <section class="card arena-ctl">
+      <a class="btn" href="#/chat">自己输入任务 / 连续对话 →</a>
       ${['batch_id','decision_mode'].map(k => `<label>${k==='batch_id'?'批次':'决策模式'}<select data-overview-filter="${k}"><option value="">全部历史</option>${d.filters[k].map(v=>`<option value="${esc(v)}" ${overviewFilters[k]===v?'selected':''}>${esc(v)}</option>`).join('')}</select></label>`).join('')}
       <span class="muted small">历史描述性统计；攻击成功率排除正常场景及未判定结果，最终指标以正式配对评测为准。可按批次与决策模式（add_risk / rules_gate / taint_gate）分开查看。</span>
     </section>
@@ -357,13 +358,15 @@ function laneApprovals(runId, calls) {
 function renderLane(box, protect, t, step) {
   const head = protect === 'off' ? ['裸奔 Agent', '防护关闭 · 只记录本应作出的裁决'] : ['D²Guard 护航', '防护开启 · 每次工具调用先裁决再执行'];
   if (!t) {
-    const msg = step?.preparing_memory ? '前置 Agent 正在写入跨会话记忆，完成后两路同时开始…' : step?.status === 'failed' ? '运行失败，请查看下方日志。' : step ? (step.status === 'queued' ? '等待启动…' : '正在启动真实 Agent（加载快镜模型约 10–20 秒）…') : '该场景在此环境下暂无运行记录';
+    const msg = step?.preparing_memory ? '前置 Agent 正在写入跨会话记忆，完成后两路同时开始…' : step?.status === 'failed' ? '运行失败，请查看下方日志。' : step ? (step.status === 'queued' ? '等待启动…' : '正在启动真实 Agent（加载快镜模型约 10–20 秒）…') : '尚未测试此场景。点击上方“开始双路对决”，即可启动两路真实 Agent。';
     setHTML(box, `<div class="lane-h"><b>${head[0]}</b><small>${head[1]}</small></div><div class="lane-empty">${msg}</div>`);
     return;
   }
   const r = t.run;
   const [label, cls] = outcomeLabel(r);
   const { unmatched } = laneApprovals(r.id, t.calls);
+  const progress = step?.progress;
+  const progressText = progress ? `${{ thinking: '模型正在推理', generating: '模型正在生成响应', waiting: '等待模型响应' }[progress.phase] || '等待模型响应'} · 当前请求 ${Math.round(progress.request_seconds)} 秒${progress.last_update_seconds == null ? '' : ` · 最近更新 ${Math.round(progress.last_update_seconds)} 秒前`}` : '';
   const steps = t.calls.map((c, i) => {
     const w = effectiveVerdict(c);
     const waiting = approvalFor(r.id, c.call_id);
@@ -377,6 +380,7 @@ function renderLane(box, protect, t, step) {
   }).join('');
   setHTML(box, `
     <div class="lane-h"><b>${head[0]}</b><small>${head[1]}</small></div>
+    ${progressText ? `<div class="lane-tip">${esc(progressText)}</div>` : ''}
     ${unmatched.map((a) => `<div class="lane-tip">⏸ Agent 暂停在 <b>${esc(a.tool)}</b>，等你决定。${approvalButtons(a)}</div>`).join('')}
     <div class="lane-result"><span class="big badge ${cls}">${esc(label)}</span>
       <a class="link" href="#/trace/${esc(r.id)}">溯源 →</a></div>
@@ -590,7 +594,9 @@ PAGES.settings = async (el) => {
     <section class="settings-grid">
       <div class="card"><div class="card-h"><h3>Agent 模型</h3>${badge('执行任务', 'blue')}</div>
         <div class="muted small">被保护的 Pi Agent 调用这个模型来理解任务、决定调用哪些工具。</div>
-        ${block('a', s.agent)}</div>
+        ${block('a', s.agent)}
+        <label class="check"><input type="checkbox" id="a-reasoning" ${s.reasoning_capable ? 'checked' : ''}> 此模型支持显式思考模式控制</label>
+        <div class="muted small">当前 Agent 使用关闭思考的运行设置。对支持此选项的 Responses 接口，勾选后会明确传递关闭指令，避免沿用服务端默认的长时间思考；不支持的接口请保持关闭。</div></div>
       <div class="card"><div class="card-h"><h3>慢镜模型</h3>${badge('异步研判 · 溯源报告', 'gray')}</div>
         <div class="muted small">在挂起或阻断之后，慢镜调用这个模型生成中文研判报告；它不会改变放行、挂起、阻断的裁决。</div>
         <label class="check"><input type="checkbox" id="r-same" ${s.review.separate ? '' : 'checked'}> 与 Agent 使用同一个模型</label>
@@ -598,7 +604,7 @@ PAGES.settings = async (el) => {
           <div class="muted small">与 Agent 用同一个接口地址时，API Key 可以留空，自动沿用 Agent 的 Key。</div></fieldset></div>
     </section>
     <section class="card row"><button class="btn primary big" id="s-save">保存设置</button><span class="muted">保存时会检查必填项；建议先点“测试连接”。</span></section>`;
-  const form = (id) => ({ base_url: $(`#${id}-url`).value.trim(), api_style: $(`#${id}-style`).value, model: $(`#${id}-model`).value.trim(), api_key: $(`#${id}-key`).value.trim() });
+  const form = (id) => ({ base_url: $(`#${id}-url`).value.trim(), api_style: $(`#${id}-style`).value, model: $(`#${id}-model`).value.trim(), api_key: $(`#${id}-key`).value.trim(), ...(id === 'a' ? { reasoning_capable: $('#a-reasoning').checked } : {}) });
   $('#r-same').addEventListener('change', () => { $('#r-fields').disabled = $('#r-same').checked; });
   $('.settings-grid', el).addEventListener('click', async (e) => {
     const t = e.target.closest('[data-test],[data-list]'); if (!t) return;
