@@ -12,6 +12,7 @@ import sqlite3
 import tempfile
 import hashlib
 import base64
+from collections import defaultdict
 from .ledger import values
 from .provenance import memory_origin
 from d2core.extractor import SECRET_ASSIGNMENT, KEY_PATTERNS
@@ -91,6 +92,19 @@ def target_of(tool, args):
     if tool == 'spawn_subagent':
         return '子 Agent'
     return ''
+
+
+OP_ZH = {'fs.read': '读取', 'fs.write': '写入', 'net.fetch': '访问', 'mcp.call': '调用 MCP', 'memory.read': '读取记忆',
+         'memory.write': '写入记忆', 'spawn': '派发', 'git.push': '推送', 'git.commit': '提交'}
+
+
+def brief_target(target):
+    t = str(target or '')
+    if '://' in t:
+        return short(t.split('://', 1)[1], 40)
+    if '/' in t or '\\' in t:
+        return t.replace('\\', '/').rstrip('/').rsplit('/', 1)[-1]
+    return short(t, 40)
 
 
 def short(text, n=EXCERPT):
@@ -176,6 +190,7 @@ def build_trace(folder):
 
     # Calls, sources and the timeline, in audit order.
     calls, sources, timeline = {}, {}, []
+    fed, asked = defaultdict(list), set()
     for x in audit:
         t, cid, aid = x.get('type'), x.get('call_id'), x.get('agent_id', 'main')
         row = {'seq': x.get('seq'), 't_ms': ms(x), 'agent': aid, 'kind': t, 'call_id': cid}
@@ -184,7 +199,19 @@ def build_trace(folder):
         elif t == 'system_init':
             continue
         elif t == 'model_request':
-            row.update(title=f"模型请求 #{x.get('request_index')}", detail='')
+            items = fed.pop(aid, [])
+            if aid not in asked:
+                basis = '依据用户任务' if aid == 'main' else '依据派发的子任务'
+                detail = basis + '规划首个动作'
+            elif items:
+                basis = f"{items[0]}{'' if items[0][-1] > chr(0x2e80) else ' '}后" + (f"（共 {len(items)} 项结果）" if len(items) > 1 else '')
+                detail = '新增输入：' + '；'.join(f"{i}{'' if i[-1] > chr(0x2e80) else ' '}的返回结果" for i in items)
+            else:
+                basis, detail = '继续生成', '无新增工具结果'
+            asked.add(aid)
+            who = agents.get(aid, {}).get('label', aid)
+            row.update(title='模型规划：' + basis, detail=f"{who} 第 {x.get('request_index')} 次调用模型 · {detail}",
+                       graph_label=f"模型规划 · {who}", basis=basis)
         elif t in ('model_response', 'tool_outcome'):
             continue
         elif t == 'assistant_turn':
@@ -230,12 +257,15 @@ def build_trace(folder):
                                           'kind': SOURCE_KIND.get(src_type, src_type), 'uri': mask(ev.get('uri')),
                                           'agent': aid, 'via_call': cid, 'text': mask(ev.get('raw') or x.get('text') or ''),
                                           't_ms': ms(x)}
+            if c is not None:
+                fed[aid].append('执行命令' if c['op'] == 'exec' else f"{OP_ZH.get(c['op'], c['op'])} {brief_target(c['target'])}".strip())
             row.update(title=f"返回 {c['op'] if c else x.get('tool')}", detail=mask(short(x.get('text'))),
                        source_type=src_type, event_id=x.get('event_id'))
         elif t == 'subagent_spawn':
             row.update(title='派发子 Agent', detail=agents.get(x.get('child_agent_id'), {}).get('label', ''),
                        child=x.get('child_agent_id'))
         elif t == 'subagent_end':
+            fed[aid].append(agents.get(x.get('child_agent_id'), {}).get('label', '子 Agent') + ' 汇报')
             row.update(title='子 Agent 结束', detail=mask(short(x.get('final_answer'))), child=x.get('child_agent_id'))
         elif t == 'approval_hold_complete':
             row.update(title='挂起等待用户确认', detail='该调用未执行')
@@ -550,7 +580,7 @@ def enrich_graph(graph, timeline, events, calls):
     for row in timeline:
         if row['kind']=='model_request':
             nid='model:'+str(row['seq'])
-            add(nid,'model_request',row['title'],2,seq=row['seq'])
+            add(nid,'model_request',row.get('graph_label',row['title']),2,seq=row['seq'],sub=row.get('basis',''))
             edges.append({'from':'agent:'+row['agent'],'to':nid,'kind':'request'})
     for cid,c in calls.items():
         source='call:'+cid

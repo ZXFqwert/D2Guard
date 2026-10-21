@@ -169,10 +169,11 @@ const legend = (items) => `<div class="legend">${items.map(([name, color]) => `<
 // ---------------- router ----------------
 const PAGES = {};
 const TITLES = {
-  screen: ['态势', '攻防大屏'], overview: ['态势', '态势总览'], scenarios: ['管理', '攻防场景库'], policies: ['管理', '防御策略'],
-  arena: ['执行', '攻防竞技场 · 双路对决'], escort: ['执行', '护航模式 · 计划—决策—执行'],
-  chat: ['执行', '自由对话 · Pi Agent'],
-  trace: ['分析', '溯源分析'], runs: ['分析', '运行记录'], settings: ['管理', '模型设置'],
+  home: ['展示', '作品概览'], highlights: ['展示', '核心亮点'], abilities: ['展示', '五种能力 · 对照赛题'],
+  screen: ['展示', '攻防大屏'], overview: ['展示', '态势总览'], scenarios: ['设置', '攻防场景库'], policies: ['设置', '防御策略'],
+  arena: ['实操', '三步演示 · 正常运行 → 遭受攻击 → 防护拦截'], escort: ['实操', '护航模式 · 计划—决策—执行'],
+  chat: ['实操', '自由对话 · Pi Agent'],
+  trace: ['实操', '溯源分析'], runs: ['实操', '运行记录'], settings: ['设置', '模型设置'],
 };
 const app = { timers: [], cleanups: [], job: null };
 function clearTimers() {
@@ -187,8 +188,8 @@ function later(fn, ms) { app.timers.push(setTimeout(fn, ms)); }
 async function route() {
   if (app.routing) { app.routeQueued = true; return; }
   app.routing = true;
-  const [name = 'screen', ...rest] = location.hash.replace(/^#\/?/, '').split('/');
-  const page = PAGES[name] ? name : 'screen';
+  const [name = 'home', ...rest] = location.hash.replace(/^#\/?/, '').split('/');
+  const page = PAGES[name] ? name : 'home';
   clearTimers(); hideTip(); closeDrawer();
   document.body.dataset.page = page;
   $$('#nav a').forEach((a) => a.classList.toggle('active', a.dataset.page === page));

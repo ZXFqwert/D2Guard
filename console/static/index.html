@@ -8,6 +8,7 @@
 <script>try { var t = localStorage.getItem('d2guard-theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}</script>
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="screen.css">
+<link rel="stylesheet" href="showcase.css">
 </head>
 <body>
 <aside class="nav">
@@ -16,20 +17,20 @@
     <div><b>双镜 D²Guard</b><small>智能体运行时安全控制台</small></div>
   </div>
   <nav id="nav">
-    <div class="nav-group">态势</div>
+    <div class="nav-group">展示</div>
+    <a href="#/home" data-page="home"><i>◆</i>作品概览</a>
+    <a href="#/highlights" data-page="highlights"><i>✦</i>核心亮点</a>
+    <a href="#/abilities" data-page="abilities"><i>▦</i>五种能力</a>
     <a href="#/screen" data-page="screen"><i>◉</i>攻防大屏<span class="nav-new">LIVE</span></a>
-    <a href="#/overview" data-page="overview"><i>◧</i>态势总览</a>
-    <div class="nav-group">管理</div>
-    <a href="#/scenarios" data-page="scenarios"><i>☰</i>攻防场景库</a>
-    <a href="#/policies" data-page="policies"><i>⚖</i>防御策略</a>
-    <a href="#/settings" data-page="settings"><i>⚙</i>模型设置</a>
-    <div class="nav-group">执行</div>
+    <div class="nav-group">实操</div>
+    <a href="#/arena" data-page="arena"><i>⚔</i>三步演示</a>
     <a href="#/chat" data-page="chat"><i>◇</i>自由对话</a>
-    <a href="#/arena" data-page="arena"><i>⚔</i>攻防竞技场</a>
-    <a href="#/escort" data-page="escort"><i>⛨</i>护航模式</a>
-    <div class="nav-group">分析</div>
     <a href="#/trace" data-page="trace"><i>⤳</i>溯源分析</a>
     <a href="#/runs" data-page="runs"><i>▤</i>运行记录</a>
+    <div class="nav-group">设置</div>
+    <a href="#/settings" data-page="settings"><i>⚙</i>模型设置</a>
+    <a href="#/scenarios" data-page="scenarios"><i>☰</i>攻防场景库</a>
+    <a href="#/policies" data-page="policies"><i>⚖</i>防御策略</a>
   </nav>
   <div class="nav-foot">
     <div>检测 → 研判 → 阻断 → 溯源</div>
@@ -53,6 +54,7 @@
 <script src="trace.js"></script>
 <script src="screen.js"></script>
 <script src="chat.js"></script>
+<script src="showcase.js"></script>
 <script src="pages.js"></script>
 </body>
 </html>

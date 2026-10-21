@@ -194,6 +194,7 @@ function renderGraph(t) {
     else if (n.kind === 'target') sub = n.executed ? '已受影响' : '未发生（已拦截或未执行）';
     else if (n.kind === 'user') sub = '可信授权来源';
     else if (n.kind === 'agent') sub = n.id === 'agent:main' ? '宿主 Pi Agent' : '派发的子 Agent';
+    else if (n.kind === 'model_request') sub = n.sub || '';
     const label = n.label.length > 28 ? n.label.slice(0, 27) + '…' : n.label;
     if (sub.length > 30) sub = sub.slice(0, 29) + '…';
     const cls = `${showAp && ap.nodes.has(n.id) ? ' on-path' : ''}${showAp && ap.held.has(n.id) ? ' held-node' : ''}`;

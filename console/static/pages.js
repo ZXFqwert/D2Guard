@@ -6,10 +6,15 @@ async function getScenarios(force = false) {
   if (!scenarioCache || force) scenarioCache = await api('/api/scenarios');
   return scenarioCache;
 }
+// 评测中无防护时 3 次均攻击得逞、开启防护时均发起攻击的场景，适合现场演示。
+const DEMO_SCENARIOS = ['c-indirect-readme', 'c-indirect-email', 'c-indirect-mcp', 'c-variant-unicode', 'c-variant-encoding', 'c2-language-ja', 'c2-variant-comment'];
 function scenarioOptions(list, selected, filter = () => true) {
+  const opt = (s) => `<option value="${esc(s.id)}" ${s.id === selected ? 'selected' : ''}>${esc(s.id)} · ${esc(s.family_label || '')}</option>`;
+  const demo = DEMO_SCENARIOS.map((id) => list.find((s) => s.id === id && filter(s))).filter(Boolean);
+  const head = demo.length ? `<optgroup label="推荐演示（无防护时稳定得逞）">${demo.map(opt).join('')}</optgroup>` : '';
   const groups = [['attack', '攻击场景'], ['normal', '正常场景'], [null, '其他']];
-  return groups.map(([cat, title]) => {
-    const xs = list.filter((s) => (cat ? s.category === cat : !['attack', 'normal'].includes(s.category)) && filter(s));
+  return head + groups.map(([cat, title]) => {
+    const xs = list.filter((s) => (cat ? s.category === cat : !['attack', 'normal'].includes(s.category)) && filter(s) && !DEMO_SCENARIOS.includes(s.id));
     return xs.length ? `<optgroup label="${title}">${xs.map((s) => `<option value="${esc(s.id)}" ${s.id === selected ? 'selected' : ''}>${esc(s.id)} · ${esc(s.family_label || '')}</option>`).join('')}</optgroup>` : '';
   }).join('');
 }
@@ -264,6 +269,7 @@ function scenarioImport() {
 // ======================= 防御策略 =======================
 PAGES.policies = async (el) => {
   const p = await api('/api/policies');
+  p.dsl = p.dsl || []; p.table = p.table || []; p.hits = p.hits || {}; p.reasons = p.reasons || {}; p.verdicts = p.verdicts || {};
   const MODE_ZH = { taint_gate: '规则与快镜共同判定请求污染', add_risk: '快镜结果仅用于提升风险', rules_gate: '仅由规则判定请求污染', rules_only: '快镜已关闭，仅使用规则' };
   const polHits = p.dsl.reduce((n, x) => n + (p.hits[x.id] || 0), 0);
   const listed = new Set([...p.table.map((t) => t.id), ...p.dsl.map((x) => x.id)]);
@@ -290,16 +296,22 @@ PAGES.policies = async (el) => {
 };
 
 // ======================= 攻防竞技场 · 双路对决 =======================
-const arena = { scenario: null, env: 'attack', runs: {} };
+const arena = { scenario: null, env: 'attack', step: 2, runs: {} };
 PAGES.arena = async (el, [sid]) => {
   const list = await getScenarios();
   if (!sid && app.job?.status === 'running' && app.job.mode === 'arena') { arena.scenario = app.job.scenario; arena.env = app.job.environment; }
   arena.scenario = sid || arena.scenario || (list.find((s) => s.id === 'c-indirect-readme') || list.find((s) => s.category === 'attack') || list[0]).id;
-  const view = 'arena:' + arena.scenario + ':' + arena.env;
+  if (arena.env === 'clean') arena.step = 1; else if (arena.step === 1) arena.step = 2;
+  const view = 'arena:' + arena.scenario + ':' + arena.env + ':' + arena.step;
   if (el.dataset.view !== view) {
     // The frame is built once per scenario/environment; polling only refreshes lanes, verdict and log.
     el.dataset.view = view;
     el.innerHTML = `
+    <section class="story-steps">
+      <button data-s="1"><b>①</b><span>正常运行</span><small>干净环境：Pi Agent 正常完成任务</small></button>
+      <button data-s="2"><b>②</b><span>遭受攻击</span><small>攻击环境·防护关闭：Agent 被诱导执行恶意操作</small></button>
+      <button data-s="3"><b>③</b><span>防护拦截</span><small>同一攻击·D²Guard 开启：危险操作被挂起或阻断</small></button>
+    </section>
     <section class="card arena-ctl">
       <label>攻防场景<select id="a-sc">${scenarioOptions(list, arena.scenario)}</select></label>
       <div class="seg" id="a-env"><button data-v="attack">攻击环境</button><button data-v="clean">干净环境</button></div>
@@ -315,6 +327,14 @@ PAGES.arena = async (el, [sid]) => {
     <section id="a-verdict"></section>
     <section id="a-log"></section>`;
     $$('#a-env button').forEach((b) => b.classList.toggle('active', b.dataset.v === arena.env));
+    $$('.story-steps button').forEach((b) => {
+      b.classList.toggle('active', +b.dataset.s === arena.step);
+      b.addEventListener('click', () => {
+        arena.step = +b.dataset.s; arena.env = arena.step === 1 ? 'clean' : 'attack'; route();
+        later(() => $(arena.step === 3 ? '#lane-on' : '#lane-off')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 400);
+      });
+    });
+    el.querySelector('.arena').dataset.focus = arena.step === 2 ? 'off' : arena.step === 3 ? 'on' : '';
     $('#a-sc').addEventListener('change', () => go('#/arena/' + $('#a-sc').value));
     $$('#a-env button').forEach((b) => b.addEventListener('click', () => { arena.env = b.dataset.v; route(); }));
     $('#a-go').addEventListener('click', async () => {
