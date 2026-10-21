@@ -1,0 +1,10 @@
+{
+  "zip_sha256": "5a872486818a0fd802de03659e48d8dd04672a29c1c9181cdb7f6eed4968d63a",
+  "zip_bytes": 1402941097,
+  "exact_archive_reconstruction": true,
+  "service": "active",
+  "http_status": 200,
+  "restarted": false,
+  "old_project_touched": false,
+  "compressed_weight_bytes_reused": 1371987724
+}
