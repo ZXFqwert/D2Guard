@@ -6,8 +6,8 @@
 
 ## 环境与部署边界
 
-- Mesh `10.33.0.30` 已连接。原 SSH 私钥需要口令解锁；先前 BatchMode 的 publickey 失败不意味着服务端不接受该公钥。口令不进入仓库、远端命令参数或报告。
-- 独立目录 `/home/roots/d2guard-next-lab-20261016`；不修改旧 `d2guard-current`、`d2guard-v4-lab` 或已有服务。GPU 0 是 NVIDIA A100 80GB，部署时约占用 1.4GB；GPU 1 约占用 76GB，未使用。
+- Mesh `<算力机内网地址>` 已连接。原 SSH 私钥需要口令解锁；先前 BatchMode 的 publickey 失败不意味着服务端不接受该公钥。口令不进入仓库、远端命令参数或报告。
+- 独立目录 `~/d2guard-next-lab-20261016`；不修改旧 `d2guard-current`、`d2guard-v4-lab` 或已有服务。GPU 0 是 NVIDIA A100 80GB，部署时约占用 1.4GB；GPU 1 约占用 76GB，未使用。
 - 从算力机旧模型目录复用文件前逐个验证本机固定摘要。权重 SHA256 为 `9d628fd971b700382ac6f65920a86f149777b2e748e0c955fb3b19695aa8f204`；配置不匹配的 tokenizer 配置由本机原版补齐。没有复用旧运行器或检测结果。
 - 新 venv 通过 system-site-packages 复用现成 CUDA Torch，不更改系统包；Laya 0.4.6、Transformers 4.57.3、Tokenizer 0.22.1 等安装在该 venv。继承环境存在其他产品依赖冲突提示，不把本 venv 用于运行那些产品。
 - GPU Torch `2.10.0+cu128`；官方 Laya eager 后端默认 BF16 autocast。Windows CPU 为 Torch 2.9.1、FP32。这是实际部署配置比较，不是只改变一个变量的严格硬件微基准。没有量化、训练或改权重。
@@ -53,7 +53,7 @@ GPU 先对每种输入预热一次，再测 10 次；加载与短预热约 9.9 �
 算力机目录内运行（认证信息在本机/算力机私有配置，不出现在命令中）：
 
 ```bash
-cd /home/roots/d2guard-next-lab-20261016
+cd ~/d2guard-next-lab-20261016
 export CUDA_VISIBLE_DEVICES=0
 export NPM_CONFIG_PREFIX="$PWD/.local/pi"
 .venv/bin/python lab.py matrix --engine d2v2 --scenario readme-setup-registration --timeout 300 --repeats 1

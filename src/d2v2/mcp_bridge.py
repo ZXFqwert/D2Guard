@@ -1,10 +1,11 @@
 """Host-configured MCP proxy: stdio and Streamable HTTP JSON/SSE responses."""
-import json,os,queue,subprocess,sys,threading
+import json,os,queue,re,subprocess,sys,threading
 from pathlib import Path
 import httpx
 
 class MCPBridge:
-    def __init__(self,observe,fixture=None,config=None):
+    def __init__(self,observe,fixture=None,config=None,configure_fixture=None):
+        if configure_fixture is None:configure_fixture=not config
         config=config or {};fixture=fixture or {}
         self.observe=observe;self.server_id=config.get('server_id','local-docs');self.next_id=0
         self.lock=threading.Lock();self.responses=queue.Queue(maxsize=64)
@@ -27,7 +28,7 @@ class MCPBridge:
             self.protocol=handshake.get('protocolVersion')
             if self.protocol not in {'2024-11-05','2025-03-26','2025-06-18'}:raise ValueError('Unsupported MCP protocol version')
             self._send({'jsonrpc':'2.0','method':'notifications/initialized'})
-            if not config:self.request('fixture/configure',{k:v for k,v in fixture.items() if k in {'mcp_description','mcp_return','mcp_write'}})
+            if configure_fixture:self.request('fixture/configure',{k:v for k,v in fixture.items() if k in {'mcp_description','mcp_return','mcp_write'}})
             self.tools=[];cursor=None
             for _ in range(20):
                 page=self.request('tools/list',{'cursor':cursor} if cursor else {})
@@ -97,3 +98,55 @@ class MCPBridge:
             except subprocess.TimeoutExpired:self.process.kill();self.process.wait()
             if self.reader:self.reader.join(timeout=2)
             self.process.stdin.close();self.process.stdout.close()
+
+
+SERVER_ID=re.compile(r'[a-z0-9][a-z0-9-]{0,40}')
+
+
+class MCPRouter:
+    """Several MCP servers attached to one task.
+
+    With one server, tool names stay as the server reports them (unchanged single-bridge behaviour).
+    With two or more, every tool is exposed as ``server_id/tool`` so same-named tools on different
+    servers never collide; each call is routed to exactly one bridge and returns its server_id.
+    Sources: host config ``{"servers":[{server_id,...},...]}`` or scenario fixture ``mcp_servers``.
+    """
+    def __init__(self,observe,fixture=None,config=None):
+        fixture=fixture or {}
+        if config and config.get('servers'):
+            specs=[(dict(c),{},False) for c in config['servers']]
+        elif not config and fixture.get('mcp_servers'):
+            specs=[({'server_id':s.get('server_id'),'transport':s.get('mcp_transport',fixture.get('mcp_transport','stdio'))},s,True) for s in fixture['mcp_servers']]
+        else:
+            specs=[(config,fixture,None)]
+        ids=[(c or {}).get('server_id','local-docs') for c,_,_ in specs]
+        if len(specs)>1 and (len(set(ids))!=len(ids) or not all(isinstance(i,str) and SERVER_ID.fullmatch(i) for i in ids)):
+            raise ValueError('MCP server ids must be unique lowercase identifiers')
+        self.bridges={};self.multi=len(specs)>1
+        try:
+            for (cfg,fx,configure),sid in zip(specs,ids):
+                if self.multi:cfg={**cfg,'server_id':sid}
+                self.bridges[sid]=MCPBridge(observe,fixture=fx,config=cfg or None,configure_fixture=configure)
+        except Exception:
+            self.close();raise
+        self.server_ids=list(self.bridges);self.server_id=self.server_ids[0] if not self.multi else None
+        self.tools=[];self.routes={}
+        for sid,bridge in self.bridges.items():
+            for tool in bridge.tools:
+                # Single-server tool descriptions stay byte-identical to the plain bridge.
+                name=sid+'/'+tool['name'] if self.multi else tool['name']
+                self.tools.append({**tool,'name':name,'server_id':sid} if self.multi else tool)
+                self.routes[name]=(sid,tool['name'])
+
+    def resolve(self,name):
+        if name not in self.routes:raise ValueError('Unregistered MCP tool')
+        return self.routes[name]
+
+    def call(self,name,args):
+        sid,tool=self.resolve(name)
+        return {**self.bridges[sid].call(tool,args),'server_id':sid,'tool_name':tool}
+
+    def close(self):
+        for bridge in getattr(self,'bridges',{}).values():
+            try:bridge.close()
+            except Exception:pass

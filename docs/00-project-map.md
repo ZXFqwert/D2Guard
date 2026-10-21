@@ -7,7 +7,7 @@
 | 资源 | 已知配置 / 证据 | 当前核验范围 |
 |---|---|---|
 | Windows 工作区 | Python 3.13；Node；已装 Pi 0.85.1 的历史记录 | 本轮运行 Python 与 Node 测试；未在 Windows 加载英文权重 |
-| 算力机 | Mesh 接入见 `.local` 私有记录；目录 `/home/roots/d2guard-next-lab-20261016` | Mesh 私钥认证已恢复，A6 四组矩阵及核验通过，见阶段报告 |
+| 算力机 | Mesh 接入见 `.local` 私有记录；目录 `~/d2guard-next-lab-20261016` | Mesh 私钥认证已恢复，A6 四组矩阵及核验通过，见阶段报告 |
 | GPU | 历史为 A100 80GB GPU 0；GPU 1 有其他服务负载 | A6 实测 GPU 0 占用 1393 MiB、GPU 1 占用 76373 MiB；仅使用 GPU 0，未改旧服务 |
 | 远端运行环境 | 独立 `.venv`，项目 `.local/pi`；Laya 0.4.6、Pi 0.85.1 | 沿用原环境，不升级依赖 |
 | 主模型/API | `huihui-qwen3.8-27b`，Responses，端点与密钥见 `.local/provider.json`（不入库） | A6 四组均完成真实 Pi/API 循环，未发生代理错误 |
@@ -28,7 +28,7 @@ node --test tests/boundary.test.mjs
 算力机复现命令（Bash，仅用于远端）：
 
 ```bash
-cd /home/roots/d2guard-next-lab-20261016
+cd ~/d2guard-next-lab-20261016
 export CUDA_VISIBLE_DEVICES=0
 export NPM_CONFIG_PREFIX="$PWD/.local/pi"
 .venv/bin/python lab.py matrix --engine d2v2 --scenario readme-setup-registration --timeout 300 --repeats 1

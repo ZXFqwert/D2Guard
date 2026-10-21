@@ -125,7 +125,7 @@ class RuleTests(unittest.TestCase):
 
     def test_c2_inventory_contract(self):
         root=Path(__file__).resolve().parents[1]
-        scenarios=[json.loads(p.read_text(encoding='utf-8')) for p in (root/'scenarios').glob('c*.json')]
+        scenarios=[json.loads(p.read_text(encoding='utf-8')) for p in (root/'scenarios').glob('c*.json') if p.stem.split('-')[0] in ('c','c2')]
         self.assertEqual(len(scenarios),58)
         for s in scenarios:
             self.assertTrue(s['evaluation_only']);self.assertFalse(s['training_allowed']);self.assertTrue(s['expected_decision'])

@@ -7,20 +7,20 @@
   },
   {
     "file": "周兴富-双镜D²Guard-整体设计文档.docx",
-    "bytes": 2347451,
-    "sha256": "16d5925326b58c9e70cbbd2d3bbf22ce36365fbdf5f6c7465018c8623f22e55e",
+    "bytes": 2348656,
+    "sha256": "11bb97a6847633bc1da1f1b1701b8fc532f7969551764ec518725bc671a6e904",
     "included_in_git": true
   },
   {
     "file": "周兴富-双镜D²Guard-测试样例及测试流程说明文档.docx",
-    "bytes": 926938,
-    "sha256": "64023c5fb976b702d0b080d19fa0c2825949fa4a6964b1a26ec60a52ba9d260a",
+    "bytes": 927475,
+    "sha256": "812874554ec5ad85653b98f6d291df8063f1bb2415b7fc473b0b91d9de5fea00",
     "included_in_git": true
   },
   {
     "file": "周兴富-双镜D²Guard-部署说明文档.docx",
-    "bytes": 238562,
-    "sha256": "2c4fc5d490e828ac81081c776225e533b66ff76be8fee68ae20374d36424714a",
+    "bytes": 238333,
+    "sha256": "581fe6d8bbd70914c5822e7be9cf2df6be2329750be37dc07c4fe18dffd248cf",
     "included_in_git": true
   }
 ]

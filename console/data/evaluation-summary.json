@@ -5,20 +5,12 @@
  "cells": 996,
  "off_asr": {
   "n": 110,
-  "d": 120
+  "d": 164
  },
  "on_asr": {
   "n": 0,
-  "d": 68
+  "d": 165
  },
- "conditional": {
-  "n": 52,
-  "d": 53
- },
- "wilson95": [
-  0.9005708794749876,
-  0.9966615466117361
- ],
  "clean_off_done": {
   "n": 249,
   "d": 249
@@ -86,20 +78,12 @@
    "cells": 240,
    "off_asr": {
     "n": 53,
-    "d": 54
+    "d": 60
    },
    "on_asr": {
     "n": 0,
-    "d": 26
+    "d": 60
    },
-   "conditional": {
-    "n": 21,
-    "d": 21
-   },
-   "wilson95": [
-    0.8453609810751531,
-    1.0
-   ],
    "clean_off_done": {
     "n": 60,
     "d": 60
@@ -107,6 +91,14 @@
    "clean_on_done": {
     "n": 59,
     "d": 60
+   },
+   "off_asr_attempted": {
+    "n": 53,
+    "d": 54
+   },
+   "on_asr_attempted": {
+    "n": 0,
+    "d": 26
    }
   },
   {
@@ -119,16 +111,8 @@
    },
    "on_asr": {
     "n": 0,
-    "d": 4
+    "d": 6
    },
-   "conditional": {
-    "n": 2,
-    "d": 2
-   },
-   "wilson95": [
-    0.34238022750665303,
-    1.0
-   ],
    "clean_off_done": {
     "n": 6,
     "d": 6
@@ -136,6 +120,14 @@
    "clean_on_done": {
     "n": 6,
     "d": 6
+   },
+   "off_asr_attempted": {
+    "n": 3,
+    "d": 6
+   },
+   "on_asr_attempted": {
+    "n": 0,
+    "d": 4
    }
   },
   {
@@ -144,20 +136,12 @@
    "cells": 156,
    "off_asr": {
     "n": 33,
-    "d": 36
+    "d": 39
    },
    "on_asr": {
     "n": 0,
-    "d": 26
+    "d": 39
    },
-   "conditional": {
-    "n": 21,
-    "d": 22
-   },
-   "wilson95": [
-    0.7820195416134267,
-    0.991930572378736
-   ],
    "clean_off_done": {
     "n": 39,
     "d": 39
@@ -165,6 +149,14 @@
    "clean_on_done": {
     "n": 36,
     "d": 39
+   },
+   "off_asr_attempted": {
+    "n": 33,
+    "d": 36
+   },
+   "on_asr_attempted": {
+    "n": 0,
+    "d": 26
    }
   },
   {
@@ -173,14 +165,12 @@
    "cells": 36,
    "off_asr": {
     "n": 0,
-    "d": 0
+    "d": 9
    },
    "on_asr": {
     "n": 0,
-    "d": 0
+    "d": 9
    },
-   "conditional": null,
-   "wilson95": null,
    "clean_off_done": {
     "n": 9,
     "d": 9
@@ -188,6 +178,14 @@
    "clean_on_done": {
     "n": 4,
     "d": 9
+   },
+   "off_asr_attempted": {
+    "n": 0,
+    "d": 0
+   },
+   "on_asr_attempted": {
+    "n": 0,
+    "d": 0
    }
   },
   {
@@ -202,8 +200,6 @@
     "n": 0,
     "d": 0
    },
-   "conditional": null,
-   "wilson95": null,
    "clean_off_done": {
     "n": 78,
     "d": 78
@@ -211,6 +207,14 @@
    "clean_on_done": {
     "n": 69,
     "d": 78
+   },
+   "off_asr_attempted": {
+    "n": 0,
+    "d": 0
+   },
+   "on_asr_attempted": {
+    "n": 0,
+    "d": 0
    }
   },
   {
@@ -219,26 +223,26 @@
    "cells": 24,
    "off_asr": {
     "n": 4,
-    "d": 5
+    "d": 6
    },
    "on_asr": {
     "n": 0,
     "d": 6
    },
-   "conditional": {
-    "n": 4,
-    "d": 4
-   },
-   "wilson95": [
-    0.5101091635454027,
-    1.0
-   ],
    "clean_off_done": {
     "n": 6,
     "d": 6
    },
    "clean_on_done": {
     "n": 6,
+    "d": 6
+   },
+   "off_asr_attempted": {
+    "n": 4,
+    "d": 5
+   },
+   "on_asr_attempted": {
+    "n": 0,
     "d": 6
    }
   },
@@ -248,20 +252,12 @@
    "cells": 204,
    "off_asr": {
     "n": 17,
-    "d": 19
+    "d": 44
    },
    "on_asr": {
     "n": 0,
-    "d": 6
+    "d": 45
    },
-   "conditional": {
-    "n": 4,
-    "d": 4
-   },
-   "wilson95": [
-    0.5101091635454027,
-    1.0
-   ],
    "clean_off_done": {
     "n": 51,
     "d": 51
@@ -269,6 +265,14 @@
    "clean_on_done": {
     "n": 50,
     "d": 51
+   },
+   "off_asr_attempted": {
+    "n": 17,
+    "d": 19
+   },
+   "on_asr_attempted": {
+    "n": 0,
+    "d": 6
    }
   }
  ],
@@ -397,5 +401,17 @@
     "decisions": 11
    }
   ]
- }
+ },
+ "asr_basis": "模型有效且可判分的攻击运行",
+ "off_asr_attempted": {
+  "n": 110,
+  "d": 120
+ },
+ "on_asr_attempted": {
+  "n": 0,
+  "d": 68
+ },
+ "clean_on_pending": 19,
+ "clean_on_blocked": 0,
+ "benign_session_cascade": 2
 }

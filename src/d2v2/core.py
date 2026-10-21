@@ -27,6 +27,13 @@ from .approval import Approvals
 from .memory import MemoryStore
 
 
+def mcp_route(server_id,name):
+    """(server, tool) for an MCP result; multi-server tools are exposed as ``server/tool``."""
+    if server_id and name.startswith(server_id+'/'):return server_id,name[len(server_id)+1:]
+    if not server_id and '/' in name:return tuple(name.split('/',1))
+    return server_id or 'local-docs',name
+
+
 class CoreV2:
     def __init__(self, enabled, folder, provider, emit, fast=None, memory_root=None, content_fast=None, decision_mode='add_risk'):
         self.slow_review_timeout=review_timeout_seconds()
@@ -152,7 +159,7 @@ class CoreV2:
         with self.lock:
             kind=event.get('type');agent=event.get('agent_id','main')
             source='MODEL_GENERATED';uri='agent://'+agent
-            raw=event.get('text','');delta={'event_kind':kind,'actor':agent}
+            raw=event.get('text','');delta={'event_kind':kind,'actor':agent};mcp_server=None
             if kind in {'agent_start','user_input'}:
                 raw=event.get('task',event.get('text',''))
                 source='TRUSTED_USER' if agent=='main' else 'SUBAGENT_TASK'
@@ -163,7 +170,9 @@ class CoreV2:
                 source='MEMORY' if tool in {'memory_read','memory_write'} else 'WEB' if tool=='net_fetch' else 'SUBAGENT' if tool=='spawn_subagent' else 'MCP_RET' if tool=='mcp_call' else 'LOCAL_FILE'
                 uri=args.get('path') or args.get('url') or 'agent://'+agent+'/result'
                 if tool in {'memory_read','memory_write'}:uri='memory://local/'+str(args.get('key',''))
-                if tool=='mcp_call':uri='mcp://'+event.get('server_id','local-docs')+'/'+args.get('name','unknown')
+                if tool=='mcp_call':
+                    mcp_server,mcp_tool=mcp_route(event.get('server_id'),args.get('name','unknown'))
+                    uri='mcp://'+mcp_server+'/'+mcp_tool
                 if tool=='fs_read':
                     source='MEMORY' if self.hard.memory_storage_path(args.get('path','')) else self.file_sources.get(args.get('path'),source)
                 if event.get('is_error') and event.get('error_origin','host')=='host':
@@ -188,7 +197,7 @@ class CoreV2:
             if kind in {'tool_result','tool_outcome'} and event.get('call_id'):
                 self.store.edge('call:'+event['call_id'],'event:'+ref['event_id'],'OBSERVED_RETURN',ref['event_id'])
             if source in {'MCP_DESC','MCP_RET'}:
-                server='mcp:'+event.get('server_id','local-docs')
+                server='mcp:'+(mcp_server or event.get('server_id','local-docs'))
                 self.store.node(server,'MCP_SERVER',server)
                 self.store.edge(server,'event:'+ref['event_id'],'MCP_OBSERVATION',ref['event_id'])
             delta.update(source_type=source,evidence_ref=ref)

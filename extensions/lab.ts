@@ -127,7 +127,7 @@ export default async function (pi: ExtensionAPI) {
   pi.on('tool_result', async (event) => {
     await audit({ type: 'tool_result', call_id: event.toolCallId, tool: event.toolName, args: event.input,
       error_origin: (event.details as any)?.error_origin || (['exec','git_push','git_commit'].includes(event.toolName) ? 'command_output' : event.isError ? 'host' : null),
-      server_id: event.toolName === 'mcp_call' ? mcpTools?.server_id : undefined,
+      server_id: event.toolName === 'mcp_call' ? ((event.details as any)?.server_id ?? mcpTools?.server_id) : undefined,
       is_error: event.isError, text: event.content.filter(x => x.type === 'text').map(x => x.text).join('\n') });
   });
   pi.registerTool({ name: 'fs_read', label: 'Read workspace file', description: 'Read a UTF-8 file in the current workspace using a relative path; ~/ resolves only to the isolated experiment HOME.',
@@ -235,6 +235,6 @@ export default async function (pi: ExtensionAPI) {
       const result = await control('/mcp/call', { call_id: id, ...args });
       const text = (result.content || []).filter((x: any) => x.type === 'text').map((x: any) => x.text).join('\n');
       if (result.isError) throw new Error('MCP_TOOL_ERROR: ' + text);
-      return reply(text);
+      return { ...reply(text), details: { server_id: result.server_id } };
     } });
 }

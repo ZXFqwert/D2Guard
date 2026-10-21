@@ -65,9 +65,9 @@ def main():
         '新增：stage_h_run.py、stage_h_audit.py、stage_h_models.py、stage_h_report.py、stage_h_verify.py、tests/test_stage_h.py；结果为本报告、stage-h-results.json、stage-h-verification.md。另有用户授权的 src/d2v2/trace.py 展示修复与 tests/test_stage_h_trace.py，未替换冻结运行版本；状态更新 docs/03-status.md 和设计 §12。',
         '## H1：正式四格','',
         '每个数字的逐轮来源均在机读结果相应分组的 run_ids；记录包含运行 ID、格子、尝试序号和 verify_v2。各格子计划位于 `#/plan/cells`。']
-    table(lines,['攻击族','格子数','off ASR（已尝试）','on ASR（已尝试）','条件防护率','Wilson 95%','来源'],[
-        [f,s['n'],rate(s['off']['asr_observed_attempts']),rate(s['on']['asr_observed_attempts']),rate(s['conditional_defense']),
-         '—' if s['conditional_defense']['wilson95'] is None else '–'.join(rate(x) for x in s['conditional_defense']['wilson95']),
+    table(lines,['攻击族','格子数','off ASR（模型有效可判分）','on ASR（模型有效可判分）','off ASR（已尝试）','on ASR（已尝试）','来源'],[
+        [f,s['n'],rate(s['off']['asr_all_model_valid_descriptive']),rate(s['on']['asr_all_model_valid_descriptive']),
+         rate(s['off']['asr_observed_attempts']),rate(s['on']['asr_observed_attempts']),
          '#/overall' if f=='总体' else '#/by_family/'+f] for f,s in [('总体',d['overall']),*d['by_family'].items()]])
     table(lines,['分组','clean off 完成','clean on 完成','良性动作子集误挂起','DT-4b','会话暂停','其他待审挂起','本地路径','来源'],[
         [f,rate(s['off']['normal_completion']),rate(s['on']['normal_completion']),rate(s['clean_action_holds']['benign_subset_false_hold']),
@@ -136,7 +136,7 @@ def main():
         f"最终仍有 {d['failure_accounting']['selected_model_failed']} 格模型失败，按协议不再补跑，也不计入防护成绩；全部原始尝试已在附录列出。来源：`#/failure_accounting`。",
         f"clean/on 完成 {rate(d['overall']['on']['normal_completion'])}，低于 clean/off 的 {rate(d['overall']['off']['normal_completion'])}；clean 中 DT-4b 共 {d['overall']['clean_action_holds']['dt4b']} 次，另有 {d['overall']['clean_action_holds']['other_holds_for_review']} 次不在可确认良性子集的非会话挂起。动作次数不能直接等同于失败轮数，不能把子集误拦0解释为所有正常任务零误拦。来源：`#/overall`及附录。",
         f"GPU单窗口p95为 {num(d['h3']['s1_single_window_gpu_ms']['p95'])} ms，尾部不满足设计≤50 ms目标；保留首次推理等实际开销，没有事后删除慢样本。慢镜模板回退 {rate(d['h4']['fallback'])}，原因按异常类型列于H4；引用有效与模型研判质量不是同一指标。",
-        '记忆污染族本次没有观察到攻击尝试，因此 ASR/条件防护率分母为0；不能据此宣称已证明该族有效防护。攻击未触发列表保留，未改写场景增强诱导。来源：`#/by_family/memory`。',
+        '记忆污染族本次没有观察到攻击尝试，因此已尝试口径的 ASR 分母为0；不能据此宣称已证明该族有效防护。攻击未触发列表保留，未改写场景增强诱导。来源：`#/by_family/memory`。',
         '只读引用来源展示补丁已在本机落地，完成离线核对；未替换冻结运行版本。H4主表与补丁投影分开报告，后续部署由评审决定。']
 
     lines+=['单元：评测脚本8项本机与算力机通过；本机另加1项引用来源回归和7项相关F测试，合计16项通过。来源 `#/tests`。真实运行、离线消融和分类诊断分别列在 H1、H2/H5，不混合计算。',

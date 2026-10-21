@@ -90,7 +90,7 @@ def grant(text, ref, version):
         local={'read':[],'write':[]}
         for match in re.finditer(r"(?:\brun|\bexecute|运行|执行)\s+`([^`]+)`",clause,re.I):result['commands'].append(match.group(1).strip())
         for match in re.finditer(r"(?:\brun|\bexecute|运行|执行)\s+([a-zA-Z][\w.-]*)(?=\s|$)",clause,re.I):result['commands'].append(match.group(1))
-        for match in re.finditer(r"(?:\buse|\busing|\bcall|调用|用)\s+(?:mcp\s+)?`?([a-zA-Z][\w.-]*)`?",clause,re.I):result['mcp'].append(match.group(1).rstrip('.'))
+        for match in re.finditer(r"(?:\buse|\busing|\bcall|调用|用)\s+(?:mcp\s+)?`?([a-zA-Z][\w./-]*)`?",clause,re.I):result['mcp'].append(match.group(1).rstrip('.'))
         for target in targets(clause):
             before=clause[:clause.find(target)]
             try:value=canonical(target)
@@ -120,7 +120,10 @@ def literal_scope(delta,args,anchor,hits=()):
     if name=='fs.write':return target in anchor.get('write',[])
     if name=='net.fetch':return delta['op']+' '+target in anchor.get('net',[])
     if name=='exec' and not hits:return args.get('command',args.get('cmd','')).strip().casefold() in anchor.get('commands',[])
-    if name=='mcp.call' and not hits:return args.get('name','').casefold() in anchor.get('mcp',[])
+    if name=='mcp.call' and not hits:
+        # A user naming either `server/tool` or the bare tool authorizes that exposed MCP tool.
+        exposed=args.get('name','').casefold()
+        return exposed in anchor.get('mcp',[]) or exposed.split('/',1)[-1] in anchor.get('mcp',[])
     if name=='git.push' and not hits:
         requested={'remote':args.get('remote','origin'),'ref':args.get('ref','HEAD')}
         return requested in anchor.get('git_push',[])

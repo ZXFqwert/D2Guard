@@ -168,27 +168,27 @@ function countUp(root) {
 
 // ---------------- KPI ribbon (evaluation-summary.json only) ----------------
 function kpiRibbon(s) {
-  const off = r1(rate(s.off_asr)), on = r1(rate(s.on_asr)), cond = r1(rate(s.conditional));
+  const off = r1(rate(s.off_asr)), on = r1(rate(s.on_asr));
+  const doneOff = r1(rate(s.clean_off_done)), doneOn = r1(rate(s.clean_on_done));
   const benign = s.benign_hold, local = s.local_path, L = s.latency_ms || {};
   const src = esc(`正式评测 ${s.cells} 格`);
   const tile = (style, body, srcTxt = src) => `<div class="kt" style="${style}">${body}<div class="kt-src">${srcTxt}</div></div>`;
-  const ci = Array.isArray(s.wilson95) ? s.wilson95.map((x) => r1(x * 100)) : null;
   const tiles = [];
   if (off != null && on != null) tiles.push(tile('--kc:#ff4d61;--kg:rgba(255,77,97,.2)', `
     <div class="kt-l"><span>攻击成功率</span><span style="color:var(--s-faint)">防护关闭 → 开启</span></div>
     <div class="kt-v"><span class="atk">${cu(off)}<i>%</i></span><span class="arrow">→</span><span class="def">${cu(on)}<i>%</i></span></div>
     <div class="kt-bars"><span>关闭</span><span class="tr"><span class="fl atk" data-w="${off}"></span></span><em>${fracTxt(s.off_asr)}</em>
-      <span>开启</span><span class="tr"><span class="fl def" data-w="${on}"></span></span><em>${fracTxt(s.on_asr)}</em></div>`, `${src} · 攻击环境`));
-  if (cond != null) tiles.push(tile('--kc:#38bdf8;--kg:rgba(56,189,248,.2)', `
-    <div class="kt-l">条件防护率</div>
-    <div class="kt-v glow">${cu(cond)}<i>%</i></div>
-    ${ci ? `<div class="kt-ci" title="Wilson 95% 置信区间"><span style="left:${ci[0]}%;right:${100 - ci[1]}%"></span><i style="left:${cond}%"></i></div>` : ''}
-    <div class="kt-s"><b>${fracTxt(s.conditional)}</b>${ci ? ` · CI ${ci[0]}–${ci[1]}%` : ''}</div>`));
+      <span>开启</span><span class="tr"><span class="fl def" data-w="${on}"></span></span><em>${fracTxt(s.on_asr)}</em></div>
+    ${s.asr_basis ? `<div class="kt-s">${esc(s.asr_basis)}</div>` : ''}`, `${src} · 攻击环境`));
+  if (doneOff != null && doneOn != null) tiles.push(tile('--kc:#38bdf8;--kg:rgba(56,189,248,.2)', `
+    <div class="kt-l"><span>正常任务自动完成</span><span style="color:var(--s-faint)">防护关闭 → 开启</span></div>
+    <div class="kt-v sm"><span class="def">${cu(doneOff)}<i>%</i></span><span class="arrow">→</span><span class="def">${cu(doneOn)}<i>%</i></span></div>
+    <div class="kt-s"><b>${fracTxt(s.clean_off_done)} → ${fracTxt(s.clean_on_done)}</b>${s.clean_on_pending != null ? ` · 其余 ${esc(s.clean_on_pending)} 次等待人工确认，阻断 ${esc(s.clean_on_blocked ?? 0)}` : ''}</div>`, `${src} · 干净环境`));
   if (benign) tiles.push(tile('--kc:#34d399;--kg:rgba(52,211,153,.18);--kg2:rgba(52,211,153,.5)', `
     <div class="kt-l">良性动作误挂起</div>
     <div class="kt-v glow">${cu(benign.n, 0)}<i>/${esc(benign.d)}</i></div>
     <div class="kt-bars" style="grid-template-columns:1fr auto"><span class="tr"><span class="fl" style="background:linear-gradient(90deg,#047857,#34d399);box-shadow:0 0 10px rgba(52,211,153,.6)" data-w="${r1(100 - rate(benign))}"></span></span><em>${esc(benign.d - benign.n)} 放行</em></div>
-    <div class="kt-s">${esc(benign.d)} 个良性动作中 <b>${esc(benign.n)}</b> 个被挂起</div>`));
+    <div class="kt-s">自身裁决${s.benign_session_cascade ? `；另有 ${esc(s.benign_session_cascade)} 次会话连带暂停` : ''}</div>`));
   if (L.decision_p50 != null) tiles.push(tile('--kc:#60a5fa;--kg:rgba(96,165,250,.2)', `
     <div class="kt-l">单动作裁决 <span style="color:var(--s-faint)">p50</span></div>
     <div class="kt-v glow">${cu(Math.round(L.decision_p50), 0)}<i>ms</i></div>
@@ -700,13 +700,13 @@ function famPanel(s) {
   return `
   <section class="sp">
     <div class="sp-h"><div><div class="sp-t">攻击家族 · 防护前后 <small>${fams.length} 类</small></div>
-      <div class="sp-d">各家族攻击成功率：防护关闭（红）vs 开启（青），右侧为条件防护率。</div></div><div class="sp-src">正式评测 ${esc(s.cells)} 格</div></div>
+      <div class="sp-d">各家族攻击成功率：防护关闭（红）vs 开启（青），分母为模型有效且可判分的攻击运行。</div></div><div class="sp-src">正式评测 ${esc(s.cells)} 格</div></div>
     <div class="fam">
-      <div class="fam-head"><span>攻击家族</span><span>攻击成功率</span><span style="text-align:right">条件防护</span></div>
-      ${fams.map((f) => { const c = r1(rate(f.conditional)); return `<div class="fam-row">
+      <div class="fam-head"><span>攻击家族</span><span>攻击成功率</span><span style="text-align:right">发起攻击</span></div>
+      ${fams.map((f) => `<div class="fam-row">
         <div class="fam-n"><b>${esc(f.label)}</b><small>${esc(f.cells)} 格</small></div>
         <div class="fam-bars"><span>关闭</span>${bar(f.off_asr, 'atk')}<span>开启</span>${bar(f.on_asr, 'def')}</div>
-        <div class="fam-c"><b>${c == null ? '—' : cu(c) + '%'}</b><small>${fracTxt(f.conditional)}</small></div></div>`; }).join('')}
+        <div class="fam-c"><b>${f.off_asr_attempted ? esc(f.off_asr_attempted.d) : '—'}</b><small>关闭侧发起攻击轮次</small></div></div>`).join('')}
       ${skipped.length ? `<div class="fam-foot">${esc(skipped.join('、'))}：攻击成功率分母为 0（无可判定攻击格），未列入。</div>` : ''}
     </div>
   </section>`;

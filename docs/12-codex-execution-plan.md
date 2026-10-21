@@ -61,7 +61,7 @@
 | G 能力补全 | 退回（2026-10-19）：双容器部署导致僵尸进程停机；exec/spawn/MCP 一律按外发建模、命令白名单外即判不可审计，干净轮次大量误拦 | [执行报告](28-stage-g-report.md)；[stage-g-review](reviews/stage-g-review.md) |
 | G′ 能力补全简化重做 | 实现有条件通过（2026-10-19）；矩阵 20/72 未跑完，授权续跑 | [执行报告](29-stage-g-prime-report.md)；[stage-g-prime-review](reviews/stage-g-prime-review.md) |
 | G′ 续 | 通过（2026-10-19）：72 格 verify 72/72，攻击成功全 0，clean 仅 DT-4b 正确挂起；5 项自检失败只对应 1 轮上游超时和评审方过严的“指定策略命中”条目 | [执行报告](30-stage-g-prime2-report.md)；[stage-g-prime2-review](reviews/stage-g-prime2-review.md) |
-| H 系统评测与报告 | 通过（2026-10-19）：996 格全部执行，开启防护攻击成功 0/68，条件防护率 52/53，干净完成 92.4%，裁决 p50 8 ms；评审循环结束，转交付整理 | [执行报告](31-stage-h-report.md)；[stage-h-review](reviews/stage-h-review.md) |
+| H 系统评测与报告 | 通过（2026-10-19）：996 格全部执行，攻击成功（模型有效可判分）关闭 110/164、开启 0/165，干净完成 92.4%，裁决 p50 8 ms；评审循环结束，转交付整理 | [执行报告](31-stage-h-report.md)；[stage-h-review](reviews/stage-h-review.md) |
 | I 前端 | 未开始 | — |
 
 ---
@@ -486,7 +486,7 @@
 | # | 任务 |
 |---|---|
 | H0 | 把 G′ 续的改动提交为检查点（全局规则 10） |
-| H1 | **正式四格评测。** `scenarios/` 下全部场景（c、c2、e、g，不含 README）× {clean, attack} × {off, on} × 3 次，默认 taint_gate、冻结内核、评测预算 20/40/180（多层场景 540）。不再冒烟。指标按攻击族（§10.1）和总体给出：无防护/有防护 ASR、条件防护率（Wilson 95% 区间）、正常完成率（clean on 对 off）、误拦率（良性动作被 ASK/BLOCK 的比例，DT-4b 与 POL-SESSION-HOLD 单列）、本地路径比例。模型失败、模型拒绝、攻击未触发，按 §10.2 单独统计 |
+| H1 | **正式四格评测。** `scenarios/` 下全部场景（c、c2、e、g，不含 README）× {clean, attack} × {off, on} × 3 次，默认 taint_gate、冻结内核、评测预算 20/40/180（多层场景 540）。不再冒烟。指标按攻击族（§10.1）和总体给出：无防护/有防护 ASR、正常完成率（clean on 对 off）、误拦率（良性动作被 ASK/BLOCK 的比例，DT-4b 与 POL-SESSION-HOLD 单列）、本地路径比例。模型失败、模型拒绝、攻击未触发，按 §10.2 单独统计 |
 | H2 | **E4 消融（离线）。** 用 H1 的 on 轮轨迹，离线重算 rules_gate、taint_gate（以及 add_risk 作参考），比较 ASR 代理指标、误拦和拦截召回；同时引用阶段 E/E′ 的真实三臂结果。不新增真实运行 |
 | H3 | **延迟。** S1 单次推理 p50/p95，分 GPU 和 CPU（CPU 为评测机 CPU，从 H1 抽 200 个视图，batch=1）；单个动作完整裁决 p50/p95（取自 decisions）；任务端到端增量（每个场景 clean on 与 clean off 的耗时中位数之差） |
 | H4 | **慢镜与溯源。** 在 H1 的 on 轮上统计：研判收尾率、引用校验通过率、回退模板比例、被挂起攻击动作的 DAG 来源可达率。不做人工评分 |

@@ -48,11 +48,11 @@ def main():
     bridge = None
     if args.engine == 'd2v2':
         from d2v2.core import CoreV2
-        from d2v2.mcp_bridge import MCPBridge
+        from d2v2.mcp_bridge import MCPRouter
         provider = json.loads(os.environ['D2_CORE_PROVIDER'])
         guard = CoreV2(args.protect == 'on', folder, provider, append, memory_root=os.environ.get('D2_MEMORY_ROOT'))
         mcp_config=json.loads(Path(os.environ['D2_MCP_CONFIG']).read_text(encoding='utf-8')) if os.environ.get('D2_MCP_CONFIG') else None
-        bridge = MCPBridge(guard.observe,fixture=fixture,config=mcp_config)
+        bridge = MCPRouter(guard.observe,fixture=fixture,config=mcp_config)
         overrides=(mcp_config or {}).get('effects',{})
         guard.mcp_effects={t['name']:overrides.get(t['name'],'read' if t.get('annotations',{}).get('readOnlyHint') is True else 'write') for t in bridge.tools}
         if any(v not in {'read','write','network'} for v in guard.mcp_effects.values()):raise ValueError('Invalid host MCP effect')
@@ -228,7 +228,9 @@ def main():
                         guard.store.db.execute("UPDATE calls SET status='sandbox_dispatched' WHERE id=?",(data['call_id'],));guard.store.db.commit()
                     return self.respond(200,execute(folder/'workspace',data['tool'],data['args'],timeout=positive_limit(os.environ.get('D2_WALL_SECONDS')),lab_origin='http://127.0.0.1:'+str(self.server.server_port)))
                 if self.path == '/mcp/call' and bridge:
-                    guard.observe({**data,'type':'mcp_dispatch','text':''})
+                    try:server_id,_=bridge.resolve(data.get('name'))
+                    except ValueError:return self.respond(404,{'error':'Unregistered MCP tool'})
+                    guard.observe({**data,'type':'mcp_dispatch','server_id':server_id,'text':''})
                     # Invocation requires a matching ALLOW bound to the exact arguments.
                     from d2v2.store import digest,encode
                     with guard.lock:
@@ -245,10 +247,11 @@ def main():
                 if self.path == '/mcp/tools' and bridge:
                     guard.observe({**data,'type':'mcp_discovery','text':''})
                     for index,tool in enumerate(bridge.tools):
+                        server_id,tool_name=bridge.resolve(tool['name'])
                         guard.observe({'event_id':data['event_id']+':tool:'+str(index),'agent_id':data.get('agent_id','main'),
-                                       'parent_call_id':data.get('parent_call_id'),'type':'mcp_description','server_id':bridge.server_id,
-                                       'tool_name':tool['name'],'text':json.dumps(tool,ensure_ascii=False)})
-                    return self.respond(200,{'tools':bridge.tools,'server_id':bridge.server_id})
+                                       'parent_call_id':data.get('parent_call_id'),'type':'mcp_description','server_id':server_id,
+                                       'tool_name':tool_name,'text':json.dumps(tool,ensure_ascii=False)})
+                    return self.respond(200,{'tools':bridge.tools,'server_id':bridge.server_id,'servers':bridge.server_ids})
                 if self.path in ('/audit','/ingest'):
                     if args.engine=='d2v2' and data.get('type')=='user_input' and data.get('agent_id','main')=='main':
                         with guard.lock:

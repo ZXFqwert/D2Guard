@@ -3,9 +3,14 @@ import argparse,ast,hashlib,json,re,shutil
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 def copytree(src,dst):shutil.copytree(src,dst,dirs_exist_ok=True,ignore=shutil.ignore_patterns('__pycache__','.cache','*.pyc','app.js'))
-def scan(folder):
- findings=[];secrets=[]
- for f in (ROOT/'.local').glob('*teacher*.env'):
+def blocklist(root=ROOT):
+ # Infrastructure identifiers stay in the ignored .local/ directory, one per line; none means an empty list.
+ f=root/'.local'/'delivery-blocklist.txt'
+ if not f.is_file():return []
+ return [l.strip() for l in f.read_text(encoding='utf-8').splitlines() if l.strip() and not l.lstrip().startswith('#')]
+def scan(folder,root=ROOT):
+ findings=[];secrets=[];blocked_terms=blocklist(root)
+ for f in (root/'.local').glob('*teacher*.env'):
   for l in f.read_text(encoding='utf-8').splitlines():
    if '=' in l and any(k in l.split('=',1)[0].upper() for k in ('KEY','TOKEN','SECRET')):
     v=l.split('=',1)[1].strip().strip('\"\'')
@@ -18,8 +23,8 @@ def scan(folder):
   counts['ip']+=len(re.findall(r'\b(?:\d{1,3}\.){3}\d{1,3}\b',text))
   if any(v in text for v in secrets) or re.search(r'\bsk-[A-Za-z0-9]{20,}',text):blocked.append(p.relative_to(folder).as_posix())
   # Infrastructure identifiers are forbidden, synthetic/local-service addresses are not secrets.
-  if any(v in text for v in ('175.6.27.158','10.33.0.30','li33_compute_roots','/home/roots/','li33.art')):blocked.append(p.relative_to(folder).as_posix())
- return {'passed':not blocked,'blocked_files':sorted(set(blocked)),'pattern_counts':counts,'known_secret_count':len(secrets),'note':'Generic API field names, Bearer construction and loopback/lab/test fixture addresses are code, not credentials; matching live keys or compute identifiers blocks export.'}
+  if any(v in text for v in blocked_terms):blocked.append(p.relative_to(folder).as_posix())
+ return {'passed':not blocked,'blocked_files':sorted(set(blocked)),'pattern_counts':counts,'known_secret_count':len(secrets),'blocklist_terms':len(blocked_terms),'note':'Generic API field names, Bearer construction and loopback/lab/test fixture addresses are code, not credentials; matching live keys or compute identifiers blocks export.'}
 def main():
  p=argparse.ArgumentParser();p.add_argument('--assets',required=True);p.add_argument('--destination',default=str(ROOT.parent/'交付件'));a=p.parse_args();dest=Path(a.destination).resolve();code=dest/'03-程序源码';code.mkdir(parents=True,exist_ok=True)
  for name in ('src','extensions','scenarios','training'):copytree(ROOT/name,code/name)
