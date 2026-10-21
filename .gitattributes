@@ -1,1 +1,32 @@
 * text=auto eol=lf
+
+# Preserve frozen runtime bytes: source-manifest hashes must survive Git checkout.
+console/server.py -text
+console/static/screen.js -text
+deploy/WINDOWS-使用说明.md -text
+stage_d2_cloud.py -text
+stage_d5_admit.py -text
+stage_d5_collect.py -text
+stage_d5_commands.py -text
+stage_d5_data.py -text
+stage_d5_dean_finalize.py -text
+stage_d5_offline.py -text
+stage_d5_probe.py -text
+stage_d5_protocol.py -text
+stage_d5_replace_quoted.py -text
+stage_d5_report.py -text
+stage_d5_resume_glm.py -text
+stage_d5_teacher.py -text
+stage_d5_verify.py -text
+stage_g_prime2_audit.py -text
+stage_g_prime2_regression.py -text
+stage_g_prime_audit.py -text
+stage_g_prime_regression.py -text
+stage_h_audit.py -text
+stage_h_report.py -text
+stage_h_run.py -text
+tests/test_stage_d5.py -text
+tests/test_stage_d5_dean.py -text
+tools/delivery-readme.md -text
+train_stage_d5.py -text
+training/schema-example.jsonl -text

@@ -1,0 +1,17 @@
+{
+  "python": {
+    "tests": 343,
+    "passed": true,
+    "seconds": 44.006
+  },
+  "console": {
+    "tests": 30,
+    "passed": true,
+    "seconds": 0.875
+  },
+  "npm": {
+    "tests": 3,
+    "passed": true
+  },
+  "formal_996_rerun": false
+}

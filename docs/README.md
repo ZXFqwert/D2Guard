@@ -1,6 +1,6 @@
 # 主线文档阅读顺序
 
-当前约束：`../AGENTS.md` → `整体设计文档.md` → `12-codex-execution-plan.md`。阶段 B 自检完成、等待评审；未开始阶段 C。
+当前入口：`../AGENTS.md` → [运行环境与算力机交接](39-runtime-and-compute-handoff.md) → [直接指标与多 MCP](38-multi-mcp-and-direct-metrics-20261021.md)。早期阶段报告按日期阅读，不能作为当前部署状态。
 
 | 文档 | 定位 |
 |---|---|
@@ -15,3 +15,7 @@
 | *.json | 对应历史批次的统计/核验摘要，原始数据在 ../runs/ |
 
 未迁移旧 JSON 摘要和历史文档，避免切断运行证据引用。请按日期和引擎标识区分 m1、d2core、d2v2；历史通过结果不能替代当前阶段验收。
+
+- [40 真正多轮拆分注入评测与审计](40-multiturn-final-20261021.md)
+
+- [41 最终功能交付验收记录](41-final-acceptance-20261021.md)

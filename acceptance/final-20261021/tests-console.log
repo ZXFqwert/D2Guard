@@ -1,0 +1,35 @@
+test_lane_shows_agent_result_before_evidence_review_ends (test_approval.AgentFinishedTests.test_lane_shows_agent_result_before_evidence_review_ends) ... ok
+test_reject_and_stop_is_forwarded (test_approval.AgentFinishedTests.test_reject_and_stop_is_forwarded) ... ok
+test_browser_cannot_substitute_tool_or_arguments (test_approval.ApprovalTests.test_browser_cannot_substitute_tool_or_arguments) ... ok
+test_host_denial_is_not_reported_as_success (test_approval.ApprovalTests.test_host_denial_is_not_reported_as_success) ... ok
+test_lanes_run_at_the_same_time (test_approval.ApprovalTests.test_lanes_run_at_the_same_time) ... ok
+test_stale_or_wrong_run_cannot_be_resolved (test_approval.ApprovalTests.test_stale_or_wrong_run_cannot_be_resolved) ... ok
+test_unreachable_channel_still_shows_the_waiting_call (test_approval.ApprovalTests.test_unreachable_channel_still_shows_the_waiting_call) ... ok
+test_attachment_cannot_close_its_quotation_boundary (test_chat.ChatTests.test_attachment_cannot_close_its_quotation_boundary) ... ok
+test_busy_session_does_not_accept_second_prompt (test_chat.ChatTests.test_busy_session_does_not_accept_second_prompt) ... ok
+test_evidence_finalization_does_not_block_a_new_session (test_chat.ChatTests.test_evidence_finalization_does_not_block_a_new_session) ... ok
+test_idle_followup_is_queued_once_in_original_channel (test_chat.ChatTests.test_idle_followup_is_queued_once_in_original_channel) ... ok
+test_transcript_never_returns_thinking (test_chat.ChatTests.test_transcript_never_returns_thinking) ... ok
+test_alignment_does_not_invent_low_risk_or_malice (test_console.ConsoleTests.test_alignment_does_not_invent_low_risk_or_malice) ... ok
+test_execution_requires_started_event (test_console.ConsoleTests.test_execution_requires_started_event) ... ok
+test_filter_modes_and_batches (test_console.ConsoleTests.test_filter_modes_and_batches) ... ok
+test_find_run_binds_subprocess_and_manifest (test_console.ConsoleTests.test_find_run_binds_subprocess_and_manifest) ... ok
+test_mask_both_synthetic_formats (test_console.ConsoleTests.test_mask_both_synthetic_formats) ... ok
+test_new_rule_ids_round_trip_without_relabeling (test_console.ConsoleTests.test_new_rule_ids_round_trip_without_relabeling) ... ok
+test_real_command_contract_and_job_binding (test_console.ConsoleTests.test_real_command_contract_and_job_binding) ... ok
+test_unchanged_incomplete_run_is_not_reparsed (test_console.ConsoleTests.test_unchanged_incomplete_run_is_not_reparsed) ... ok
+test_missing_written_memory_does_not_start_evaluation (test_memory_launch.MemoryLaunchTests.test_missing_written_memory_does_not_start_evaluation) ... ok
+test_real_writer_precedes_independent_arena_copies (test_memory_launch.MemoryLaunchTests.test_real_writer_precedes_independent_arena_copies) ... ok
+test_completed_transport_is_not_shown_as_generating (test_runtime_progress.RuntimeProgressTests.test_completed_transport_is_not_shown_as_generating) ... ok
+test_reasoning_content_never_enters_progress_response (test_runtime_progress.RuntimeProgressTests.test_reasoning_content_never_enters_progress_response) ... ok
+test_invalid_reasoning_capability_is_rejected (test_settings.SettingsTests.test_invalid_reasoning_capability_is_rejected) ... ok
+test_keys_are_never_returned (test_settings.SettingsTests.test_keys_are_never_returned) ... ok
+test_other_origins_cannot_use_the_api (test_settings.SettingsTests.test_other_origins_cannot_use_the_api) ... ok
+test_reasoning_capability_survives_model_edits_and_can_be_disabled (test_settings.SettingsTests.test_reasoning_capability_survives_model_edits_and_can_be_disabled) ... ok
+test_separate_review_model_reuses_key_on_same_service (test_settings.SettingsTests.test_separate_review_model_reuses_key_on_same_service) ... ok
+test_stored_key_only_goes_to_its_own_address (test_settings.SettingsTests.test_stored_key_only_goes_to_its_own_address) ... ok
+
+----------------------------------------------------------------------
+Ran 30 tests in 0.875s
+
+OK

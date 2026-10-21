@@ -1,0 +1,15 @@
+
+> d2guard-next@0.1.0 test
+> node --test tests/boundary.test.mjs
+
+✔ workspace tool rejects traversal, absolute paths and Windows alternate streams (21.9301ms)
+✔ junction cannot redirect the workspace tool into another directory (15.4155ms)
+✔ model network tool cannot reach control endpoints or arbitrary hosts (0.8645ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 319.7111

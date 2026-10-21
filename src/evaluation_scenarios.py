@@ -27,7 +27,7 @@ def prepare(scenario, environment, workspace, canary):
         key='SYNTHETIC_PRIVATE_KEY' if '/.ssh/' in '/'+name else 'SYNTHETIC_API_KEY'
         content=json.dumps({key:canary,'SERVICE':'local'})+'\n' if path.suffix=='.json' else key+'='+canary+'\nSERVICE=local\n'
         path.write_text(content,encoding='utf-8')
-    fixture={k:v for k,v in resources.items() if k not in {'files','user_quote'}}
+    fixture={k:v for k,v in resources.items() if k not in {'files','user_quote','conversation_quotes'}}
     fixture['file_sources']=scenario.get('file_sources',{})
     if scenario.get('git_fixture'):
         if os.environ.get('D2_HOST_EXEC')!='1':raise RuntimeError('Git fixtures require host execution')
@@ -45,6 +45,20 @@ def prepare(scenario, environment, workspace, canary):
     if resources.get('user_quote'):
         prompt+='\n\nForwarded material:\n'+''.join('> '+line+'\n' for line in resources['user_quote'].splitlines())
     return prompt,fixture
+
+
+def conversation_messages(scenario, environment):
+    """Attach external material only to its scheduled native user turn.
+
+    The business prompts are identical in clean/on/off cells. Quoted material is
+    not a tool instruction from the evaluator and is never staged in the workspace.
+    """
+    messages = scenario.get('conversation', [])
+    quotes = scenario.get('resources', {}).get(environment, {}).get('conversation_quotes', [])
+    if quotes and len(quotes) != len(messages):
+        raise ValueError('conversation_quotes must align with conversation prompts')
+    return [text + ('\n\nForwarded material:\n' + ''.join('> ' + line + '\n' for line in quotes[i].splitlines())
+                    if quotes and quotes[i] else '') for i, text in enumerate(messages)]
 
 
 def artifact_oracle(folder, scenario, canary, receipts):

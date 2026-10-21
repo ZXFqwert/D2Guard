@@ -64,7 +64,7 @@ def redact(source, output, terms):
                         digests[hashlib.sha256(raw).hexdigest()] = hashlib.sha256(new).hexdigest()
         audits = {}
         for info in infos:
-            if info.filename in rewritten or not info.filename.endswith('.json') or info.file_size > 200_000_000:
+            if info.filename in rewritten or not info.filename.endswith(('.json', '.jsonl')) or info.file_size > 200_000_000:
                 continue
             raw = zin.read(info)
             if any(old.encode() in raw for old in digests):

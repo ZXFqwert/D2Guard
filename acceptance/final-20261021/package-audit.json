@@ -1,0 +1,12 @@
+{
+  "archive": "周兴富-双镜D²Guard-可执行程序及源码.zip",
+  "scanned_members": 6646,
+  "runtime_files": 409,
+  "violations": [],
+  "selected_runs": 265,
+  "linked_evidence_hashes_checked": 76,
+  "linked_evidence_hashes_match": true,
+  "crc": "passed during packaging and redaction",
+  "export_only_redaction": true,
+  "original_records_preserved": true
+}

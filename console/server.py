@@ -1090,7 +1090,7 @@ def make_handler(console):
                         return self.send_json(200, console.pairs(parts[2]))
                     if parts == ['api', 'summary']:
                         s = console.summary()
-                        return self.send_json(200, s) if s else self.send_json(404, {'error': '未找到正式评测汇总 console/data/evaluation-summary.json'})
+                        return self.send_json(200, s) if s else self.send_json(404, {'error': '未找到竞赛评测汇总 console/data/evaluation-summary.json'})
                     if parts[:2] == ['api', 'replay'] and len(parts) == 3:
                         r = console.replay(parts[2])
                         return self.send_json(200, r) if r else self.send_json(404, {'error': '未找到运行'})

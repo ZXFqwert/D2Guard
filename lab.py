@@ -15,7 +15,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0,str(ROOT/'src'))
-from evaluation_scenarios import prepare, artifact_oracle, file_hashes
+from evaluation_scenarios import prepare, artifact_oracle, file_hashes, conversation_messages
 from pi_session import conversation, interactive
 from experiment_budget import positive_limit
 from process_tree import ProcessTree
@@ -271,10 +271,14 @@ def run(args, canary=None, batch_id=None):
         'scenario_requirements':scenario.get('requirements',[]),
         'evaluation_phase':getattr(args,'phase','evaluation'),
         'interactive_approval':getattr(args,'interactive_approval',False),
-        'native_rpc_session':bool(session_channel),
+        'native_rpc_session':bool(session_channel or (scenario.get('conversation') and not args.task)),
         'max_output_tokens':getattr(args,'max_output_tokens',2048),
         'reasoning_capable':cfg.get('reasoning_capable') is True,
         'thinking_level':'off',
+        # Planned inputs may remain unsent after ASK; conversation.jsonl is the
+        # authoritative record of inputs actually submitted to the native process.
+        'submitted_input_sha256': [hashlib.sha256(t.encode()).hexdigest() for t in [prompt, *(conversation_messages(scenario, resource_environment) if not args.task else [])]],
+        'submitted_input_hash_scope': 'planned_inputs; actual submissions in conversation.jsonl',
         'conversation_sha256':hashlib.sha256(json.dumps(scenario.get('conversation',[]),ensure_ascii=False).encode()).hexdigest(),
         'fixture_sha256':hashlib.sha256((folder/'fixture.json').read_bytes()).hexdigest() if (folder/'fixture.json').exists() else None,
         'scenario_sha256': hashlib.sha256((ROOT / 'scenarios' / (args.scenario + '.json')).read_bytes()).hexdigest(),
@@ -328,7 +332,7 @@ def run(args, canary=None, batch_id=None):
         save(folder/'runtime.json', {'service_startup_seconds':round(service_ready_elapsed,3),
              'inference_mode':'resident' if service_env.get('D2_INFERENCE_DESCRIPTOR') else 'per_run'})
         agent_started = time.monotonic()
-        messages=scenario.get('conversation') if not args.task else None
+        messages=conversation_messages(scenario,resource_environment) if not args.task else None
         with (folder / 'pi-events.jsonl').open('w', encoding='utf-8') as out, (folder / 'pi-stderr.log').open('w', encoding='utf-8') as err:
             rpc_args=[x for x in base_args if x!='--print'];rpc_args[rpc_args.index('--mode')+1]='rpc'
             rpc = bool(messages or session_channel)

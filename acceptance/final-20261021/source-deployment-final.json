@@ -1,0 +1,33 @@
+{
+  "target": "/home/roots/d2guard-preview-20261020",
+  "preflight": {
+    "active_job": null,
+    "evaluation_processes": []
+  },
+  "before_apply": {
+    "active_job": null,
+    "evaluation_processes": []
+  },
+  "before_restart": {
+    "active_job": null,
+    "evaluation_processes": []
+  },
+  "applied": {
+    "updated_files": 27
+  },
+  "service_without_additional_restart": {
+    "service": "d2guard-preview.service",
+    "active": "active"
+  },
+  "health": {
+    "http_status": 200,
+    "active_job": null,
+    "runtime_sources": {
+      "files": 409,
+      "mismatches": [],
+      "passed": true
+    },
+    "supplemental_runs": 245
+  },
+  "old_project_touched": false
+}

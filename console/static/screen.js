@@ -1,5 +1,5 @@
 'use strict';
-// 攻防大屏：正式评测指标、运行时防御链路、“同一攻击 · 两种结局”证据回放、安全链 vs 原始上下文、攻击家族与三臂消融。
+// 攻防大屏：竞赛评测指标、运行时防御链路、“同一攻击 · 两种结局”证据回放、安全链 vs 原始上下文、攻击家族与三臂消融。
 // 页面不写死任何结果数字：指标来自 /api/summary（console/data/evaluation-summary.json），
 // 回放与曲线来自 /api/replay、/api/compaction 对 runs/ 运行证据的只读投影。
 
@@ -35,12 +35,12 @@ PAGES.screen = async (el, args) => {
   <div class="scr" id="scr">
     <canvas class="scr-bg" id="scr-bg"></canvas>
     ${scrHeader(summary, mode, full)}
-    ${summary ? kpiRibbon(summary) : `<div class="scr-note">未找到正式评测汇总 <span class="mono">console/data/evaluation-summary.json</span>：已隐藏评测指标、攻击家族与消融板块。下方回放与曲线仍直接读取运行证据。</div>`}
+    ${summary ? kpiRibbon(summary) : `<div class="scr-note">未找到竞赛评测汇总 <span class="mono">console/data/evaluation-summary.json</span>：已隐藏评测指标、攻击家族与消融板块。下方回放与曲线仍直接读取运行证据。</div>`}
     ${pipelinePanel(summary)}
     ${duelPanel(pairs)}
     ${cmpPanel(comp.runs || [], summary)}
     ${summary ? `<div class="scr-grid2">${famPanel(summary)}${ablPanel(summary, mode)}</div>` : ''}
-    <div class="sp-src" style="text-align:center;margin-top:4px">指标取自正式评测汇总 evaluation-summary.json；回放、曲线取自 runs/ 运行证据，只读投影，不重算、不改写任何裁决；合成凭据已脱敏。</div>
+    <div class="sp-src" style="text-align:center;margin-top:4px">指标取自竞赛评测汇总 evaluation-summary.json；回放、曲线取自 runs/ 运行证据，只读投影，不重算、不改写任何裁决；合成凭据已脱敏。</div>
   </div>`;
   startBackdrop();
   startClock();
@@ -64,7 +64,7 @@ function toggleFull() {
 
 // ---------------- header, clock, backdrop ----------------
 function scrHeader(s, mode, full) {
-  const batch = s ? `正式评测（2026-10，83 个场景）· ${esc(s.cells)} 格` : '正式评测汇总缺失';
+  const batch = s ? `竞赛评测（2026-10，83 个场景）· ${esc(s.cells)} 格` : '竞赛评测汇总缺失';
   return `
   <header class="scr-head">
     <div class="scr-brand">
@@ -171,7 +171,7 @@ function kpiRibbon(s) {
   const off = r1(rate(s.off_asr)), on = r1(rate(s.on_asr));
   const doneOff = r1(rate(s.clean_off_done)), doneOn = r1(rate(s.clean_on_done));
   const benign = s.benign_hold, local = s.local_path, L = s.latency_ms || {};
-  const src = esc(`正式评测 ${s.cells} 格`);
+  const src = esc(`竞赛评测 ${s.cells} 格`);
   const tile = (style, body, srcTxt = src) => `<div class="kt" style="${style}">${body}<div class="kt-src">${srcTxt}</div></div>`;
   const tiles = [];
   if (off != null && on != null) tiles.push(tile('--kc:#ff4d61;--kg:rgba(255,77,97,.2)', `
@@ -687,7 +687,7 @@ function cmpSide(d) {
       <span>裁决快照峰值</span><b>${kb(d.decision_state_max_bytes)}</b>
       ${d.chain_state_max_bytes != null ? `<span>安全链状态峰值</span><b>${kb(d.chain_state_max_bytes)}</b>` : ''}
       <span>内核裁决</span><b>${d.decisions.length} 次</b></div>
-    ${ev ? `<div class="cp-list"><span class="h">正式评测 · ${esc(ev.runs)} 轮样本</span>
+    ${ev ? `<div class="cp-list"><span class="h">竞赛评测 · ${esc(ev.runs)} 轮样本</span>
       <span>中位压缩比</span><b>×${Number(ev.median).toFixed(1)}</b>
       <span>最大压缩比</span><b>×${Number(ev.max).toFixed(1)}</b></div>` : ''}`;
 }
@@ -700,7 +700,7 @@ function famPanel(s) {
   return `
   <section class="sp">
     <div class="sp-h"><div><div class="sp-t">攻击家族 · 防护前后 <small>${fams.length} 类</small></div>
-      <div class="sp-d">各家族攻击成功率：防护关闭（红）vs 开启（青），分母为模型有效且可判分的攻击运行。</div></div><div class="sp-src">正式评测 ${esc(s.cells)} 格</div></div>
+      <div class="sp-d">各家族攻击成功率：防护关闭（红）vs 开启（青），分母为模型有效且可判分的攻击运行。</div></div><div class="sp-src">竞赛评测 ${esc(s.cells)} 格</div></div>
     <div class="fam">
       <div class="fam-head"><span>攻击家族</span><span>攻击成功率</span><span style="text-align:right">发起攻击</span></div>
       ${fams.map((f) => `<div class="fam-row">
@@ -740,7 +740,7 @@ function ablPanel(s, mode) {
   return `
   <section class="sp">
     <div class="sp-h"><div><div class="sp-t">三臂消融 <small>快镜的价值</small></div>
-      <div class="sp-d">${champions.length === 1 ? `只有 ${esc(champions[0].arm)} 臂在攻击成功、拦截、正常完成三项上同时最优。` : '三种污染判定口径的对照。'}</div></div><div class="sp-src">正式评测</div></div>
+      <div class="sp-d">${champions.length === 1 ? `只有 ${esc(champions[0].arm)} 臂在攻击成功、拦截、正常完成三项上同时最优。` : '三种污染判定口径的对照。'}</div></div><div class="sp-src">竞赛评测</div></div>
     <div class="ab">${arms.map((a) => { const [tc, tt] = tag(a); return `<div class="ab-arm ${champions.includes(a) ? 'best' : ''}">
       <div class="ab-k"><b>${esc(a.arm)}</b><span>${esc(a.label)}</span></div>
       <div class="ab-m">${metric(a, 'atk', '攻击成功', 'linear-gradient(90deg,#9f1239,#ff4d61)')}${metric(a, 'icp', '拦截', 'linear-gradient(90deg,#0e7490,#22d3ee)')}${metric(a, 'ok', '正常完成', 'linear-gradient(90deg,#047857,#34d399)')}</div>
