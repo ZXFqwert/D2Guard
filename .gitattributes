@@ -1,32 +1,32 @@
 * text=auto eol=lf
 
 # Preserve frozen runtime bytes: source-manifest hashes must survive Git checkout.
-console/server.py -text
-console/static/screen.js -text
-deploy/WINDOWS-使用说明.md -text
-stage_d2_cloud.py -text
-stage_d5_admit.py -text
-stage_d5_collect.py -text
-stage_d5_commands.py -text
-stage_d5_data.py -text
-stage_d5_dean_finalize.py -text
-stage_d5_offline.py -text
-stage_d5_probe.py -text
-stage_d5_protocol.py -text
-stage_d5_replace_quoted.py -text
-stage_d5_report.py -text
-stage_d5_resume_glm.py -text
-stage_d5_teacher.py -text
-stage_d5_verify.py -text
-stage_g_prime2_audit.py -text
-stage_g_prime2_regression.py -text
-stage_g_prime_audit.py -text
-stage_g_prime_regression.py -text
-stage_h_audit.py -text
-stage_h_report.py -text
-stage_h_run.py -text
-tests/test_stage_d5.py -text
-tests/test_stage_d5_dean.py -text
-tools/delivery-readme.md -text
-train_stage_d5.py -text
-training/schema-example.jsonl -text
+console/server.py -text whitespace=cr-at-eol
+console/static/screen.js -text whitespace=cr-at-eol
+deploy/WINDOWS-使用说明.md -text whitespace=cr-at-eol
+stage_d2_cloud.py -text whitespace=cr-at-eol
+stage_d5_admit.py -text whitespace=cr-at-eol
+stage_d5_collect.py -text whitespace=cr-at-eol
+stage_d5_commands.py -text whitespace=cr-at-eol
+stage_d5_data.py -text whitespace=cr-at-eol
+stage_d5_dean_finalize.py -text whitespace=cr-at-eol
+stage_d5_offline.py -text whitespace=cr-at-eol
+stage_d5_probe.py -text whitespace=cr-at-eol
+stage_d5_protocol.py -text whitespace=cr-at-eol
+stage_d5_replace_quoted.py -text whitespace=cr-at-eol
+stage_d5_report.py -text whitespace=cr-at-eol
+stage_d5_resume_glm.py -text whitespace=cr-at-eol
+stage_d5_teacher.py -text whitespace=cr-at-eol
+stage_d5_verify.py -text whitespace=cr-at-eol
+stage_g_prime2_audit.py -text whitespace=cr-at-eol
+stage_g_prime2_regression.py -text whitespace=cr-at-eol
+stage_g_prime_audit.py -text whitespace=cr-at-eol
+stage_g_prime_regression.py -text whitespace=cr-at-eol
+stage_h_audit.py -text whitespace=cr-at-eol
+stage_h_report.py -text whitespace=cr-at-eol
+stage_h_run.py -text whitespace=cr-at-eol
+tests/test_stage_d5.py -text whitespace=cr-at-eol
+tests/test_stage_d5_dean.py -text whitespace=cr-at-eol
+tools/delivery-readme.md -text whitespace=cr-at-eol
+train_stage_d5.py -text whitespace=cr-at-eol
+training/schema-example.jsonl -text whitespace=cr-at-eol

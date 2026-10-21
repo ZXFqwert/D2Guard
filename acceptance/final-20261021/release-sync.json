@@ -1,0 +1,42 @@
+{
+  "delivery_commit": "26967bfd28fc63d2457ffbeeb8266ad99a88cec4",
+  "branch": "delivery-t0-t4",
+  "transport": "GitHub Git objects API; exact original commits; force=false",
+  "release_id": 418291210,
+  "tag": "delivery-20261020",
+  "draft": true,
+  "url": "https://github.com/ZXFqwert/D2Guard/releases",
+  "assets": [
+    {
+      "name": "D2Guard-Deployment.docx",
+      "bytes": 239415,
+      "digest": "sha256:1b4f372ff8f23d7d114a3d2feccc9bd86da4d9dd2dc7e2907176e939a4395f43",
+      "state": "uploaded"
+    },
+    {
+      "name": "D2Guard-Source-and-Weights.zip",
+      "bytes": 1402941097,
+      "digest": "sha256:5a872486818a0fd802de03659e48d8dd04672a29c1c9181cdb7f6eed4968d63a",
+      "state": "uploaded"
+    },
+    {
+      "name": "D2Guard-Test.docx",
+      "bytes": 906308,
+      "digest": "sha256:4ccd7a436c0bcbf6f53d629e33f6cc249dbf38b3b9af417daa5596fad9f7e0fc",
+      "state": "uploaded"
+    },
+    {
+      "name": "manifest.json",
+      "bytes": 877,
+      "digest": "sha256:7a23cfb1e170548b8edf297c5f8b8f934f0dbab26716da638744a7a822b7451a",
+      "state": "uploaded"
+    },
+    {
+      "name": "D2Guard-Design.docx",
+      "bytes": 2648816,
+      "digest": "sha256:752e7f3377f9a8a9c06cb89a0a9ebfe730bc89d11ef1cec190a3f47a4353ad02",
+      "state": "uploaded"
+    }
+  ],
+  "checks": "Local asset sizes and SHA-256 match all five remote draft assets. Receipt commit follows delivery_commit."
+}
