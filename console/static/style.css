@@ -83,7 +83,7 @@ a { color: var(--blue-ink); text-decoration: none; }
 .brand { display: flex; gap: 12px; align-items: center; padding: 22px 20px 18px; border-bottom: 1px solid var(--nav-line); }
 .brand b { display: block; color: #fff; font-size: 18px; letter-spacing: .5px; }
 .brand small { font-size: 12px; opacity: .8; }
-.logo { width: 42px; height: 42px; border-radius: 11px; background: linear-gradient(135deg, #22d3ee, #2563eb 60%, #1e3a8a); color: #fff; display: grid; place-items: center; font-weight: 800; font-size: 17px; box-shadow: 0 0 0 1px rgba(255, 255, 255, .15) inset, 0 6px 18px rgba(34, 211, 238, .35); }
+.logo { width: 44px; height: 44px; flex: none; filter: drop-shadow(0 4px 12px rgba(34, 211, 238, .35)); }
 #nav { padding: 10px 12px; flex: 1; overflow: auto; }
 .nav-group { font-size: 12px; letter-spacing: 2px; color: var(--nav-group); margin: 16px 10px 6px; }
 #nav a { position: relative; display: flex; align-items: center; gap: 12px; color: var(--nav-ink); padding: 11px 14px; border-radius: 10px; font-size: 15.5px; margin-bottom: 2px; transition: background .15s, color .15s; }

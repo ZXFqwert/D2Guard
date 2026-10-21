@@ -25,7 +25,7 @@ PAGES.overview = async (el) => {
     <section class="card arena-ctl">
       <a class="btn" href="#/chat">自己输入任务 / 连续对话 →</a>
       ${['batch_id','decision_mode'].map(k => `<label>${k==='batch_id'?'批次':'决策模式'}<select data-overview-filter="${k}"><option value="">全部历史</option>${d.filters[k].map(v=>`<option value="${esc(v)}" ${overviewFilters[k]===v?'selected':''}>${esc(v)}</option>`).join('')}</select></label>`).join('')}
-      <span class="muted small">历史描述性统计；攻击成功率排除正常场景及未判定结果，最终指标以正式配对评测为准。可按批次与决策模式（add_risk / rules_gate / taint_gate）分开查看。</span>
+      <span class="muted small">历史描述性统计；攻击成功率排除正常场景及未判定结果，最终指标以主体评测的配对结果为准。可按批次与决策模式（add_risk / rules_gate / taint_gate）分开查看。</span>
     </section>
     <section class="hero">
       <div>
@@ -43,12 +43,12 @@ PAGES.overview = async (el) => {
     <section class="kpi-grid">
       ${kpiCard('攻击成功率 · 防护关闭', fmtPct(k.off_rate), `${k.off_success} / ${k.off_attack} 轮攻击环境运行`, 'off')}
       ${kpiCard('攻击成功率 · 防护开启', fmtPct(k.on_rate), `${k.on_success} / ${k.on_attack} 轮攻击环境运行`, 'on')}
-      ${kpiCard('攻击未成功比例', fmtPct(k.intercept_rate), '描述性比例；未触发、报错与真实拦截应在正式评测中分开', 'good')}
-      ${kpiCard('防护关闭时的应拦截覆盖', fmtPct(k.would_stop_rate), `成功的 ${k.off_success} 次攻击中 ${k.would_stop} 次本会被挂起或阻断`, 'warn')}
-      ${kpiCard('正常任务完成率 · 防护开启', fmtPct(k.clean_done_on_rate), `防护关闭时 ${fmtPct(k.clean_done_off_rate)}；干净环境 ${k.clean_on} 轮`, 'good')}
-      ${kpiCard('正常任务打扰率', fmtPct(k.clean_fp_rate), `干净环境中出现挂起或阻断 ${k.clean_fp} / ${k.clean_on} 轮`, 'warn')}
+      ${kpiCard('正常任务完成率 · 防护关闭', fmtPct(k.clean_done_off_rate), `干净环境运行，作为可用性基线`, 'off')}
+      ${kpiCard('正常任务完成率 · 防护开启', fmtPct(k.clean_done_on_rate), `干净环境 ${k.clean_on} 轮`, 'good')}
+      ${kpiCard('正常任务挂起率', fmtPct(k.clean_fp_rate), `干净环境中出现挂起或阻断 ${k.clean_fp} / ${k.clean_on} 轮`, 'warn')}
       ${kpiCard('平均裁决耗时', k.avg_latency_ms != null ? k.avg_latency_ms + ' ms' : '—', '防护开启时每次工具调用的本地裁决耗时', 'on')}
       ${kpiCard('挂起或阻断的运行', k.held_runs, '防护开启且出现 ASK/BLOCK 的轮次', 'warn')}
+      ${kpiCard('攻击环境运行', k.off_attack + k.on_attack, `防护关闭 ${k.off_attack} 轮 · 防护开启 ${k.on_attack} 轮`, 'on')}
     </section>
 
     <section class="grid-2-1">
@@ -356,7 +356,7 @@ function laneApprovals(runId, calls) {
 }
 
 function renderLane(box, protect, t, step) {
-  const head = protect === 'off' ? ['裸奔 Agent', '防护关闭 · 只记录本应作出的裁决'] : ['D²Guard 护航', '防护开启 · 每次工具调用先裁决再执行'];
+  const head = protect === 'off' ? ['无防护 Agent', '防护关闭 · 只记录本应作出的裁决'] : ['D²Guard 护航', '防护开启 · 每次工具调用先裁决再执行'];
   if (!t) {
     const msg = step?.preparing_memory ? '前置 Agent 正在写入跨会话记忆，完成后两路同时开始…' : step?.status === 'failed' ? '运行失败，请查看下方日志。' : step ? (step.status === 'queued' ? '等待启动…' : '正在启动真实 Agent（加载快镜模型约 10–20 秒）…') : '尚未测试此场景。点击上方“开始双路对决”，即可启动两路真实 Agent。';
     setHTML(box, `<div class="lane-h"><b>${head[0]}</b><small>${head[1]}</small></div><div class="lane-empty">${msg}</div>`);

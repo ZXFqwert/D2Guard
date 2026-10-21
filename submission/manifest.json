@@ -1,26 +1,26 @@
 [
   {
     "file": "周兴富-双镜D²Guard-可执行程序及源码.zip",
-    "bytes": 1402941097,
-    "sha256": "5a872486818a0fd802de03659e48d8dd04672a29c1c9181cdb7f6eed4968d63a",
+    "bytes": 1403036922,
+    "sha256": "98b42d0d6cebbb57d877d28544b7e05d9152d214d6b114f13c976ee72310311c",
     "included_in_git": false
   },
   {
     "file": "周兴富-双镜D²Guard-整体设计文档.docx",
-    "bytes": 2648816,
-    "sha256": "752e7f3377f9a8a9c06cb89a0a9ebfe730bc89d11ef1cec190a3f47a4353ad02",
+    "bytes": 2712194,
+    "sha256": "2dc36efd1f691c343ffb7c6b247011322fae3c11e0c74fc9fded051785134870",
     "included_in_git": true
   },
   {
     "file": "周兴富-双镜D²Guard-测试样例及测试流程说明文档.docx",
-    "bytes": 906308,
-    "sha256": "4ccd7a436c0bcbf6f53d629e33f6cc249dbf38b3b9af417daa5596fad9f7e0fc",
+    "bytes": 969239,
+    "sha256": "bf3bc73ddb1011c7026b53d7b003612775752d6feb076bb34c469ae187c730da",
     "included_in_git": true
   },
   {
     "file": "周兴富-双镜D²Guard-部署说明文档.docx",
-    "bytes": 239415,
-    "sha256": "1b4f372ff8f23d7d114a3d2feccc9bd86da4d9dd2dc7e2907176e939a4395f43",
+    "bytes": 302138,
+    "sha256": "b7ff79871a36adb2b4cf346a5d2c51e58260457b0dc5ec5931bd2bf3004785a2",
     "included_in_git": true
   }
 ]
