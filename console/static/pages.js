@@ -25,7 +25,7 @@ PAGES.overview = async (el) => {
     <section class="card arena-ctl">
       <a class="btn" href="#/chat">自己输入任务 / 连续对话 →</a>
       ${['batch_id','decision_mode'].map(k => `<label>${k==='batch_id'?'批次':'决策模式'}<select data-overview-filter="${k}"><option value="">全部历史</option>${d.filters[k].map(v=>`<option value="${esc(v)}" ${overviewFilters[k]===v?'selected':''}>${esc(v)}</option>`).join('')}</select></label>`).join('')}
-      <span class="muted small">历史描述性统计；攻击成功率排除正常场景及未判定结果，最终指标以主体评测的配对结果为准。可按批次与决策模式（add_risk / rules_gate / taint_gate）分开查看。</span>
+      <span class="muted small">历史描述性统计；攻击成功率排除正常场景及未判定结果，最终指标以评测汇总的配对结果为准。可按批次与决策模式（add_risk / rules_gate / taint_gate）分开查看。</span>
     </section>
     <section class="hero">
       <div>
@@ -136,7 +136,7 @@ PAGES.scenarios = async (el) => {
     const shown = rows.slice(sstate.page * PAGE_SIZE, (sstate.page + 1) * PAGE_SIZE);
     $('#s-table').innerHTML = `<div class="muted small">共 ${rows.length} 个场景</div>
       <table class="tbl click">
-        <tr><th>场景</th><th>类别</th><th>攻击类型</th><th>载荷来源</th><th>用户任务</th><th>历史结果（攻击环境）</th><th>来源</th><th>操作</th></tr>
+        <tr><th>场景</th><th>类别</th><th>攻击类型</th><th>载荷来源</th><th>用户任务</th><th>本机运行结果（攻击环境）</th><th>来源</th><th>操作</th></tr>
         ${shown.map((s) => {
           const st = s.stats || {};
           const off = st.attack_off ? `${badge(`关 ${st.attack_off_success || 0}/${st.attack_off} 成功`, (st.attack_off_success ? 'block' : 'gray'))}` : '';
@@ -144,7 +144,7 @@ PAGES.scenarios = async (el) => {
           return `<tr data-id="${esc(s.id)}"><td class="mono strong">${esc(s.id)}</td>
             <td>${badge(CAT_ZH[s.category] || '旧版', s.category === 'attack' ? 'attack' : s.category === 'normal' ? 'allow' : 'gray')}</td>
             <td class="nowrap">${esc(s.family_label || '')}</td><td class="mono small">${esc(s.attack_source || '')}</td>
-            <td class="task-cell" title="${esc(s.task)}">${esc((s.task || '').length > 90 ? s.task.slice(0, 88) + '…' : s.task)}</td><td>${off} ${on}${!off && !on ? '<span class="muted">暂无</span>' : ''}</td>
+            <td class="task-cell" title="${esc(s.task)}">${esc((s.task || '').length > 90 ? s.task.slice(0, 88) + '…' : s.task)}</td><td>${off} ${on}${!off && !on ? '<span class="muted">—</span>' : ''}</td>
             <td>${s.origin === 'console' ? badge('自定义', 'blue') : badge('官方', 'gray')}</td>
             <td class="ops"><button class="btn sm" data-act="arena">对决</button><button class="btn sm" data-act="escort">护航</button></td></tr>`;
         }).join('')}
@@ -264,23 +264,27 @@ function scenarioImport() {
 // ======================= 防御策略 =======================
 PAGES.policies = async (el) => {
   const p = await api('/api/policies');
-  const dt = Object.entries(p.hits).filter(([k]) => k.startsWith('DT-')).sort((a, b) => a[0].localeCompare(b[0], 'en', { numeric: true }));
-  const other = Object.entries(p.hits).filter(([k]) => !k.startsWith('DT-') && !p.dsl.some((x) => x.id === k));
+  const MODE_ZH = { taint_gate: '规则与快镜共同判定请求污染', add_risk: '快镜结果仅用于提升风险', rules_gate: '仅由规则判定请求污染', rules_only: '快镜已关闭，仅使用规则' };
+  const polHits = p.dsl.reduce((n, x) => n + (p.hits[x.id] || 0), 0);
+  const listed = new Set([...p.table.map((t) => t.id), ...p.dsl.map((x) => x.id)]);
+  const other = Object.entries(p.hits).filter(([k, n]) => n && !listed.has(k));
+  const vdist = (k) => ['ALLOW', 'ASK', 'BLOCK'].filter((v) => (p.verdicts[k] || {})[v]).map((v) => badge(`${VERDICT_ZH[v]} ${p.verdicts[k][v]}`, VERDICT_CLASS[v])).join(' ');
+  const vtag = (s) => s.split('／').map((v) => badge(VERDICT_ZH[v] || v, VERDICT_CLASS[v])).join(' ');
   el.innerHTML = `
-    <section class="card intro"><b>新运行默认配置：${esc(p.runtime_mode || 'unknown')}</b>（实际采用模式以各轮溯源记录为准）。<br>工具调用级的语义策略 DSL：每条策略按工具与语义条件匹配，运行时评估风险等级，映射为 <b class="c-good">放行</b> / <b class="c-warn">询问用户</b> / <b class="c-off">强制阻断</b>。策略之后由决策表综合用户授权、上下文污染（规则＋快镜 S1）与机密状态作出三态裁决。</section>
+    <section class="card intro"><b>当前决策模式：${esc(p.runtime_mode)}</b>（${esc(MODE_ZH[p.runtime_mode] || '以各轮溯源记录为准')}）。<br>工具调用级的语义策略 DSL：每条策略按工具与语义条件匹配，运行时评估风险等级，映射为 <b class="c-good">放行</b> / <b class="c-warn">询问用户</b> / <b class="c-off">强制阻断</b>。策略之后由决策表综合用户授权、上下文污染（规则＋快镜 S1）与机密状态作出三态裁决。</section>
     <section class="policy-grid">
       ${p.dsl.map((x) => `<div class="card policy">
-        <div class="policy-h"><span class="mono strong">${esc(x.id)}</span><span class="hits">${p.hits[x.id] || 0}<small>次命中</small></span></div>
+        <div class="policy-h"><span class="mono strong">${esc(x.id)}</span>${p.hits[x.id] ? `<span class="hits">${p.hits[x.id]}<small>次命中</small></span>` : ''}</div>
         <div class="policy-e">${esc(x.explain)}</div>
         <div class="meta">${x.tools.split(',').map((t) => badge(t.trim(), 'blue')).join(' ')} ${x.verdict.split(',').map((v) => { const [r, vv] = v.split(':').map((s) => s.trim()); return badge(`${r} → ${VERDICT_ZH[vv] || vv}`, VERDICT_CLASS[vv]); }).join(' ')}</div>
         <details><summary>策略原文</summary><pre class="code">${esc(x.source)}</pre></details></div>`).join('')}
     </section>
     <section class="card">
-      <div class="card-h"><h3>决策表规则命中（防护开启）</h3><span class="muted">规则号与理由取自真实裁决记录</span></div>
-      <table class="tbl"><tr><th>规则</th><th>命中次数</th><th>裁决分布</th><th>理由（首次记录）</th></tr>
-        ${[...dt, ...other].map(([k, n]) => `<tr><td class="mono strong">${esc(k)}</td><td>${n}</td>
-          <td>${['ALLOW', 'ASK', 'BLOCK'].filter((v) => (p.verdicts[k] || {})[v]).map((v) => badge(`${VERDICT_ZH[v]} ${p.verdicts[k][v]}`, VERDICT_CLASS[v])).join(' ')}</td>
-          <td class="reason">${esc(p.reasons[k] || '')}</td></tr>`).join('')}
+      <div class="card-h"><h3>决策表（按顺序取第一条命中）</h3><span class="muted">命中次数统计本机防护开启的运行记录</span></div>
+      <table class="tbl"><tr><th>编号</th><th>条件</th><th>裁决</th><th>本机命中</th><th>裁决分布</th></tr>
+        ${p.table.map((t) => { const n = t.id === 'POL-*' ? polHits : (p.hits[t.id] || 0); return `<tr><td class="mono strong" title="${esc(t.id)}">${esc(t.no)}</td><td class="reason">${esc(t.cond)}</td>
+          <td class="nowrap">${vtag(t.verdict)}</td><td>${n || '—'}</td><td>${t.id === 'POL-*' ? '' : vdist(t.id)}</td></tr>`; }).join('')}
+        ${other.map(([k, n]) => `<tr><td class="mono strong">${esc(k)}</td><td class="reason">${esc(p.reasons[k] || '')}</td><td></td><td>${n}</td><td>${vdist(k)}</td></tr>`).join('')}
       </table>
     </section>`;
 };

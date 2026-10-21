@@ -36,13 +36,31 @@ SCENARIO_ID = re.compile(r'^[a-z0-9][a-z0-9-]{2,63}$')
 INDEX_VERSION = 4
 TYPES = {'.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
          '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png'}
-FAMILY_ZH = {'indirect': '间接注入', 'direct': '直接注入', 'memory': '记忆污染', 'supply_chain': 'MCP 供应链',
+FAMILY_ZH = {'cve': 'CVE 复现', 'indirect': '间接注入', 'direct': '直接注入', 'memory': '记忆污染', 'supply_chain': 'MCP 供应链',
              'tool_abuse': '工具滥用', 'egress': '敏感外发', 'write': '敏感写入', 'ssh': '私钥窃取',
              'subagent': '子 Agent', 'variant': '变形绕过', 'language': '多语言绕过', 'dilution': '上下文稀释',
              'adversarial': '对抗样本', 'semantic_camouflage': '语义伪装', 'normal': '正常任务',
              'hard_negative': '困难负例', 'benign_nonliteral': '非字面正常任务', 'legacy': '早期 README 场景',
+             'direct-user': '直接注入',
              'custom': '自定义'}
 
+# Decision table (first match wins), as in the design document, table 5-2.
+DECISION_TABLE = [
+    {'id': 'POL-*', 'no': '1／1b', 'cond': '命中语义策略：风险为 R3 时阻断，风险降为 R2 时挂起', 'verdict': 'BLOCK／ASK'},
+    {'id': 'DT-2a', 'no': '2a', 'cond': '参数命中机密指纹，且目标为外发出口', 'verdict': 'BLOCK'},
+    {'id': 'DT-2b', 'no': '2b', 'cond': '上下文持有机密，外发至未授权目标但未命中指纹', 'verdict': 'ASK'},
+    {'id': 'DT-3', 'no': '3', 'cond': '在用户字面授权内，且无机密外流', 'verdict': 'ALLOW'},
+    {'id': 'DT-4i', 'no': '4i', 'cond': '上下文含直接注入特征的用户输入，超出授权的敏感或高风险动作', 'verdict': 'ASK'},
+    {'id': 'DT-4a', 'no': '4a', 'cond': '超出授权，敏感目标，命中外部指令', 'verdict': 'ASK'},
+    {'id': 'DT-4b', 'no': '4b', 'cond': '超出授权，敏感目标，未命中外部指令', 'verdict': 'ASK'},
+    {'id': 'DT-4c', 'no': '4c', 'cond': '超出授权，非敏感但高风险，上下文含请求污染来源', 'verdict': 'ASK'},
+    {'id': 'DT-4c-EGRESS', 'no': '4c2', 'cond': '超出授权，上下文无请求污染，但向未授权目标外发', 'verdict': 'ASK'},
+    {'id': 'DT-4c-S1', 'no': '4c′', 'cond': '超出授权，非敏感但高风险，快镜判定全部来源未提出请求', 'verdict': 'ALLOW'},
+    {'id': 'DT-4d', 'no': '4d', 'cond': '超出授权，非敏感且低风险（读取、GET）', 'verdict': 'ALLOW'},
+    {'id': 'DT-4e', 'no': '4e', 'cond': '超出授权，高风险，上下文从未摄入不可信内容', 'verdict': 'ALLOW'},
+    {'id': 'DT-5', 'no': '5', 'cond': '动作涉及覆盖不足项，且属于高风险', 'verdict': 'ASK'},
+    {'id': 'DT-6', 'no': '6', 'cond': '其余情况：高风险挂起，低风险放行并记录', 'verdict': 'ASK／ALLOW'},
+]
 
 # Host-control calls go to the per-run loopback service; a system or environment
 # proxy must never sit between the console and that service.
@@ -438,8 +456,9 @@ class Console:
                 s[key + '_held'] += 1
         out = []
         for data in self._scenario_files():
-            out.append({'id': data['id'], 'category': data.get('category'), 'family': data.get('family'),
-                        'family_label': FAMILY_ZH.get(data.get('family'), data.get('family')),
+            fam = 'cve' if data['id'].startswith('cve-') or data['id'] == 'g-ide-autoapprove' else data.get('family')
+            out.append({'id': data['id'], 'category': data.get('category'), 'family': fam,
+                        'family_label': FAMILY_ZH.get(fam, fam) or '演示场景',
                         'language': data.get('language'), 'attack_source': data.get('attack_source'),
                         'task': mask(data.get('task')), 'payload_text': mask(data.get('payload_text')),
                         'expected_decision': data.get('expected_decision'),
@@ -549,13 +568,11 @@ class Console:
                 verdict_of[k].update(v)
             for k, v in (r.get('rule_reasons') or {}).items():
                 reasons.setdefault(k, v)
-        for rule in ('DT-4c-S1','DT-4c-EGRESS','POL-TOOL-BUDGET'):
-            hits.setdefault(rule,0)
-            reasons.setdefault(rule,'当前索引中尚无命中记录')
         cfg_path = os.environ.get('D2_S1_CONFIG') or (str(self.repo / '.local/s1.json') if (self.repo / '.local/s1.json').is_file() else None)
         cfg = self._load(Path(cfg_path), {}) if cfg_path else self._load(self.repo / '.local/stage-d5/s1-enabled-config.json', self._load(self.repo / '.local/stage-d4/s1-enabled-config.json', {}))
-        runtime_mode = 'add_risk' if os.environ.get('D2_S1_DISABLE') == '1' else cfg.get('decision_mode', 'add_risk')
-        return {'runtime_mode':runtime_mode, 'dsl': dsl, 'hits': dict(hits), 'reasons': reasons, 'verdicts': {k: dict(v) for k, v in verdict_of.items()}}
+        latest = next((r.get('decision_mode') for r in self._done() if r['protection'] == 'on' and r.get('decision_mode') not in (None, 'unknown')), None)
+        runtime_mode = 'rules_only' if os.environ.get('D2_S1_DISABLE') == '1' else cfg.get('decision_mode') or latest or 'taint_gate'
+        return {'runtime_mode':runtime_mode, 'dsl': dsl, 'table': DECISION_TABLE, 'hits': dict(hits), 'reasons': reasons, 'verdicts': {k: dict(v) for k, v in verdict_of.items()}}
 
     # ---------- launching real runs ----------
     @staticmethod

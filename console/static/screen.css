@@ -268,7 +268,7 @@ body.scr-full .scr::before, body.scr-full .scr-bg { left: 0; }
 .spine { position: relative; display: flex; flex-direction: column; align-items: center; padding: 6px 0; }
 .spine-core { width: 70px; height: 70px; border-radius: 50%; display: grid; place-items: center; text-align: center; font-weight: 900; font-size: 15px; color: #fff; line-height: 1.1; margin-bottom: 10px;
   background: radial-gradient(circle at 35% 30%, #3b82f6, #1e3a8a 60%, #0b1430); box-shadow: 0 0 0 1px rgba(147, 197, 253, .5), 0 0 30px rgba(59, 130, 246, .55), inset 0 0 18px rgba(34, 211, 238, .4); }
-.spine-core small { display: block; font-size: 10px; font-weight: 700; color: #a5f3fc; letter-spacing: 1px; }
+.spine-core img { width: 46px; height: 46px; }
 .spine ol { list-style: none; margin: 0; padding: 0; width: 100%; display: flex; flex-direction: column; gap: 10px; position: relative; }
 .spine ol::before { content: ""; position: absolute; left: 50%; top: 10px; bottom: 10px; width: 2px; margin-left: -1px; background: linear-gradient(180deg, rgba(56, 189, 248, .5), rgba(167, 139, 250, .5)); }
 .spine li { position: relative; z-index: 1; margin: 0 auto; width: 112px; text-align: center; font-size: 12px; font-weight: 700; color: var(--s-muted); padding: 6px 4px; border-radius: 9px; border: 1px solid var(--s-line); background: #08122b; transition: all .25s; }

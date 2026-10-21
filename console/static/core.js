@@ -277,7 +277,7 @@ function renderApprovals(job) {
   if (key === approvalView) return;
   approvalView = key; box.hidden = !pending.length || inline;
   box.innerHTML = pending.map((a) => `<div>
-    <h3>⏸ D²Guard 拦下了一个操作，等你决定</h3>
+    <h3>⏸ D²Guard 已挂起一项操作，等待审批</h3>
     <p>Agent 已暂停在这一步，操作<b>尚未执行</b>。批准只放行下面这一次调用；拒绝后 Agent 跳过它，继续原任务；也可以拒绝并直接结束本次任务。</p>
     <p><b>${esc(a.tool)}</b> · ${a.agent_id === 'main' ? '主 Agent' : esc(a.agent_id)} · <span class="mono">${esc(a.rule_id)}</span></p>
     <pre class="code">${esc(JSON.stringify(a.args, null, 2))}</pre><p>${esc(a.reason)}</p>

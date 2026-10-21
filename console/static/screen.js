@@ -1,5 +1,5 @@
 'use strict';
-// 攻防大屏：主体评测指标、运行时防御链路、“同一攻击 · 两种结局”证据回放、安全链 vs 原始上下文、攻击家族与三臂消融。
+// 攻防大屏：评测指标、运行时防御链路、“同一攻击 · 两种结局”证据回放、安全链 vs 原始上下文、攻击家族与三臂消融。
 // 页面不写死任何结果数字：指标来自 /api/summary（console/data/evaluation-summary.json），
 // 回放与曲线来自 /api/replay、/api/compaction 对 runs/ 运行证据的只读投影。
 
@@ -35,12 +35,12 @@ PAGES.screen = async (el, args) => {
   <div class="scr" id="scr">
     <canvas class="scr-bg" id="scr-bg"></canvas>
     ${scrHeader(summary, mode, full)}
-    ${summary ? kpiRibbon(summary) : `<div class="scr-note">未找到主体评测汇总 <span class="mono">console/data/evaluation-summary.json</span>：已隐藏评测指标、攻击家族与消融板块。下方回放与曲线仍直接读取运行证据。</div>`}
+    ${summary ? kpiRibbon(summary) : `<div class="scr-note">未找到评测汇总 <span class="mono">console/data/evaluation-summary.json</span>：已隐藏评测指标、攻击家族与消融板块。下方回放与曲线仍直接读取运行证据。</div>`}
     ${pipelinePanel(summary)}
     ${duelPanel(pairs)}
     ${cmpPanel(comp.runs || [], summary)}
     ${summary ? `<div class="scr-grid2">${famPanel(summary)}${ablPanel(summary, mode)}</div>` : ''}
-    <div class="sp-src" style="text-align:center;margin-top:4px">指标取自主体评测汇总 evaluation-summary.json；回放、曲线取自 runs/ 运行证据，只读投影，不重算、不改写任何裁决；合成凭据已脱敏。</div>
+    <div class="sp-src" style="text-align:center;margin-top:4px">指标取自评测汇总 evaluation-summary.json；回放、曲线取自 runs/ 运行证据，只读投影，不重算、不改写任何裁决；合成凭据已脱敏。</div>
   </div>`;
   startBackdrop();
   startClock();
@@ -64,7 +64,7 @@ function toggleFull() {
 
 // ---------------- header, clock, backdrop ----------------
 function scrHeader(s, mode, full) {
-  const batch = s ? `主体评测（83 个场景 × 4 种条件 × 3 次）· ${esc(s.cells)} 次运行` : '主体评测汇总缺失';
+  const batch = s ? `评测（${esc(s.scenarios || '')} 个场景 × 4 种条件）· ${esc(s.cells)} 次运行` : '评测汇总缺失';
   return `
   <header class="scr-head">
     <div class="scr-brand">
@@ -169,7 +169,7 @@ function kpiRibbon(s) {
   const off = r1(rate(s.off_asr)), on = r1(rate(s.on_asr));
   const doneOff = r1(rate(s.clean_off_done)), doneOn = r1(rate(s.clean_on_done));
   const benign = s.benign_hold, local = s.local_path, L = s.latency_ms || {};
-  const src = esc(`主体评测 ${s.cells} 次运行`);
+  const src = esc(`评测 ${s.cells} 次运行`);
   const tile = (style, body, srcTxt = src) => `<div class="kt" style="${style}">${body}<div class="kt-src">${srcTxt}</div></div>`;
   const tiles = [];
   if (off != null && on != null) tiles.push(tile('--kc:#ff4d61;--kg:rgba(255,77,97,.2)', `
@@ -323,7 +323,7 @@ function duelPanel(pairs) {
     <div class="duel-body">
       <div class="dl off" id="dl-off"></div>
       <div class="spine" id="spine">
-        <div class="spine-core">D²<small>GUARD</small></div>
+        <div class="spine-core"><img src="logo.svg" alt="D²Guard"></div>
         <ol>${[['原生 Agent', 'Pi CLI'], ['三组件', 'Hook·网关·MCP'], ['增量安全链', '安全要素入链'], ['双镜内核', '规则＋快镜'], ['三态裁决', 'ALLOW/ASK/BLOCK'], ['溯源', 'DAG·时序']]
           .map(([a, b], i) => `<li data-st="${i}">${a}<small>${b}</small></li>`).join('')}</ol>
         <div class="spine-cap">两路运行同一内核<br>关闭时只记录“本应裁决”</div>
@@ -685,7 +685,7 @@ function cmpSide(d) {
       <span>裁决快照峰值</span><b>${kb(d.decision_state_max_bytes)}</b>
       ${d.chain_state_max_bytes != null ? `<span>安全链状态峰值</span><b>${kb(d.chain_state_max_bytes)}</b>` : ''}
       <span>内核裁决</span><b>${d.decisions.length} 次</b></div>
-    ${ev ? `<div class="cp-list"><span class="h">主体评测 · ${esc(ev.runs)} 次运行</span>
+    ${ev ? `<div class="cp-list"><span class="h">压缩统计 · ${esc(ev.runs)} 次运行</span>
       <span>中位压缩比</span><b>×${Number(ev.median).toFixed(1)}</b>
       <span>最大压缩比</span><b>×${Number(ev.max).toFixed(1)}</b></div>` : ''}`;
 }
@@ -698,13 +698,13 @@ function famPanel(s) {
   return `
   <section class="sp">
     <div class="sp-h"><div><div class="sp-t">攻击家族 · 防护前后 <small>${fams.length} 类</small></div>
-      <div class="sp-d">各家族攻击成功率：防护关闭（红）vs 开启（青），分母为模型有效且可判分的攻击运行。</div></div><div class="sp-src">主体评测 ${esc(s.cells)} 次运行</div></div>
+      <div class="sp-d">各家族攻击成功率：防护关闭（红）vs 开启（青），分母为模型有效且可判分的攻击运行。</div></div><div class="sp-src">评测 ${esc(s.cells)} 次运行</div></div>
     <div class="fam">
       <div class="fam-head"><span>攻击家族</span><span>攻击成功率</span><span style="text-align:right">发起攻击</span></div>
       ${fams.map((f) => `<div class="fam-row">
         <div class="fam-n"><b>${esc(f.label)}</b><small>${esc(f.cells)} 次运行</small></div>
         <div class="fam-bars"><span>关闭</span>${bar(f.off_asr, 'atk')}<span>开启</span>${bar(f.on_asr, 'def')}</div>
-        <div class="fam-c"><b>${f.off_asr_attempted ? esc(f.off_asr_attempted.d) : '—'}</b><small>关闭侧发起攻击轮次</small></div></div>`).join('')}
+        <div class="fam-c"><b>${f.off_asr_attempted ? esc(f.off_asr_attempted.d) : '—'}</b><small>防护关闭时发起攻击</small></div></div>`).join('')}
       ${skipped.length ? `<div class="fam-foot">${esc(skipped.join('、'))}：攻击成功率分母为 0（无可判定攻击格），未列入。</div>` : ''}
     </div>
   </section>`;
@@ -730,7 +730,7 @@ function ablPanel(s, mode) {
   const base = champ ? arms.filter((a) => a !== champ && a.ok).sort((a, b) => r(b.ok) - r(a.ok))[0] : null;
   const delta = champ && base ? `<div class="ab-delta"><span class="h">${esc(base.arm)} → ${esc(champ.arm)}</span>
     <span>攻击成功 <b>${fracTxt(base.atk)}</b><i>→</i><b class="g">${fracTxt(champ.atk)}</b></span>
-    <span>拦截 <b>${fracTxt(base.icp)}</b><i>→</i><b class="g">${fracTxt(champ.icp)}</b></span>
+    <span>尝试拦截 <b>${fracTxt(base.icp)}</b><i>→</i><b class="g">${fracTxt(champ.icp)}</b></span>
     <span>正常完成 <b>${fracTxt(base.ok)}</b><i>→</i><b class="g">${fracTxt(champ.ok)}</b></span></div>` : '';
   const modes = Object.entries(s.ablation || {});
   const sameBenign = modes.length && modes.every(([, v]) => JSON.stringify(v.benign_hold) === JSON.stringify(modes[0][1].benign_hold));
@@ -738,14 +738,14 @@ function ablPanel(s, mode) {
   return `
   <section class="sp">
     <div class="sp-h"><div><div class="sp-t">三臂消融 <small>快镜的价值</small></div>
-      <div class="sp-d">${champions.length === 1 ? `只有 ${esc(champions[0].arm)} 臂在攻击成功、拦截、正常完成三项上同时最优。` : '三种污染判定口径的对照。'}</div></div><div class="sp-src">消融实验</div></div>
+      <div class="sp-d">${champions.length === 1 ? `只有 ${esc(champions[0].arm)} 臂在攻击成功、攻击尝试拦截、正常完成三项上同时最优。拦截的分母为发起攻击尝试的运行。` : '三种污染判定口径的对照。'}</div></div><div class="sp-src">消融实验</div></div>
     <div class="ab">${arms.map((a) => { const [tc, tt] = tag(a); return `<div class="ab-arm ${champions.includes(a) ? 'best' : ''}">
       <div class="ab-k"><b>${esc(a.arm)}</b><span>${esc(a.label)}</span></div>
-      <div class="ab-m">${metric(a, 'atk', '攻击成功', 'linear-gradient(90deg,#9f1239,#ff4d61)')}${metric(a, 'icp', '拦截', 'linear-gradient(90deg,#0e7490,#22d3ee)')}${metric(a, 'ok', '正常完成', 'linear-gradient(90deg,#047857,#34d399)')}</div>
+      <div class="ab-m">${metric(a, 'atk', '攻击成功', 'linear-gradient(90deg,#9f1239,#ff4d61)')}${metric(a, 'icp', '攻击尝试拦截', 'linear-gradient(90deg,#0e7490,#22d3ee)')}${metric(a, 'ok', '正常完成', 'linear-gradient(90deg,#047857,#34d399)')}</div>
       <div class="ab-tag ${tc}">${tt}</div></div>`; }).join('')}</div>
     ${delta}
     <div class="ab-extra">
-      ${modes.length ? `<div><div class="h">决策模式对照 · 拦截率</div>${modes.map(([k, v]) => `<div class="r"><span class="mono">${esc(k)}${k === mode ? ' <span style="color:var(--s-cyan)">（当前）</span>' : ''}</span><b>${fracTxt(v.interception)}</b></div>`).join('')}
+      ${modes.length ? `<div><div class="h">决策模式对照 · 攻击尝试拦截</div>${modes.map(([k, v]) => `<div class="r"><span class="mono">${esc(k)}${k === mode ? ' <span style="color:var(--s-cyan)">（当前）</span>' : ''}</span><b>${fracTxt(v.interception)}</b></div>`).join('')}
         ${sameBenign ? `<div class="r"><span>良性误挂起（三种模式）</span><b>${fracTxt(modes[0][1].benign_hold)}</b></div>` : ''}</div>` : ''}
       ${cOn && cOnP ? `<div><div class="h">业务连续性 · 正常任务完成</div>
         <div class="big"><span style="color:#cbd5f5">${pctTxt(r1(rate(cOn)))}</span><i>→</i><span style="color:#5eead4">${pctTxt(r1(rate(cOnP)))}</span></div>
